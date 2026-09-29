@@ -9,9 +9,11 @@ import {
 /** Prompt/configuration stays below its node; the upper area is for local edits. */
 export function NodeInspector({
   id,
+  viewportFitting,
   children,
 }: {
   id: string;
+  viewportFitting: boolean;
   children: ReactNode;
 }) {
   const node = useInternalNode(id);
@@ -20,6 +22,7 @@ export function NodeInspector({
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
   const panel = useRef<HTMLElement>(null);
+  const aligning = useRef(false);
   const [panelHeight, setPanelHeight] = useState(0);
   const [ready, setReady] = useState(false);
 
@@ -57,19 +60,24 @@ export function NodeInspector({
   const y = bottom + gap;
 
   useLayoutEffect(() => {
-    if (ready || !node?.measured.height || !panelHeight) return;
-    // Wait for an in-flight fitView to settle, then make room once before revealing.
-    const timer = setTimeout(() => {
-      const overflow = y + panelHeight - bottomLimit;
-      if (overflow > 0)
-        void flow
-          .setViewport({ ...viewport, y: viewport.y - overflow })
-          .then(() => setReady(true));
-      else setReady(true);
-    }, 80);
-    return () => clearTimeout(timer);
+    if (
+      ready ||
+      viewportFitting ||
+      aligning.current ||
+      !node?.measured.height ||
+      !panelHeight
+    )
+      return;
+    const overflow = y + panelHeight - bottomLimit;
+    if (overflow > 0) {
+      aligning.current = true;
+      void flow
+        .setViewport({ ...viewport, y: viewport.y - overflow })
+        .then(() => setReady(true));
+    } else setReady(true);
   }, [
     ready,
+    viewportFitting,
     node?.measured.height,
     panelHeight,
     y,

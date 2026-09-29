@@ -91,10 +91,7 @@ export function Preview({ id }: { id: string }) {
   const output: Output | undefined = values[0] ?? uploaded;
   if (output && "id" in output)
     return (
-      <div
-        key={output.id}
-        className={`preview nodrag ${values[0] ? "result-preview" : ""}`}
-      >
+      <div className={`preview nodrag ${values[0] ? "result-preview" : ""}`}>
         <img
           src={output.thumbUrl ?? undefined}
           alt={output.kind === "audio" ? "" : `${type.title} preview`}

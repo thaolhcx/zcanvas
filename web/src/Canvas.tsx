@@ -131,10 +131,13 @@ function Workspace({
     [zoom, setZoom] = useState(1),
     [menu, setMenu] = useState(false),
     [name, setName] = useState(graph.toRecipe().meta.name),
-    [inspector, setInspector] = useState<string>();
+    [inspector, setInspector] = useState<string>(),
+    [viewportFitting, setViewportFitting] = useState(false);
   const clipboard = useRef<Recipe | undefined>(undefined),
     upload = useRef<HTMLInputElement>(null),
     stopRun = useRef<(() => void) | undefined>(undefined),
+    fitSequence = useRef(0),
+    fitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     [submitting, setSubmitting] = useState(false);
   const activeNode = useCanvas((s) =>
       inspector ? s.byId[inspector] : undefined,
@@ -270,8 +273,20 @@ function Workspace({
       { nodeId: state.fromNode.id, port: state.fromHandle.id ?? "" },
     );
   };
-  const fit = () =>
-    void flow.fitView({ padding: 0.15, duration: motionDuration(200) });
+  const fitTo = (options: Parameters<typeof flow.fitView>[0], delay = 0) => {
+    clearTimeout(fitTimer.current);
+    const sequence = ++fitSequence.current;
+    setViewportFitting(true);
+    const apply = () =>
+      void flow.fitView(options).finally(() => {
+        if (sequence === fitSequence.current) setViewportFitting(false);
+      });
+    if (delay) fitTimer.current = setTimeout(apply, delay);
+    else apply();
+  };
+  const fit = () => fitTo({ padding: 0.15, duration: motionDuration(200) });
+  const scheduleFit = () =>
+    fitTo({ padding: 0.15, duration: motionDuration(200) }, 50);
   const remove = () =>
     action(() =>
       graph.transaction("user", () => {
@@ -318,7 +333,7 @@ function Workspace({
   const layout = () =>
     action(() => {
       graph.autoLayout();
-      setTimeout(fit, 50);
+      scheduleFit();
     });
   const start = async () => {
     const invalid = graph.validate()[0];
@@ -328,7 +343,7 @@ function Workspace({
         Object.keys(useCanvas.getState().fieldErrors)[0]?.split(".")[0];
       if (id) {
         setInspector(id);
-        void flow.fitView({
+        fitTo({
           nodes: [{ id }],
           maxZoom: 1,
           duration: motionDuration(250),
@@ -680,7 +695,7 @@ function Workspace({
           try {
             const recipe = JSON.parse(await file.text());
             graph.fromRecipe(recipe, "replace");
-            setTimeout(fit, 50);
+            scheduleFit();
           } catch (error) {
             useCanvas.setState({ error: String(error) });
           }
@@ -826,7 +841,11 @@ function Workspace({
         </div>
       )}
       {activeNode && (
-        <NodeInspector key={activeNode.id} id={activeNode.id}>
+        <NodeInspector
+          key={activeNode.id}
+          id={activeNode.id}
+          viewportFitting={viewportFitting}
+        >
           <header>
             <div className="inspector-heading">
               <span className="eyebrow">
