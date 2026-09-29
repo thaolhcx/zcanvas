@@ -464,7 +464,7 @@ function Workspace({
         defaultEdgeOptions={{ type: "smoothstep" }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={24} size={1} color="#374040" />
+        <Background gap={24} size={1} color="#c7cdd6" />
         {minimap && <MiniMap pannable zoomable />}
       </ReactFlow>
       <header className="topbar">
