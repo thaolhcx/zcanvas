@@ -45,6 +45,7 @@ import {
 import { estimateCredits } from "../../contracts/estimate.ts";
 import { BaseNode } from "./BaseNode.tsx";
 import { ParamForm } from "./Params.tsx";
+import { NodeInspector } from "./NodeInspector.tsx";
 import { useGraph } from "./context.ts";
 import { action, useCanvas, useRun, updateRun, EMPTY_ISSUES } from "./store.ts";
 import { post, followRun, request } from "./api.ts";
@@ -115,7 +116,6 @@ function Workspace({
     [inspector, setInspector] = useState<string>();
   const clipboard = useRef<Recipe | undefined>(undefined),
     upload = useRef<HTMLInputElement>(null),
-    inspectorPanel = useRef<HTMLElement>(null),
     stopRun = useRef<(() => void) | undefined>(undefined),
     [submitting, setSubmitting] = useState(false);
   const activeNode = useCanvas((s) =>
@@ -131,30 +131,6 @@ function Workspace({
       issues.filter((i) => incomplete.has(i.code)).map((i) => i.nodeId),
     ).size;
   const estimate = estimateCredits(graph.toRecipe(), graph.registry);
-  useEffect(() => {
-    if (!inspector) return;
-    const frame = requestAnimationFrame(() => {
-      const node = flow.getNode(inspector);
-      const panel = inspectorPanel.current;
-      if (!node?.measured?.height || !panel) return;
-      const bounds = flow.getNodesBounds([node]);
-      const viewport = flow.getViewport();
-      const top = innerWidth <= 640 ? 150 : 110;
-      const bottom = panel.getBoundingClientRect().top - 20;
-      const available = bottom - top;
-      if (available <= 0) return;
-      const screenTop = bounds.y * viewport.zoom + viewport.y;
-      const screenBottom = screenTop + bounds.height * viewport.zoom;
-      if (screenTop >= top && screenBottom <= bottom) return;
-      const zoom = Math.min(viewport.zoom, available / bounds.height);
-      void flow.setViewport({
-        x: innerWidth / 2 - (bounds.x + bounds.width / 2) * zoom,
-        y: top + available / 2 - (bounds.y + bounds.height / 2) * zoom,
-        zoom,
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [inspector, flow]);
   useEffect(() => {
     setName(graph.toRecipe().meta.name);
   }, [revision]);
@@ -793,11 +769,7 @@ function Workspace({
         </div>
       )}
       {activeNode && (
-        <aside
-          ref={inspectorPanel}
-          className="inspector"
-          aria-label="Node inspector"
-        >
+        <NodeInspector id={activeNode.id}>
           <header>
             <div>
               <span className="eyebrow">
@@ -809,6 +781,7 @@ function Workspace({
             </div>
             <div className="inspector-actions">
               <button
+                title="Duplicate node"
                 onClick={() => {
                   copy();
                   paste();
@@ -817,7 +790,7 @@ function Workspace({
                 <Copy size={14} />
                 Duplicate
               </button>
-              <button onClick={remove}>
+              <button title="Delete node" onClick={remove}>
                 <Trash2 size={14} />
                 Delete
               </button>
@@ -853,7 +826,7 @@ function Workspace({
               </p>
             ))}
           </div>
-        </aside>
+        </NodeInspector>
       )}
       {error && (
         <div className="action-error" role="alert">

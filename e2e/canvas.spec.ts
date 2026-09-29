@@ -266,7 +266,7 @@ test("optional audio.sfx appears, validates and runs without changing canvas com
   ).toBeVisible();
 });
 
-test("floating controls and bottom editor stay usable on a narrow canvas", async ({
+test("node editor follows selection, dragging, panning and zoom on a narrow canvas", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 900, height: 800 });
@@ -287,10 +287,32 @@ test("floating controls and bottom editor stay usable on a narrow canvas", async
   await page.getByTestId("node-input.prompt").locator("header").click();
   const inspector = page.getByRole("complementary", { name: "Node inspector" });
   await expect(inspector).toBeVisible();
-  const dock = (await inspector.boundingBox())!;
-  expect(dock.y).toBeGreaterThan(400);
-  expect(dock.x).toBeGreaterThanOrEqual(0);
-  expect(dock.x + dock.width).toBeLessThanOrEqual(900);
+  async function expectAttached(node: ReturnType<Page["getByTestId"]>) {
+    await expect
+      .poll(async () => {
+        const target = await node.boundingBox();
+        const editor = await inspector.boundingBox();
+        if (!target || !editor) return false;
+        const side = await inspector.getAttribute("data-side");
+        const gap =
+          side === "right"
+            ? editor.x - target.x - target.width
+            : side === "left"
+              ? target.x - editor.x - editor.width
+              : side === "bottom"
+                ? editor.y - target.y - target.height
+                : target.y - editor.y - editor.height;
+        return (
+          Math.abs(gap - 16) < 2 &&
+          editor.x >= 0 &&
+          editor.y >= 0 &&
+          editor.x + editor.width <= 900 &&
+          editor.y + editor.height <= 800
+        );
+      })
+      .toBe(true);
+  }
+  await expectAttached(page.getByTestId("node-input.prompt"));
   await setParam(page, "text", "A mountain lake at sunrise");
   await expect(
     page.getByTestId("node-input.prompt").getByLabel("text", { exact: true }),
@@ -304,17 +326,44 @@ test("floating controls and bottom editor stay usable on a narrow canvas", async
   await page.getByRole("button", { name: "Fit view", exact: true }).click();
   const mediaNode = page.getByTestId("node-image.generate");
   await mediaNode.locator("header").click();
+  await expectAttached(mediaNode);
+  // Move the selected node towards the right edge: the editor must flip left.
+  const header = (await mediaNode.locator("header").boundingBox())!;
+  await page.mouse.move(
+    header.x + header.width / 2,
+    header.y + header.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(750, header.y + header.height / 2 - 80, { steps: 15 });
+  await page.mouse.up();
+  await expect(inspector).toHaveAttribute("data-side", "left");
+  await expectAttached(mediaNode);
+  const beforePan = (await mediaNode.boundingBox())!;
+  await page.mouse.move(850, 180);
+  await page.mouse.down({ button: "middle" });
+  await page.mouse.move(780, 220, { steps: 10 });
+  await page.mouse.up({ button: "middle" });
   await expect
-    .poll(async () => {
-      const media = (await mediaNode.boundingBox())!;
-      const editor = (await inspector.boundingBox())!;
-      return media.y + media.height <= editor.y - 10;
-    })
-    .toBe(true);
+    .poll(async () => (await mediaNode.boundingBox())!.x)
+    .toBeLessThan(beforePan.x - 30);
+  await expectAttached(mediaNode);
+  const beforeZoom = (await mediaNode.boundingBox())!;
+  const slider = page.getByRole("slider", { name: "Zoom" });
+  for (let i = 0; i < 5; i++) await slider.press("ArrowRight");
+  await expect
+    .poll(async () => (await mediaNode.boundingBox())!.width)
+    .toBeGreaterThan(beforeZoom.width + 5);
+  await expectAttached(mediaNode);
   await page.screenshot({
     path: "test-results/canvas-layout-media.png",
     fullPage: true,
   });
+  await page.mouse.move(850, 110);
+  await page.mouse.wheel(2000, 0);
+  await expect(inspector).not.toBeVisible();
+  await page.getByRole("button", { name: "Fit view", exact: true }).click();
+  await expect(inspector).toBeVisible();
+  await expectAttached(mediaNode);
   await page.getByRole("button", { name: "Close inspector" }).click();
   await page.getByRole("button", { name: "Add node", exact: true }).click();
   const palette = page.getByRole("dialog", { name: "Node palette" });

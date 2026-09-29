@@ -48,14 +48,16 @@ Use `/health`, the API/runner terminal output, and the run selector. Healthy beh
 ### Reference layout update — 2026-09-29
 
 The light theme now uses floating navigation and run controls, a left node palette,
-larger media previews, curved connections, and a bottom node editor. Opening the
-editor keeps the selected node above it. Preview images use `object-fit: contain`.
+larger media previews, curved connections, and an editor anchored 16 px from the
+selected node. The editor follows node dragging and canvas pan/zoom at a fixed
+readable size, flips sides at the viewport edge, and hides while its node is offscreen.
+Selecting a node does not move the camera. Preview images use `object-fit: contain`.
 
 Validation: production build and TypeScript checks passed. Four browser tests
-passed, including editing, focus, palette keyboard dismissal, and layout bounds
-at 900 × 800. The optional `audio.sfx` test was excluded from the final run because
+passed, including editing, selection changes, dragging, panning, zooming, edge
+placement, offscreen hiding/recovery, and palette keyboard dismissal at 900 × 800. The optional `audio.sfx` test was excluded from the final run because
 the running preview's registry has its eight default types and does not enable
 `ENABLE_SFX_EXAMPLE`.
 
-![Bottom editor at 900 px](evidence/canvas-layout-editor.png)
+![Node-attached editor at 900 px](evidence/canvas-layout-editor.png)
 ![Left node palette at 900 px](evidence/canvas-layout-palette.png)

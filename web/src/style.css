@@ -910,11 +910,6 @@ a {
 }
 .inspector {
   position: absolute;
-  left: 50%;
-  bottom: 80px;
-  transform: translateX(-50%);
-  width: min(760px, calc(100vw - 200px));
-  max-height: min(370px, calc(100vh - 220px));
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
@@ -935,6 +930,7 @@ a {
   border: 0;
 }
 .inspector h2 {
+  overflow-wrap: anywhere;
   font-size: 14px;
   margin: 4px 0 0;
   font-weight: 600;
@@ -942,14 +938,19 @@ a {
 }
 .inspector .params {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 16px;
 }
 .inspector-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
   margin-left: auto;
+}
+.inspector .inspector-actions button {
+  font-size: 0;
+  gap: 0;
 }
 .inspector-body {
   padding: 16px 18px 18px;
@@ -1165,12 +1166,6 @@ a {
   .run-controls select {
     max-width: 105px;
   }
-  .inspector {
-    width: calc(100vw - 120px);
-    left: auto;
-    right: 20px;
-    transform: none;
-  }
 }
 @media (max-width: 640px) {
   .topbar {
@@ -1185,18 +1180,6 @@ a {
   .palette {
     left: 74px;
     width: min(292px, calc(100vw - 86px));
-  }
-  .inspector {
-    width: calc(100vw - 32px);
-    right: 16px;
-    max-height: 40vh;
-  }
-  .inspector .params {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .inspector-actions button {
-    font-size: 0;
-    gap: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
