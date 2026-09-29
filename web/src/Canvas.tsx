@@ -7,6 +7,7 @@ import {
   useReactFlow,
   type Connection,
   type Node,
+  type OnConnectStart,
   type OnConnectEnd,
   type XYPosition,
 } from "@xyflow/react";
@@ -41,6 +42,7 @@ import {
   type Recipe,
   type Run,
   type NodeType,
+  type Kind,
 } from "../../contracts/index.ts";
 import { estimateCredits } from "../../contracts/estimate.ts";
 import { BaseNode } from "./BaseNode.tsx";
@@ -67,6 +69,19 @@ const categoryIcons = {
   text: Type,
 };
 const incomplete = new Set(["INPUT_REQUIRED", "PARAM_REQUIRED"]);
+const acceptsKind = (output: Kind | Kind[], input: Kind | Kind[]) => {
+  const outputs = Array.isArray(output) ? output : [output],
+    inputs = Array.isArray(input) ? input : [input];
+  return outputs.some((actual) =>
+    inputs.some(
+      (declared) =>
+        declared === "any" ||
+        actual === "any" ||
+        declared === actual ||
+        (actual.startsWith("list<") && declared === actual.slice(5, -1)),
+    ),
+  );
+};
 type Palette = {
   position: XYPosition;
   source?: { nodeId: string; port: string };
@@ -209,7 +224,36 @@ function Workspace({
         targetPort: connection.targetHandle ?? "",
       }),
     );
+  const connectStart: OnConnectStart = (
+    _,
+    { nodeId, handleId, handleType },
+  ) => {
+    if (handleType !== "source" || !nodeId || !handleId) {
+      useCanvas.setState({ compat: undefined });
+      return;
+    }
+    const byId = useCanvas.getState().byId,
+      source = byId[nodeId],
+      output =
+        source &&
+        graph.registry
+          .get(source.type)
+          ?.outputs.find((p) => p.key === handleId);
+    if (!output) {
+      useCanvas.setState({ compat: undefined });
+      return;
+    }
+    const compat = new Set<string>();
+    for (const [id, node] of Object.entries(byId)) {
+      if (id === nodeId) continue;
+      for (const input of graph.registry.get(node.type)?.inputs ?? [])
+        if (acceptsKind(output.kind, input.kind))
+          compat.add(`${id}.${input.key}`);
+    }
+    useCanvas.setState({ compat });
+  };
   const connectEnd: OnConnectEnd = (event, state) => {
+    useCanvas.setState({ compat: undefined });
     if (
       state.isValid ||
       state.toNode ||
@@ -415,6 +459,7 @@ function Workspace({
         onEdgesChange={onEdgesChange}
         onSelectionChange={select}
         onConnect={connect}
+        onConnectStart={connectStart}
         isValidConnection={validConnection}
         onConnectEnd={connectEnd}
         onNodeDragStop={(_, node, dragged) =>

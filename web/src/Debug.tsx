@@ -65,18 +65,20 @@ export function Debug() {
     handle = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(handle);
   }, []);
-  const add = async (count: number) => {
+  const add = async (count: number, withInputs = false) => {
     try {
       const asset = await post<Asset>("/debug/asset");
       action(() =>
         graph.transaction("script", () => {
           const existing = graph.toRecipe().nodes.length;
-          for (let i = 0; i < count; i++)
-            graph.addNode("input.asset", {
+          for (let i = 0; i < count; i++) {
+            const type = withInputs && i % 2 ? "image.generate" : "input.asset";
+            graph.addNode(type, {
               label: `Frame ${existing + i + 1}`,
-              params: { asset: asset.id },
+              params: type === "input.asset" ? { asset: asset.id } : {},
               position: { x: (i % 16) * 320, y: Math.floor(i / 16) * 380 },
             });
+          }
         }),
       );
       setTimeout(() => flow.fitView(), 80);
@@ -103,6 +105,7 @@ export function Debug() {
             +{n}
           </button>
         ))}
+        <button onClick={() => void add(128, true)}>+128 ports</button>
       </div>
       <small>Production build · measure while dragging</small>
       {run?.status === "running" && (

@@ -73,12 +73,18 @@ function App() {
             "replace",
           );
         setSeed(undefined);
-        useRun.setState({ run: undefined, jobs: {}, snapshots: {} });
+        useRun.setState({
+          run: undefined,
+          jobs: {},
+          snapshots: {},
+          changed: {},
+        });
         useCanvas.setState({
           nodes: [],
           edges: [],
           byId: {},
           issues: {},
+          compat: undefined,
           fieldErrors: {},
           selected: [],
           selectedEdges: [],

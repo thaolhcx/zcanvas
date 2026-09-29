@@ -26,6 +26,7 @@ export interface CanvasState {
   selectedEdges: string[];
   revision: number;
   compact: boolean;
+  compat?: Set<string>;
   error: string;
   fieldErrors: Record<string, string>;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -40,6 +41,7 @@ export const useCanvas = create<CanvasState>((set, get) => ({
   selectedEdges: [],
   revision: 0,
   compact: false,
+  compat: undefined,
   error: "",
   fieldErrors: {},
   onNodesChange(changes) {
@@ -63,29 +65,57 @@ export interface RunState {
   run?: Run;
   snapshots: Record<string, Recipe>;
   jobs: Record<string, Job[]>;
+  changed: Record<string, boolean>;
 }
-export const useRun = create<RunState>(() => ({ snapshots: {}, jobs: {} }));
+export const useRun = create<RunState>(() => ({
+  snapshots: {},
+  jobs: {},
+  changed: {},
+}));
 const equal = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
+const changedNodes = (
+  snapshot: Recipe | undefined,
+  byId: CanvasState["byId"],
+) => {
+  const changed: Record<string, boolean> = {};
+  for (const node of snapshot?.nodes ?? [])
+    if (byId[node.id] && !equal(node.params, byId[node.id].params))
+      changed[node.id] = true;
+  return changed;
+};
 export function updateRun(run: Run) {
-  const previous = useRun.getState().jobs,
+  const state = useRun.getState(),
+    previous = state.jobs,
     jobs: Record<string, Job[]> = {};
   for (const job of run.jobs) (jobs[job.nodeId] ??= []).push(job);
   for (const id in jobs)
     if (equal(jobs[id], previous[id])) jobs[id] = previous[id];
-  useRun.setState({ run, jobs });
+  const nextChanged = changedNodes(
+    state.snapshots[run.runId],
+    useCanvas.getState().byId,
+  );
+  useRun.setState({
+    run,
+    jobs,
+    changed: equal(nextChanged, state.changed) ? state.changed : nextChanged,
+  });
 }
 export function bindGraph(graph: Graph) {
   const sync = (changed?: string[]) => {
     const r = graph.toRecipe(),
       previous = useCanvas.getState();
+    const recipeNodes = new Map(r.nodes.map((node) => [node.id, node])),
+      oldNodes = new Map(previous.nodes.map((node) => [node.id, node])),
+      oldEdges = new Map(previous.edges.map((edge) => [edge.id, edge])),
+      groups = new Map(r.groups.map((group) => [group.id, group])),
+      changedIds = changed && new Set(changed);
     const byId = { ...previous.byId };
-    for (const id in byId)
-      if (!r.nodes.some((n) => n.id === id)) delete byId[id];
+    for (const id in byId) if (!recipeNodes.has(id)) delete byId[id];
     for (const n of r.nodes)
-      if (!changed || changed.includes(n.id) || !byId[n.id]) byId[n.id] = n;
+      if (!changedIds || changedIds.has(n.id) || !byId[n.id]) byId[n.id] = n;
     const nodes: Node[] = r.groups.map((g) => {
-      const old = previous.nodes.find((n) => n.id === g.id);
+      const old = oldNodes.get(g.id);
       const next: Node = {
         id: g.id,
         type: "group",
@@ -103,13 +133,13 @@ export function bindGraph(graph: Graph) {
         : next;
     });
     for (const n of r.nodes) {
-      const old = previous.nodes.find((node) => node.id === n.id),
-        group = r.groups.find((g) => g.id === n.groupId);
+      const old = oldNodes.get(n.id),
+        group = n.groupId ? groups.get(n.groupId) : undefined;
       if (
         old &&
         old.data.model === byId[n.id] &&
         old.parentId === group?.id &&
-        !changed?.includes(n.id)
+        !changedIds?.has(n.id)
       ) {
         nodes.push(old);
         continue;
@@ -132,14 +162,14 @@ export function bindGraph(graph: Graph) {
       });
     }
     const edges = r.edges.map((e) => {
-      const old = previous.edges.find((edge) => edge.id === e.id);
-      const source = r.nodes.find((n) => n.id === e.source),
+      const old = oldEdges.get(e.id);
+      const source = recipeNodes.get(e.source),
         port =
           source &&
           graph.registry
             .get(source.type)
             ?.outputs.find((p) => p.key === e.sourcePort);
-      const target = r.nodes.find((n) => n.id === e.target),
+      const target = recipeNodes.get(e.target),
         targetPort =
           target &&
           graph.registry
@@ -180,6 +210,13 @@ export function bindGraph(graph: Graph) {
         ),
       ),
     });
+    const runState = useRun.getState();
+    const snapshot = runState.run && runState.snapshots[runState.run.runId];
+    if (snapshot) {
+      const nextChanged = changedNodes(snapshot, byId);
+      if (!equal(nextChanged, runState.changed))
+        useRun.setState({ changed: nextChanged });
+    }
   };
   sync();
   return graph.subscribe((change) => sync(change.nodeIds));

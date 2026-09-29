@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Handle, Position, useConnection, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Image,
   Film,
@@ -11,7 +11,6 @@ import {
   WandSparkles,
 } from "lucide-react";
 import type { Asset, Output, RecipeNode } from "../../contracts/index.ts";
-import { validate } from "../../contracts/index.ts";
 import { useGraph } from "./context.ts";
 import { ParamForm } from "./Params.tsx";
 import {
@@ -33,10 +32,9 @@ const icons = {
 };
 export function Status({ id }: { id: string }) {
   const jobs = useRun((s) => s.jobs[id] ?? EMPTY_JOBS),
-    node = useCanvas((s) => s.byId[id]);
-  const run = useRun((s) => s.run),
-    snapshot = useRun((s) => s.run && s.snapshots[s.run.runId]);
-  if (!run) return null;
+    runStatus = useRun((s) => s.run?.status),
+    changed = useRun((s) => s.changed[id] ?? false);
+  if (!runStatus) return null;
   const states = jobs.map((j) => j.status),
     done = states.filter((s) => s === "done").length;
   const status = states.includes("failed")
@@ -44,7 +42,7 @@ export function Status({ id }: { id: string }) {
     : states.includes("running")
       ? "running"
       : states.includes("queued") || !states.length
-        ? run.status === "cancelled"
+        ? runStatus === "cancelled"
           ? "cancelled"
           : "queued"
         : states.every((s) => s === "skipped")
@@ -52,10 +50,6 @@ export function Status({ id }: { id: string }) {
           : states.includes("cancelled")
             ? "cancelled"
             : "done";
-  const previous = snapshot?.nodes.find((n) => n.id === id),
-    changed =
-      previous &&
-      JSON.stringify(previous.params) !== JSON.stringify(node?.params);
   return (
     <span
       className={`status ${status}`}
@@ -140,7 +134,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
     node = useCanvas((s) => s.byId[id]),
     compact = useCanvas((s) => s.compact),
     issues = useCanvas((s) => s.issues[id] ?? EMPTY_ISSUES),
-    connection = useConnection();
+    compat = useCanvas((s) => s.compat);
   const jobs = useRun((s) => s.jobs[id] ?? EMPTY_JOBS),
     runId = useRun((s) => s.run?.runId),
     runStatus = useRun((s) => s.run?.status);
@@ -151,28 +145,6 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
       (i) => !["INPUT_REQUIRED", "PARAM_REQUIRED"].includes(i.code),
     );
   const running = jobs.find((j) => j.status === "running");
-  const matches = (port: string) => {
-    if (
-      !connection.inProgress ||
-      !connection.fromNode ||
-      !connection.fromHandle
-    )
-      return true;
-    const recipe = graph.toRecipe();
-    recipe.edges = recipe.edges.filter(
-      (e) => e.target !== id || e.targetPort !== port,
-    );
-    recipe.edges.push({
-      id: "candidate",
-      source: connection.fromNode.id,
-      sourcePort: connection.fromHandle.id ?? "",
-      target: id,
-      targetPort: port,
-    });
-    return !validate(recipe, graph.registry).some(
-      (i) => !["INPUT_REQUIRED", "PARAM_REQUIRED"].includes(i.code),
-    );
-  };
   return (
     <article
       className={`canvas-node ${selected ? "selected" : ""} ${compact ? "compact" : ""} ${wrong.length ? "invalid" : ""}`}
@@ -233,7 +205,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
           title={`${p.label ?? p.key} · ${p.kind}`}
           style={{
             top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)`,
-            opacity: matches(p.key) ? 1 : 0.15,
+            opacity: !compat || compat.has(`${id}.${p.key}`) ? 1 : 0.15,
           }}
           className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
         />

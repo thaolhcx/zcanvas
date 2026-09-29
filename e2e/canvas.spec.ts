@@ -246,6 +246,10 @@ test("mock failure can be retried from canvas; fresh run uses cache; cancel is f
   await page.getByRole("button", { name: /^Run ·/ }).click();
   await page.getByRole("button", { name: "Cancel run" }).click();
   await expect(page.locator(".run-summary")).toContainText("Cancelled");
+  const promptNode = page.getByTestId("node-input.prompt");
+  await promptNode.locator("header").click();
+  await setParam(page, "text", `Changed after run ${Date.now()}`);
+  await expect(promptNode.locator(".status")).toContainText("changed");
   expect(promptId).toBeTruthy();
 });
 test("optional audio.sfx appears, validates and runs without changing canvas components", async ({
