@@ -28,6 +28,12 @@ import {
   Search,
   ChevronDown,
   Save,
+  Image as ImageIcon,
+  Film,
+  Music2,
+  Type,
+  GitBranch,
+  ArrowUpRight,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -50,6 +56,15 @@ const nodeTypes = {
   ),
 };
 const edgeTypes = {};
+const categoryIcons = {
+  input: Type,
+  image: ImageIcon,
+  video: Film,
+  audio: Music2,
+  flow: GitBranch,
+  output: ArrowUpRight,
+  text: Type,
+};
 const incomplete = new Set(["INPUT_REQUIRED", "PARAM_REQUIRED"]);
 type Palette = {
   position: XYPosition;
@@ -100,6 +115,7 @@ function Workspace({
     [inspector, setInspector] = useState<string>();
   const clipboard = useRef<Recipe | undefined>(undefined),
     upload = useRef<HTMLInputElement>(null),
+    inspectorPanel = useRef<HTMLElement>(null),
     stopRun = useRef<(() => void) | undefined>(undefined),
     [submitting, setSubmitting] = useState(false);
   const activeNode = useCanvas((s) =>
@@ -115,6 +131,30 @@ function Workspace({
       issues.filter((i) => incomplete.has(i.code)).map((i) => i.nodeId),
     ).size;
   const estimate = estimateCredits(graph.toRecipe(), graph.registry);
+  useEffect(() => {
+    if (!inspector) return;
+    const frame = requestAnimationFrame(() => {
+      const node = flow.getNode(inspector);
+      const panel = inspectorPanel.current;
+      if (!node?.measured?.height || !panel) return;
+      const bounds = flow.getNodesBounds([node]);
+      const viewport = flow.getViewport();
+      const top = innerWidth <= 640 ? 150 : 110;
+      const bottom = panel.getBoundingClientRect().top - 20;
+      const available = bottom - top;
+      if (available <= 0) return;
+      const screenTop = bounds.y * viewport.zoom + viewport.y;
+      const screenBottom = screenTop + bounds.height * viewport.zoom;
+      if (screenTop >= top && screenBottom <= bottom) return;
+      const zoom = Math.min(viewport.zoom, available / bounds.height);
+      void flow.setViewport({
+        x: innerWidth / 2 - (bounds.x + bounds.width / 2) * zoom,
+        y: top + available / 2 - (bounds.y + bounds.height / 2) * zoom,
+        zoom,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [inspector, flow]);
   useEffect(() => {
     setName(graph.toRecipe().meta.name);
   }, [revision]);
@@ -461,41 +501,61 @@ function Workspace({
         panOnDrag={[1, 2]}
         multiSelectionKeyCode="Shift"
         selectionKeyCode="Shift"
-        defaultEdgeOptions={{ type: "smoothstep" }}
+        defaultEdgeOptions={{ type: "default" }}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={24} size={1} color="#c7cdd6" />
         {minimap && <MiniMap pannable zoomable />}
       </ReactFlow>
       <header className="topbar">
-        <div className="canvas-heading">
+        <div className="workspace-navigation">
           <button
-            className="icon-button"
+            className="back-button"
             aria-label="Back to canvases"
             onClick={onBack}
           >
             <ArrowLeft size={18} />
           </button>
-          <span className="brand-mark">Z</span>
-          <input
-            className="canvas-name"
-            aria-label="Canvas name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => action(() => graph.setName(name))}
-          />
-          <button
-            className="icon-button"
-            aria-label="Canvas menu"
-            onClick={() => setMenu(!menu)}
-          >
-            <ChevronDown size={15} />
-          </button>
+          <div className="canvas-heading">
+            <span className="brand-mark">Z</span>
+            <input
+              className="canvas-name"
+              aria-label="Canvas name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => action(() => graph.setName(name))}
+            />
+            <button
+              className="icon-button"
+              aria-label="Canvas menu"
+              onClick={() => setMenu(!menu)}
+            >
+              <ChevronDown size={15} />
+            </button>
+            <span className="toolbar-divider" />
+            <button
+              className="icon-button"
+              aria-label="Undo"
+              title="Undo ⌘Z"
+              onClick={() => action(() => graph.undo())}
+            >
+              <Undo2 size={17} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Redo"
+              title="Redo ⇧⌘Z"
+              onClick={() => action(() => graph.redo())}
+            >
+              <Redo2 size={17} />
+            </button>
+          </div>
           <span
             className={`sync ${syncStatus === "connected" ? "" : "offline"}`}
           >
+            <span className="sync-dot" />
             {syncStatus === "connected"
-              ? "Saved locally · synced"
+              ? "All changes saved"
               : "Offline · saved locally"}
           </span>
         </div>
@@ -599,34 +659,27 @@ function Workspace({
           className="add-button"
           aria-label="Add node"
           title="Add node /"
-          onClick={() => openPalette()}
+          aria-expanded={Boolean(palette)}
+          onClick={() => (palette ? setPalette(undefined) : openPalette())}
         >
-          <Plus size={21} />
+          {palette ? <X size={21} /> : <Plus size={21} />}
         </button>
         <span />
-        <button aria-label="Fit view" title="Fit view F" onClick={fit}>
-          <Maximize size={18} />
-        </button>
-        <button aria-label="Auto layout" onClick={layout}>
-          <Workflow size={18} />
-        </button>
-        <span />
-        <button
-          aria-label="Undo"
-          title="Undo ⌘Z"
-          onClick={() => action(() => graph.undo())}
-        >
-          <Undo2 size={18} />
+        <button aria-label="Auto layout" title="Auto layout" onClick={layout}>
+          <Workflow size={19} />
         </button>
         <button
-          aria-label="Redo"
-          title="Redo ⇧⌘Z"
-          onClick={() => action(() => graph.redo())}
+          aria-label="Import recipe"
+          title="Import recipe"
+          onClick={() => upload.current?.click()}
         >
-          <Redo2 size={18} />
+          <Upload size={19} />
         </button>
       </nav>
       <div className="zoom-controls">
+        <button aria-label="Fit view" title="Fit view F" onClick={fit}>
+          <Maximize size={16} />
+        </button>
         <button
           aria-label="Toggle minimap"
           onClick={() => setMinimap(!minimap)}
@@ -687,6 +740,10 @@ function Workspace({
       )}
       {palette && (
         <div className="palette" role="dialog" aria-label="Node palette">
+          <div className="palette-heading">
+            {palette.source ? "Connect a node" : "Add a node"}
+            <span>Build your next step</span>
+          </div>
           <header>
             <Search size={17} />
             <input
@@ -708,13 +765,26 @@ function Workspace({
             </button>
           </header>
           <div className="palette-list">
-            {choices.map((entry) => (
-              <button key={entry.type} onClick={() => add(entry)}>
-                <span className="category-label">{entry.category}</span>
-                <strong>{entry.title}</strong>
-                <small>{entry.description}</small>
-              </button>
-            ))}
+            {choices.map((entry) => {
+              const Icon =
+                entry.type === "input.asset"
+                  ? Upload
+                  : (categoryIcons[
+                      entry.category as keyof typeof categoryIcons
+                    ] ?? Workflow);
+              return (
+                <button key={entry.type} onClick={() => add(entry)}>
+                  <span className="palette-icon">
+                    <Icon size={19} />
+                  </span>
+                  <span className="palette-copy">
+                    <strong>{entry.title}</strong>
+                    <small>{entry.description}</small>
+                  </span>
+                  <Plus className="palette-add" size={14} />
+                </button>
+              );
+            })}
             {!choices.length && <p>No compatible nodes.</p>}
           </div>
           <footer>
@@ -723,15 +793,34 @@ function Workspace({
         </div>
       )}
       {activeNode && (
-        <aside className="inspector" aria-label="Node inspector">
+        <aside
+          ref={inspectorPanel}
+          className="inspector"
+          aria-label="Node inspector"
+        >
           <header>
             <div>
               <span className="eyebrow">
                 {graph.registry.get(activeNode.type)!.category}
               </span>
               <h2>
-                {activeNode.label ?? graph.registry.get(activeNode.type)!.title}
+                {activeNode.label || graph.registry.get(activeNode.type)!.title}
               </h2>
+            </div>
+            <div className="inspector-actions">
+              <button
+                onClick={() => {
+                  copy();
+                  paste();
+                }}
+              >
+                <Copy size={14} />
+                Duplicate
+              </button>
+              <button onClick={remove}>
+                <Trash2 size={14} />
+                Delete
+              </button>
             </div>
             <button
               aria-label="Close inspector"
@@ -740,43 +829,30 @@ function Workspace({
               <X size={18} />
             </button>
           </header>
-          <label className="param">
-            <span>Label</span>
-            <input
-              aria-label="Node label"
-              defaultValue={activeNode.label ?? ""}
-              key={activeNode.id}
-              onBlur={(e) =>
-                action(() => graph.setLabel(activeNode.id, e.target.value))
-              }
-            />
-          </label>
-          <ParamForm node={activeNode} />
-          {activeIssues.map((issue, i) => (
-            <p
-              className={
-                incomplete.has(issue.code) ? "incomplete-note" : "field-error"
-              }
-              key={i}
-            >
-              {issue.message}
-            </p>
-          ))}
-          <footer>
-            <button
-              onClick={() => {
-                copy();
-                paste();
-              }}
-            >
-              <Copy size={14} />
-              Duplicate
-            </button>
-            <button onClick={remove}>
-              <Trash2 size={14} />
-              Delete
-            </button>
-          </footer>
+          <div className="inspector-body">
+            <label className="param node-label-field">
+              <span>Node name</span>
+              <input
+                aria-label="Node label"
+                defaultValue={activeNode.label ?? ""}
+                key={activeNode.id}
+                onBlur={(e) =>
+                  action(() => graph.setLabel(activeNode.id, e.target.value))
+                }
+              />
+            </label>
+            <ParamForm key={activeNode.id} node={activeNode} />
+            {activeIssues.map((issue, i) => (
+              <p
+                className={
+                  incomplete.has(issue.code) ? "incomplete-note" : "field-error"
+                }
+                key={i}
+              >
+                {issue.message}
+              </p>
+            ))}
+          </div>
         </aside>
       )}
       {error && (

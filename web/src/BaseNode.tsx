@@ -122,12 +122,7 @@ export function Preview({ id }: { id: string }) {
         )}
       </div>
     );
-  if (node.type === "input.prompt")
-    return (
-      <div className="text-preview">
-        {String(node.params.text ?? "Describe your scene below.")}
-      </div>
-    );
+  if (node.type === "input.prompt") return null;
   return (
     <div className="preview empty">
       <WandSparkles size={22} />
@@ -151,7 +146,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
     runStatus = useRun((s) => s.run?.status);
   if (!node) return null;
   const entry = graph.registry.get(node.type)!,
-    Icon = icons[entry.category],
+    Icon = node.type === "input.asset" ? Upload : icons[entry.category],
     wrong = issues.filter(
       (i) => !["INPUT_REQUIRED", "PARAM_REQUIRED"].includes(i.code),
     );
@@ -188,11 +183,11 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
         <button
           className="node-title nodrag"
           onDoubleClick={() => {
-            const label = prompt("Node label", node.label ?? entry.title);
+            const label = prompt("Node label", node.label || entry.title);
             if (label !== null) action(() => graph.setLabel(id, label));
           }}
         >
-          {node.label ?? entry.title}
+          {node.label || entry.title}
         </button>
         {issues.length > 0 && (
           <span
@@ -237,7 +232,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
           position={Position.Left}
           title={`${p.label ?? p.key} · ${p.kind}`}
           style={{
-            top: compact ? 14 + i * 20 : 64 + i * 28,
+            top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)`,
             opacity: matches(p.key) ? 1 : 0.15,
           }}
           className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
@@ -250,7 +245,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
           type="source"
           position={Position.Right}
           title={`${p.label ?? p.key} · ${p.kind}`}
-          style={{ top: compact ? 14 + i * 20 : 64 + i * 28 }}
+          style={{ top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)` }}
           className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
         />
       ))}

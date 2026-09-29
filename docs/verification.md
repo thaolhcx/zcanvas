@@ -44,3 +44,18 @@ Resolved issues include nested transaction rollback, stale worker writes after c
 ## Local operational check
 
 Use `/health`, the API/runner terminal output, and the run selector. Healthy behavior: jobs move to a terminal state, cancellation remains terminal, retry preserves upstream job IDs, and a repeated recipe has zero mock model charges. Search `runs`, `jobs`, `run_events` and `usage` by run ID when diagnosing an issue. For the first manual pilot session, Thao owns the usability check; stop a problematic run with Cancel and restart the local processes if needed. Do not remove Docker volumes to reset a process.
+
+### Reference layout update — 2026-09-29
+
+The light theme now uses floating navigation and run controls, a left node palette,
+larger media previews, curved connections, and a bottom node editor. Opening the
+editor keeps the selected node above it. Preview images use `object-fit: contain`.
+
+Validation: production build and TypeScript checks passed. Four browser tests
+passed, including editing, focus, palette keyboard dismissal, and layout bounds
+at 900 × 800. The optional `audio.sfx` test was excluded from the final run because
+the running preview's registry has its eight default types and does not enable
+`ENABLE_SFX_EXAMPLE`.
+
+![Bottom editor at 900 px](evidence/canvas-layout-editor.png)
+![Left node palette at 900 px](evidence/canvas-layout-palette.png)

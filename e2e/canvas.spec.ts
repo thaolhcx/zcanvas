@@ -265,3 +265,66 @@ test("optional audio.sfx appears, validates and runs without changing canvas com
     page.getByTestId("node-audio.sfx").locator(".waveform"),
   ).toBeVisible();
 });
+
+test("floating controls and bottom editor stay usable on a narrow canvas", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  await page.goto("/");
+  await waitApi(page);
+  await page.getByRole("button", { name: "New canvas", exact: true }).click();
+  await addNode(page, "Prompt");
+  await addNode(page, "Generate image");
+  await page.getByRole("button", { name: "Close inspector" }).click();
+  await page.getByRole("button", { name: "Auto layout", exact: true }).click();
+  const navigation = page.locator(".workspace-navigation");
+  const runControls = page.locator(".run-controls");
+  const left = (await navigation.boundingBox())!;
+  const right = (await runControls.boundingBox())!;
+  expect(left.x + left.width).toBeLessThan(right.x);
+  expect(right.x + right.width).toBeLessThanOrEqual(900);
+
+  await page.getByTestId("node-input.prompt").locator("header").click();
+  const inspector = page.getByRole("complementary", { name: "Node inspector" });
+  await expect(inspector).toBeVisible();
+  const dock = (await inspector.boundingBox())!;
+  expect(dock.y).toBeGreaterThan(400);
+  expect(dock.x).toBeGreaterThanOrEqual(0);
+  expect(dock.x + dock.width).toBeLessThanOrEqual(900);
+  await setParam(page, "text", "A mountain lake at sunrise");
+  await expect(
+    page.getByTestId("node-input.prompt").getByLabel("text", { exact: true }),
+  ).toHaveValue("A mountain lake at sunrise");
+  await page.screenshot({
+    path: "test-results/canvas-layout-editor.png",
+    fullPage: true,
+  });
+
+  await page.getByRole("button", { name: "Close inspector" }).click();
+  await page.getByRole("button", { name: "Fit view", exact: true }).click();
+  const mediaNode = page.getByTestId("node-image.generate");
+  await mediaNode.locator("header").click();
+  await expect
+    .poll(async () => {
+      const media = (await mediaNode.boundingBox())!;
+      const editor = (await inspector.boundingBox())!;
+      return media.y + media.height <= editor.y - 10;
+    })
+    .toBe(true);
+  await page.screenshot({
+    path: "test-results/canvas-layout-media.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Close inspector" }).click();
+  await page.getByRole("button", { name: "Add node", exact: true }).click();
+  const palette = page.getByRole("dialog", { name: "Node palette" });
+  await expect(
+    palette.getByRole("textbox", { name: "Search nodes" }),
+  ).toBeFocused();
+  await page.screenshot({
+    path: "test-results/canvas-layout-palette.png",
+    fullPage: true,
+  });
+  await palette.getByRole("textbox", { name: "Search nodes" }).press("Escape");
+  await expect(palette).not.toBeVisible();
+});
