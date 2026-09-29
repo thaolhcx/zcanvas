@@ -309,8 +309,12 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
       .toBe(true);
   }
   await expectAttached(page.getByTestId("node-input.prompt"));
-  const opened = (await inspector.boundingBox())!;
-  expect(opened.y + opened.height).toBeLessThanOrEqual(800);
+  await expect
+    .poll(async () => {
+      const opened = await inspector.boundingBox();
+      return opened ? opened.y + opened.height : Infinity;
+    })
+    .toBeLessThanOrEqual(800);
   await setParam(page, "text", "A mountain lake at sunrise");
   await expect(
     page.getByTestId("node-input.prompt").getByLabel("text", { exact: true }),

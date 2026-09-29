@@ -826,7 +826,7 @@ function Workspace({
         </div>
       )}
       {activeNode && (
-        <NodeInspector id={activeNode.id}>
+        <NodeInspector key={activeNode.id} id={activeNode.id}>
           <header>
             <div className="inspector-heading">
               <span className="eyebrow">

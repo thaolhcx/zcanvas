@@ -20,8 +20,8 @@ export function NodeInspector({
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
   const panel = useRef<HTMLElement>(null);
-  const positioned = useRef<string | undefined>(undefined);
   const [panelHeight, setPanelHeight] = useState(0);
+  const [ready, setReady] = useState(false);
 
   useLayoutEffect(() => {
     const element = panel.current!;
@@ -57,21 +57,38 @@ export function NodeInspector({
   const y = bottom + gap;
 
   useLayoutEffect(() => {
-    if (positioned.current === id || !node?.measured.height || !panelHeight)
-      return;
-    positioned.current = id;
-    // Make room once when opening the editor; dragging and panning remain free.
-    const overflow = y + panelHeight - bottomLimit;
-    if (overflow > 0)
-      void flow.setViewport({ ...viewport, y: viewport.y - overflow });
-  }, [id, node?.measured.height, panelHeight, y, bottomLimit, flow, viewport]);
+    if (ready || !node?.measured.height || !panelHeight) return;
+    // Wait for an in-flight fitView to settle, then make room once before revealing.
+    const timer = setTimeout(() => {
+      const overflow = y + panelHeight - bottomLimit;
+      if (overflow > 0)
+        void flow
+          .setViewport({ ...viewport, y: viewport.y - overflow })
+          .then(() => setReady(true));
+      else setReady(true);
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [
+    ready,
+    node?.measured.height,
+    panelHeight,
+    y,
+    bottomLimit,
+    flow,
+    viewport,
+  ]);
 
   const visible =
-    node && left + nodeWidth > 0 && left < width && bottom > 0 && top < height;
+    ready &&
+    node &&
+    left + nodeWidth > 0 &&
+    left < width &&
+    bottom > 0 &&
+    top < height;
   return (
     <aside
       ref={panel}
-      className="inspector"
+      className={`inspector ${ready ? "inspector-enter" : ""}`}
       aria-label="Node inspector"
       data-side="bottom"
       style={{

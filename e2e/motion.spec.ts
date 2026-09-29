@@ -12,6 +12,14 @@ test("motion follows the selected node and respects reduced motion", async ({
   });
   await expect(inspector).toBeVisible();
   await expect(inspector).toHaveCSS("animation-name", "panel-enter");
+  await expect(inspector).toHaveCSS("animation-duration", "0.32s");
+  expect(
+    await inspector.evaluate((element) =>
+      (element.getAnimations()[0]?.effect as KeyframeEffect | null)
+        ?.getKeyframes()[0]
+        ?.transform?.toString(),
+    ),
+  ).toBe("translateY(-16px)");
   const port = node.locator(".react-flow__handle-left").first();
   const restingPort = await port.evaluate(
     (element) => getComputedStyle(element).transform,
