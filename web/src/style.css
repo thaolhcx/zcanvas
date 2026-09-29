@@ -564,6 +564,9 @@ a {
   flex-shrink: 0;
 }
 .node-title {
+  cursor: inherit;
+  user-select: none;
+  -webkit-user-select: none;
   padding: 0;
   border: 0;
   background: transparent !important;

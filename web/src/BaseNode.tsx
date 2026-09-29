@@ -181,7 +181,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
       <header>
         <Icon size={16} />
         <button
-          className="node-title nodrag"
+          className="node-title"
           onDoubleClick={() => {
             const label = prompt("Node label", node.label || entry.title);
             if (label !== null) action(() => graph.setLabel(id, label));

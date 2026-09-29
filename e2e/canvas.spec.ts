@@ -321,8 +321,15 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
   const mediaNode = page.getByTestId("node-image.generate");
   await mediaNode.locator("header").click();
   await expectAttached(mediaNode);
-  // The wide editor remains below the node, even near the right edge.
-  const header = (await mediaNode.locator("header").boundingBox())!;
+  const title = mediaNode.locator(".node-title");
+  expect(
+    await title.evaluate((element) => getComputedStyle(element).cursor),
+  ).toBe("grab");
+  const originalX = (await snapshot(page)).nodes.find(
+    (node: { type: string }) => node.type === "image.generate",
+  ).position.x;
+  // Dragging the title should behave like dragging the rest of the node.
+  const header = (await title.boundingBox())!;
   await page.mouse.move(
     header.x + header.width / 2,
     header.y + header.height / 2,
@@ -330,6 +337,15 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
   await page.mouse.down();
   await page.mouse.move(750, header.y + header.height / 2 - 80, { steps: 15 });
   await page.mouse.up();
+  await expect
+    .poll(
+      async () =>
+        (await snapshot(page)).nodes.find(
+          (node: { type: string }) => node.type === "image.generate",
+        ).position.x,
+    )
+    .toBeGreaterThan(originalX + 50);
+  expect(await page.evaluate(() => getSelection()?.toString())).toBe("");
   await expect(inspector).toHaveAttribute("data-side", "bottom");
   await expectAttached(mediaNode);
   const beforePan = (await mediaNode.boundingBox())!;
@@ -358,6 +374,9 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
   await page.getByRole("button", { name: "Fit view", exact: true }).click();
   await expect(inspector).toBeVisible();
   await expectAttached(mediaNode);
+  page.once("dialog", (dialog) => dialog.accept("Renamed image"));
+  await title.dblclick();
+  await expect(title).toHaveText("Renamed image");
   await page.getByRole("button", { name: "Close inspector" }).click();
   await page.getByRole("button", { name: "Add node", exact: true }).click();
   const palette = page.getByRole("dialog", { name: "Node palette" });
