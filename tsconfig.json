@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
+    "strict": true, "skipLibCheck": true, "noEmit": true,
+    "allowImportingTsExtensions": true, "resolveJsonModule": true,
+    "esModuleInterop": true, "types": ["node"]
+  },
+  "include": ["contracts/**/*.ts", "graph/**/*.ts", "server/**/*.ts", "workers/**/*.ts", "web/**/*.ts", "web/**/*.tsx", "e2e/**/*.ts", "*.ts"]
+}

@@ -1,0 +1,33 @@
+import { validate, checkRegistryEntry } from '../validate.mjs';
+import { loadRegistry } from '../node.mjs';
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+
+const reg = loadRegistry(new URL('../examples/registry/', import.meta.url).pathname);
+const pilot = JSON.parse(readFileSync(new URL('../examples/pilot.recipe.json', import.meta.url)));
+const clone = () => structuredClone(pilot);
+let pass = 0;
+const t = (name, fn) => { try { fn(); pass++; console.log('ok  ', name); } catch (e) { console.log('FAIL', name, '\n     ', e.message); process.exitCode = 1; } };
+const codes = r => validate(r, reg).map(i => i.code);
+
+t('registry: 8 types load and pass registry/v1', () => assert.equal(reg.size, 8));
+t('pilot recipe passes recipe/v1 + all invariants', () => assert.deepEqual(codes(pilot), []));
+t('inv 1: duplicate id', () => { const r = clone(); r.edges[0].id = 'n_img'; assert.ok(codes(r).includes('DUP_ID')); });
+t('inv 2: unknown type', () => { const r = clone(); r.nodes[0].type = 'text.nope'; assert.ok(codes(r).includes('UNKNOWN_TYPE')); });
+t('inv 2: old typeVersion without migrate', () => { const r = clone(); r.nodes[1].typeVersion = 9; assert.ok(codes(r).includes('VERSION')); });
+t('inv 3: edge to missing port', () => { const r = clone(); r.edges[0].targetPort = 'nope'; assert.ok(codes(r).includes('EDGE_PORT')); });
+t('inv 4: kind mismatch text -> image', () => { const r = clone(); r.edges.push({ id: 'e_bad', source: 'n_prompt', sourcePort: 'text', target: 'n_vid', targetPort: 'prompt' }); r.edges.push({ id: 'e_bad2', source: 'n_voice', sourcePort: 'audio', target: 'n_edit', targetPort: 'instruction' }); assert.ok(codes(r).includes('KIND')); });
+t('inv 4: fan-out list<image> -> image is allowed', () => assert.deepEqual(codes(pilot), []));
+t('inv 4: any passes the real kind through flow.if', () => { const r = clone(); r.edges.find(e => e.id === 'e_4').targetPort = 'prompt'; assert.ok(codes(r).includes('KIND'), 'image into a text port must fail even through any'); });
+t('inv 5: two edges into one non-multiple input', () => { const r = clone(); r.edges.push({ id: 'e_dup', source: 'n_prompt', sourcePort: 'text', target: 'n_img', targetPort: 'prompt' }); assert.ok(codes(r).includes('FAN_IN')); });
+t('inv 6: cycle', () => { const r = clone(); r.edges.push({ id: 'e_cyc', source: 'n_edit', sourcePort: 'image', target: 'n_img', targetPort: 'reference' }); assert.ok(codes(r).includes('CYCLE')); });
+t('inv 4: nested list is refused', () => { const r = clone(); r.nodes.push({ id: 'n_img2', type: 'image.generate', typeVersion: 1, position: { x: 0, y: 300 }, params: {} }); r.edges.push({ id: 'e_p2', source: 'n_prompt', sourcePort: 'text', target: 'n_img2', targetPort: 'prompt' }, { id: 'e_ref', source: 'n_edit', sourcePort: 'image', target: 'n_img2', targetPort: 'reference' }); assert.ok(codes(r).includes('NESTED_LIST')); });
+t('inv 7: enum value not in options', () => { const r = clone(); r.nodes[1].params.model = 'dalle'; assert.ok(codes(r).includes('PARAM_VALUE')); });
+t('inv 7: number out of range', () => { const r = clone(); r.nodes[1].params.count = 9; assert.ok(codes(r).includes('PARAM_VALUE')); });
+t('inv 7: required param missing', () => { const r = clone(); delete r.nodes[6].params.name; assert.ok(codes(r).includes('PARAM_REQUIRED')); });
+t('inv 7: required input not connected', () => { const r = clone(); r.edges = r.edges.filter(e => e.id !== 'e_6'); assert.ok(codes(r).includes('INPUT_REQUIRED')); });
+t('inv 8: groupId to missing group', () => { const r = clone(); r.nodes[0].groupId = 'g_x'; assert.ok(codes(r).includes('GROUP')); });
+t('inv 9 / schema: meta.version must be integer', () => { const r = clone(); r.meta.version = 1.5; assert.ok(codes(r).includes('SCHEMA')); });
+t('schema: unknown field rejected', () => { const r = clone(); r.nodes[0].color = 'red'; assert.ok(codes(r).includes('SCHEMA')); });
+t('registry schema: bad entry rejected', () => { const bad = structuredClone(reg.get('image.generate')); bad.outputs[0].kind = 'list<list<image>>'; bad.extra = 1; assert.ok(checkRegistryEntry(bad).length >= 2); });
+console.log(`\n${pass} passed`);

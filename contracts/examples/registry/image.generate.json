@@ -1,0 +1,19 @@
+{
+  "type": "image.generate", "version": 1, "title": "Generate image", "category": "image",
+  "description": "Makes images from a prompt, with an optional reference image.",
+  "inputs": [
+    { "key": "prompt", "kind": "text", "required": true },
+    { "key": "reference", "kind": "image", "required": false }
+  ],
+  "outputs": [{ "key": "image", "kind": "list<image>" }],
+  "params": {
+    "model": { "type": "enum", "options": ["seedream-4", "flux-2"], "default": "seedream-4" },
+    "aspect": { "type": "enum", "options": ["1:1", "9:16", "16:9"], "default": "9:16" },
+    "count": { "type": "number", "min": 1, "max": 4, "step": 1, "default": 1 },
+    "seed": { "type": "number", "advanced": true }
+  },
+  "runner": { "kind": "job", "worker": "image-gen", "timeoutSec": 300, "concurrency": 4, "cacheable": true },
+  "cost": { "unit": "credit_per_image", "estimate": 1 },
+  "ui": { "previewPort": "image" },
+  "agentHints": "First step of most visual flows. Use a reference image to keep a character consistent."
+}

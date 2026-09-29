@@ -1,0 +1,20 @@
+{
+  "type": "audio.sfx",
+  "version": 1,
+  "title": "Sound effect",
+  "category": "audio",
+  "description": "Optional extension example: make a sound effect from text.",
+  "inputs": [{ "key": "text", "kind": "text", "required": true }],
+  "outputs": [{ "key": "audio", "kind": "audio" }],
+  "params": {
+    "durationSec": { "type": "number", "min": 1, "max": 20, "default": 3 }
+  },
+  "runner": {
+    "kind": "job",
+    "worker": "audio-sfx",
+    "timeoutSec": 60,
+    "cacheable": true
+  },
+  "cost": { "unit": "credit_per_run", "estimate": 0.5 },
+  "ui": { "previewPort": "audio" }
+}

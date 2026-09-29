@@ -1,0 +1,16 @@
+{
+  "type": "output.export", "version": 1, "title": "Export", "category": "output",
+  "description": "Muxes video and audio and saves a named asset.",
+  "inputs": [
+    { "key": "video", "kind": "video", "required": true },
+    { "key": "audio", "kind": "audio", "required": false }
+  ],
+  "outputs": [{ "key": "file", "kind": "video" }],
+  "params": {
+    "name": { "type": "string", "required": true, "placeholder": "final-cut" },
+    "format": { "type": "enum", "options": ["mp4", "webm"], "default": "mp4" }
+  },
+  "runner": { "kind": "job", "worker": "export", "timeoutSec": 300, "cacheable": false },
+  "cost": { "unit": "credit_per_run", "estimate": 0 },
+  "ui": { "previewPort": "file" }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "audio.generate", "version": 1, "title": "Generate audio", "category": "audio",
+  "description": "Voice from text, or music from a style prompt.",
+  "inputs": [{ "key": "text", "kind": "text", "required": true }],
+  "outputs": [{ "key": "audio", "kind": "audio" }],
+  "params": {
+    "mode": { "type": "enum", "options": ["voice", "music"], "default": "voice" },
+    "voice": { "type": "enum", "options": ["alloy", "nova", "echo"], "default": "alloy", "showIf": { "key": "mode", "equals": "voice" } },
+    "durationSec": { "type": "number", "min": 5, "max": 60, "step": 1, "default": 15, "unit": "s", "showIf": { "key": "mode", "equals": "music" } }
+  },
+  "runner": { "kind": "job", "worker": "audio-gen", "timeoutSec": 300, "concurrency": 4 },
+  "cost": { "unit": "credit_per_1k_chars", "estimate": 0.5 }
+}

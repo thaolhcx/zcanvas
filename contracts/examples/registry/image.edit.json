@@ -1,0 +1,16 @@
+{
+  "type": "image.edit", "version": 1, "title": "Edit image", "category": "image",
+  "description": "Changes an image by instruction: upscale, inpaint, restyle.",
+  "inputs": [
+    { "key": "image", "kind": "image", "required": true },
+    { "key": "instruction", "kind": "text", "required": false }
+  ],
+  "outputs": [{ "key": "image", "kind": "image" }],
+  "params": {
+    "mode": { "type": "enum", "options": ["instruction", "upscale"], "default": "instruction" },
+    "scale": { "type": "number", "min": 2, "max": 4, "step": 1, "default": 2, "showIf": { "key": "mode", "equals": "upscale" } }
+  },
+  "runner": { "kind": "job", "worker": "image-edit", "timeoutSec": 300, "concurrency": 4 },
+  "cost": { "unit": "credit_per_image", "estimate": 1 },
+  "ui": { "previewPort": "image" }
+}

@@ -1,0 +1,10 @@
+{
+  "type": "input.asset", "version": 1, "title": "Asset", "category": "input",
+  "description": "Upload or pick an existing image, video or audio.",
+  "inputs": [],
+  "outputs": [{ "key": "asset", "kind": ["image", "video", "audio"] }],
+  "params": { "asset": { "type": "asset", "kind": "image", "required": true, "label": "File" } },
+  "runner": { "kind": "flow" },
+  "cost": { "unit": "credit_per_run", "estimate": 0 },
+  "ui": { "previewPort": "asset" }
+}

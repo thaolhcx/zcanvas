@@ -1,0 +1,29 @@
+{
+  "name": "@zcanvas/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
+  },
+  "dependencies": {
+    "@zcanvas/contracts": "workspace:*",
+    "@zcanvas/graph": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@xyflow/react": "^12.0.0",
+    "zustand": "^5.0.0",
+    "yjs": "^13.6.27",
+    "y-indexeddb": "^9.0.0",
+    "@hocuspocus/provider": "^4.0.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

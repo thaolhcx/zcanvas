@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recipe/v1",
+  "title": "Recipe (recipe/v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "meta", "nodes", "edges", "groups"],
+  "properties": {
+    "schema": { "const": "recipe/v1" },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version", "registryVersion"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "version": { "type": "integer", "minimum": 0, "description": "Graph version; +1 per Graph API transaction" },
+        "registryVersion": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "typeVersion", "position", "params"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "type": { "type": "string", "pattern": "^(input|video|audio|image|text|flow|output)\\.[a-z][a-z0-9_]*$" },
+          "typeVersion": { "type": "integer", "minimum": 1 },
+          "label": { "type": "string", "maxLength": 80 },
+          "position": { "$ref": "#/$defs/xy" },
+          "params": { "type": "object" },
+          "groupId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "source", "sourcePort", "target", "targetPort"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "source": { "$ref": "#/$defs/id" },
+          "sourcePort": { "type": "string" },
+          "target": { "$ref": "#/$defs/id" },
+          "targetPort": { "type": "string" }
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "position", "size"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "type": "string", "maxLength": 80 },
+          "position": { "$ref": "#/$defs/xy" },
+          "size": {
+            "type": "object", "additionalProperties": false, "required": ["w", "h"],
+            "properties": { "w": { "type": "number", "minimum": 1 }, "h": { "type": "number", "minimum": 1 } }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$" },
+    "xy": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    }
+  }
+}

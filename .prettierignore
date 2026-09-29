@@ -1,0 +1,11 @@
+node_modules
+web/dist
+pnpm-lock.yaml
+docs/prd.md
+docs/contracts-source.md
+contracts/schemas
+contracts/examples/registry
+contracts/examples/pilot.recipe.json
+contracts/test/run.mjs
+contracts/validate.mjs
+test-results

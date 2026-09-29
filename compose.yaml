@@ -1,0 +1,28 @@
+name: zcanvas
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zcanvas
+      POSTGRES_PASSWORD: zcanvas
+      POSTGRES_DB: zcanvas
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zcanvas"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  minio:
+    build:
+      context: .
+      dockerfile: infra/minio.Dockerfile
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: zcanvas
+      MINIO_ROOT_PASSWORD: zcanvas-local-only
+    ports: ["127.0.0.1:59000:9000", "127.0.0.1:59001:9001"]
+    volumes: ["minio:/data"]
+volumes:
+  postgres:
+  minio:
