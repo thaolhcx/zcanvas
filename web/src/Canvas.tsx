@@ -18,6 +18,7 @@ import {
   Redo2,
   Workflow,
   Play,
+  LoaderCircle,
   Square,
   ArrowLeft,
   Download,
@@ -69,6 +70,8 @@ const categoryIcons = {
   text: Type,
 };
 const incomplete = new Set(["INPUT_REQUIRED", "PARAM_REQUIRED"]);
+const motionDuration = (ms: number) =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms;
 const acceptsKind = (output: Kind | Kind[], input: Kind | Kind[]) => {
   const outputs = Array.isArray(output) ? output : [output],
     inputs = Array.isArray(input) ? input : [input];
@@ -267,7 +270,8 @@ function Workspace({
       { nodeId: state.fromNode.id, port: state.fromHandle.id ?? "" },
     );
   };
-  const fit = () => void flow.fitView({ padding: 0.15, duration: 200 });
+  const fit = () =>
+    void flow.fitView({ padding: 0.15, duration: motionDuration(200) });
   const remove = () =>
     action(() =>
       graph.transaction("user", () => {
@@ -324,7 +328,11 @@ function Workspace({
         Object.keys(useCanvas.getState().fieldErrors)[0]?.split(".")[0];
       if (id) {
         setInspector(id);
-        void flow.fitView({ nodes: [{ id }], maxZoom: 1, duration: 250 });
+        void flow.fitView({
+          nodes: [{ id }],
+          maxZoom: 1,
+          duration: motionDuration(250),
+        });
       }
       return;
     }
@@ -626,7 +634,11 @@ function Workspace({
                 : "Run snapshot · ⌘Enter"
             }
           >
-            <Play size={14} />
+            {submitting ? (
+              <LoaderCircle className="spinner" size={14} />
+            ) : (
+              <Play size={14} />
+            )}
             Run · ~{estimate.toFixed(1)} cr
           </button>
         </div>

@@ -91,7 +91,10 @@ export function Preview({ id }: { id: string }) {
   const output: Output | undefined = values[0] ?? uploaded;
   if (output && "id" in output)
     return (
-      <div className="preview nodrag">
+      <div
+        key={output.id}
+        className={`preview nodrag ${values[0] ? "result-preview" : ""}`}
+      >
         <img
           src={output.thumbUrl ?? undefined}
           alt={output.kind === "audio" ? "" : `${type.title} preview`}
@@ -118,7 +121,14 @@ export function Preview({ id }: { id: string }) {
     );
   if (node.type === "input.prompt") return null;
   return (
-    <div className="preview empty">
+    <div
+      className="preview empty"
+      data-aspect={
+        node.type === "image.generate"
+          ? String(node.params.aspect ?? "9:16")
+          : undefined
+      }
+    >
       <WandSparkles size={22} />
       <span>
         {type.outputs[0]?.kind
@@ -207,7 +217,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
             top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)`,
             opacity: !compat || compat.has(`${id}.${p.key}`) ? 1 : 0.15,
           }}
-          className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
+          className={`kind-${String(p.kind).replace("list<", "").replace(">", "")} ${compat?.has(`${id}.${p.key}`) ? "compatible" : ""}`}
         />
       ))}
       {entry.outputs.map((p, i) => (

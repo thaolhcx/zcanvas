@@ -19,6 +19,11 @@
   --success: #21734b;
   --error: #b53335;
   --gold: #926008;
+  --motion-fast: 150ms;
+  --motion-panel: 160ms;
+  --motion-medium: 300ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 * {
   box-sizing: border-box;
@@ -44,8 +49,9 @@ button {
   align-items: center;
   justify-content: center;
   transition:
-    background 0.12s,
-    border-color 0.12s;
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease);
 }
 button:hover {
   background: var(--hover);
@@ -666,6 +672,31 @@ a {
   letter-spacing: 1.2px;
   background: var(--surface-subtle);
 }
+.preview.empty[data-aspect]::before {
+  content: "";
+  position: absolute;
+  width: 76px;
+  height: 135px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  opacity: 0.5;
+  transform: scaleX(var(--preview-scale, 1));
+  transition: transform var(--motion-medium) var(--motion-ease);
+  pointer-events: none;
+}
+.preview.empty[data-aspect="1:1"] {
+  --preview-scale: 1.78;
+}
+.preview.empty[data-aspect="16:9"] {
+  --preview-scale: 3.15;
+}
+.preview.empty > svg,
+.preview.empty > span {
+  position: relative;
+}
+.preview.result-preview {
+  animation: result-arrive var(--motion-medium) ease;
+}
 .preview-tag {
   position: absolute;
   bottom: 6px;
@@ -699,6 +730,16 @@ a {
   height: 10px;
   border: 2px solid var(--surface);
   background: #31815b;
+  transition:
+    transform var(--motion-medium) var(--motion-spring),
+    opacity var(--motion-medium) var(--motion-spring);
+}
+.react-flow__handle-left:hover,
+.react-flow__handle-left.compatible {
+  transform: translate(-50%, -50%) scale(1.35);
+}
+.react-flow__handle-right:hover {
+  transform: translate(50%, -50%) scale(1.35);
 }
 .react-flow__handle.kind-text {
   background: #a8791e;
@@ -728,6 +769,17 @@ a {
 }
 .status.running {
   color: var(--gold);
+}
+.status.running::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+  animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .status.skipped {
   text-decoration: line-through;
@@ -813,6 +865,7 @@ a {
   border-radius: 18px;
   z-index: 12;
   overflow: hidden;
+  animation: palette-enter var(--motion-panel) ease both;
 }
 .palette-heading {
   padding: 19px 18px 12px;
@@ -918,6 +971,7 @@ a {
   border-radius: 16px;
   overflow: auto;
   z-index: 5;
+  animation: panel-enter var(--motion-panel) ease both;
 }
 .inspector > header {
   display: flex;
@@ -1013,6 +1067,66 @@ a {
   align-items: center;
   gap: 6px;
   z-index: 5;
+  animation: selection-enter 200ms ease-out both;
+}
+.spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes selection-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes palette-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    box-shadow: 0 4px 12px rgba(32, 39, 52, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 14px 36px rgba(32, 39, 52, 0.12);
+  }
+}
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes result-arrive {
+  from {
+    border-color: var(--success);
+    background-color: #e8f4ec;
+  }
+  to {
+    border-color: var(--line);
+    background-color: var(--surface);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .selection-bar span {
   padding: 0 10px;
@@ -1188,7 +1302,10 @@ a {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
+    animation: none !important;
   }
 }
