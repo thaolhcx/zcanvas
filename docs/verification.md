@@ -49,9 +49,12 @@ Use `/health`, the API/runner terminal output, and the run selector. Healthy beh
 
 The light theme now uses floating navigation and run controls, a left node palette,
 larger media previews, curved connections, and an editor anchored 16 px from the
-selected node. The editor follows node dragging and canvas pan/zoom at a fixed
-readable size, flips sides at the viewport edge, and hides while its node is offscreen.
-Selecting a node does not move the camera. Preview images use `object-fit: contain`.
+selected node, always beneath it. Its horizontal layout puts multiline content first
+and configuration fields in a wrapping row. The editor follows dragging and pan/zoom
+at a readable size, clamps horizontally at viewport edges, and hides with offscreen
+nodes. Opening it can pan just enough to reveal the panel; subsequent pan/drag stays
+under user control. The space above the node is reserved for a future local-edit
+bar. Preview images use `object-fit: contain`.
 
 Validation: production build and TypeScript checks passed. Four browser tests
 passed, including editing, selection changes, dragging, panning, zooming, edge

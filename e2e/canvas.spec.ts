@@ -293,26 +293,20 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
         const target = await node.boundingBox();
         const editor = await inspector.boundingBox();
         if (!target || !editor) return false;
-        const side = await inspector.getAttribute("data-side");
-        const gap =
-          side === "right"
-            ? editor.x - target.x - target.width
-            : side === "left"
-              ? target.x - editor.x - editor.width
-              : side === "bottom"
-                ? editor.y - target.y - target.height
-                : target.y - editor.y - editor.height;
+        const gap = editor.y - target.y - target.height;
         return (
+          (await inspector.getAttribute("data-side")) === "bottom" &&
           Math.abs(gap - 16) < 2 &&
+          editor.width > target.width &&
           editor.x >= 0 &&
-          editor.y >= 0 &&
-          editor.x + editor.width <= 900 &&
-          editor.y + editor.height <= 800
+          editor.x + editor.width <= 900
         );
       })
       .toBe(true);
   }
   await expectAttached(page.getByTestId("node-input.prompt"));
+  const opened = (await inspector.boundingBox())!;
+  expect(opened.y + opened.height).toBeLessThanOrEqual(800);
   await setParam(page, "text", "A mountain lake at sunrise");
   await expect(
     page.getByTestId("node-input.prompt").getByLabel("text", { exact: true }),
@@ -327,7 +321,7 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
   const mediaNode = page.getByTestId("node-image.generate");
   await mediaNode.locator("header").click();
   await expectAttached(mediaNode);
-  // Move the selected node towards the right edge: the editor must flip left.
+  // The wide editor remains below the node, even near the right edge.
   const header = (await mediaNode.locator("header").boundingBox())!;
   await page.mouse.move(
     header.x + header.width / 2,
@@ -336,7 +330,7 @@ test("node editor follows selection, dragging, panning and zoom on a narrow canv
   await page.mouse.down();
   await page.mouse.move(750, header.y + header.height / 2 - 80, { steps: 15 });
   await page.mouse.up();
-  await expect(inspector).toHaveAttribute("data-side", "left");
+  await expect(inspector).toHaveAttribute("data-side", "bottom");
   await expectAttached(mediaNode);
   const beforePan = (await mediaNode.boundingBox())!;
   await page.mouse.move(850, 180);

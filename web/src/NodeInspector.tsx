@@ -1,7 +1,12 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { useInternalNode, useStore, useViewport } from "@xyflow/react";
+import {
+  useInternalNode,
+  useReactFlow,
+  useStore,
+  useViewport,
+} from "@xyflow/react";
 
-/** A screen-sized editor anchored to the node, independent of canvas zoom. */
+/** Prompt/configuration stays below its node; the upper area is for local edits. */
 export function NodeInspector({
   id,
   children,
@@ -10,10 +15,12 @@ export function NodeInspector({
   children: ReactNode;
 }) {
   const node = useInternalNode(id);
+  const flow = useReactFlow();
   const viewport = useViewport();
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
   const panel = useRef<HTMLElement>(null);
+  const positioned = useRef<string | undefined>(undefined);
   const [panelHeight, setPanelHeight] = useState(0);
 
   useLayoutEffect(() => {
@@ -32,49 +39,41 @@ export function NodeInspector({
   const position = node?.internals.positionAbsolute ?? { x: 0, y: 0 };
   const left = position.x * viewport.zoom + viewport.x;
   const top = position.y * viewport.zoom + viewport.y;
-  const right = left + (node?.measured.width ?? 280) * viewport.zoom;
-  const bottom = top + (node?.measured.height ?? 0) * viewport.zoom;
-  const leftSpace = left - gap - margin;
-  const rightSpace = width - margin - right - gap;
-  let panelWidth = Math.min(360, width - margin * 2);
-  let maxHeight = Math.max(120, bottomLimit - topLimit);
-  let x: number, y: number, side: string;
-  const clamp = (value: number, min: number, max: number) =>
-    Math.max(min, Math.min(value, Math.max(min, max)));
+  const nodeWidth = (node?.measured.width ?? 280) * viewport.zoom;
+  const nodeHeight = (node?.measured.height ?? 0) * viewport.zoom;
+  const bottom = top + nodeHeight;
+  const panelWidth = Math.max(0, Math.min(720, width - margin * 2));
+  const maxHeight = Math.max(
+    140,
+    Math.min(320, bottomLimit - topLimit - nodeHeight - gap),
+  );
+  const x = Math.max(
+    margin,
+    Math.min(
+      left + nodeWidth / 2 - panelWidth / 2,
+      width - margin - panelWidth,
+    ),
+  );
+  const y = bottom + gap;
 
-  if (Math.max(leftSpace, rightSpace) >= Math.min(280, panelWidth)) {
-    side =
-      rightSpace >= panelWidth || rightSpace >= leftSpace ? "right" : "left";
-    panelWidth = Math.min(
-      panelWidth,
-      side === "right" ? rightSpace : leftSpace,
-    );
-    x = side === "right" ? right + gap : left - gap - panelWidth;
-    y = clamp(top, topLimit, bottomLimit - panelHeight);
-  } else {
-    const below = bottomLimit - bottom - gap;
-    const above = top - gap - topLimit;
-    side = below >= above ? "bottom" : "top";
-    maxHeight = Math.min(
-      maxHeight,
-      Math.max(120, side === "bottom" ? below : above),
-    );
-    x = clamp(left, margin, width - margin - panelWidth);
-    y = clamp(
-      side === "bottom" ? bottom + gap : top - gap - panelHeight,
-      topLimit,
-      bottomLimit - panelHeight,
-    );
-  }
+  useLayoutEffect(() => {
+    if (positioned.current === id || !node?.measured.height || !panelHeight)
+      return;
+    positioned.current = id;
+    // Make room once when opening the editor; dragging and panning remain free.
+    const overflow = y + panelHeight - bottomLimit;
+    if (overflow > 0)
+      void flow.setViewport({ ...viewport, y: viewport.y - overflow });
+  }, [id, node?.measured.height, panelHeight, y, bottomLimit, flow, viewport]);
+
   const visible =
-    node && right > 0 && left < width && bottom > 0 && top < height;
-
+    node && left + nodeWidth > 0 && left < width && bottom > 0 && top < height;
   return (
     <aside
       ref={panel}
       className="inspector"
       aria-label="Node inspector"
-      data-side={side}
+      data-side="bottom"
       style={{
         left: x,
         top: y,

@@ -771,13 +771,19 @@ function Workspace({
       {activeNode && (
         <NodeInspector id={activeNode.id}>
           <header>
-            <div>
+            <div className="inspector-heading">
               <span className="eyebrow">
                 {graph.registry.get(activeNode.type)!.category}
               </span>
-              <h2>
-                {activeNode.label || graph.registry.get(activeNode.type)!.title}
-              </h2>
+              <input
+                aria-label="Node label"
+                defaultValue={activeNode.label ?? ""}
+                placeholder={graph.registry.get(activeNode.type)!.title}
+                key={activeNode.id}
+                onBlur={(e) =>
+                  action(() => graph.setLabel(activeNode.id, e.target.value))
+                }
+              />
             </div>
             <div className="inspector-actions">
               <button
@@ -803,17 +809,6 @@ function Workspace({
             </button>
           </header>
           <div className="inspector-body">
-            <label className="param node-label-field">
-              <span>Node name</span>
-              <input
-                aria-label="Node label"
-                defaultValue={activeNode.label ?? ""}
-                key={activeNode.id}
-                onBlur={(e) =>
-                  action(() => graph.setLabel(activeNode.id, e.target.value))
-                }
-              />
-            </label>
             <ParamForm key={activeNode.id} node={activeNode} />
             {activeIssues.map((issue, i) => (
               <p
