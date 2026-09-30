@@ -28,13 +28,11 @@ test("motion follows the selected node and respects reduced motion", async ({
     ),
   ).toBe(false);
   const port = node.locator(".react-flow__handle-left").first();
-  const restingPort = await port.evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
-  await port.hover();
-  await expect
-    .poll(() => port.evaluate((element) => getComputedStyle(element).transform))
-    .not.toBe(restingPort);
+  await expect(port).toHaveCSS("width", "2px");
+  const plus = node.locator(".handle-target .handle-plus");
+  await expect(plus).toHaveCSS("opacity", "1");
+  await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
+  await expect(plus).toHaveCSS("transition-duration", "0.3s, 0.3s, 0.08s");
   const preview = node.locator(".preview.empty");
   const before = await preview.evaluate(
     (element) => getComputedStyle(element, "::before").aspectRatio,
