@@ -1,10 +1,7 @@
 import { memo, useSyncExternalStore } from "react";
-import {
-  BaseEdge,
-  getBezierPath,
-  type Edge,
-  type EdgeProps,
-} from "@xyflow/react";
+import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
+
+import { useCanvas } from "./store.ts";
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const subscribe = (notify: () => void) => {
@@ -13,9 +10,11 @@ const subscribe = (notify: () => void) => {
 };
 const getReducedMotion = () => reducedMotion.matches;
 
-export const SignalEdge = memo(function SignalEdge(
-  props: EdgeProps<Edge<{ active: boolean }>>,
-) {
+export const SignalEdge = memo(function SignalEdge(props: EdgeProps) {
+  const active = useCanvas(
+    (s) =>
+      s.selected.includes(props.source) || s.selected.includes(props.target),
+  );
   const reduced = useSyncExternalStore(subscribe, getReducedMotion);
   const [path] = getBezierPath({
     ...props,
@@ -32,7 +31,7 @@ export const SignalEdge = memo(function SignalEdge(
         markerEnd={props.markerEnd}
         interactionWidth={props.interactionWidth}
       />
-      {props.data?.active && !reduced && (
+      {active && !reduced && (
         <>
           <defs>
             <radialGradient id={`${id}-g`}>
