@@ -10,7 +10,11 @@ export type Alignment = {
 };
 
 /** Match any edge or center, independently on each axis, in flow units. */
-export function findAlignment(bounds: Rect, targets: Rect[]): Alignment {
+export function findAlignment(
+  bounds: Rect,
+  targets: Rect[],
+  threshold = 5,
+): Alignment {
   const result: Alignment = { dx: 0, dy: 0 };
   let closestX = Infinity,
     closestY = Infinity;
@@ -26,7 +30,7 @@ export function findAlignment(bounds: Rect, targets: Rect[]): Alignment {
         const delta = x - (bounds.x + offset),
           distance = Math.abs(delta);
         // Equivalent matches can differ by floating-point noise after a drag.
-        if (distance <= 5 && distance < closestX - 1e-9) {
+        if (distance <= threshold && distance < closestX - 1e-9) {
           closestX = distance;
           result.x = x;
           result.dx = delta;
@@ -41,7 +45,7 @@ export function findAlignment(bounds: Rect, targets: Rect[]): Alignment {
       for (const offset of ys) {
         const delta = y - (bounds.y + offset),
           distance = Math.abs(delta);
-        if (distance <= 5 && distance < closestY - 1e-9) {
+        if (distance <= threshold && distance < closestY - 1e-9) {
           closestY = distance;
           result.y = y;
           result.dy = delta;

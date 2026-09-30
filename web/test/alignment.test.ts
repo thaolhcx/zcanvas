@@ -62,4 +62,16 @@ describe("helper-line alignment in flow units", () => {
     expect(result.x).toBe(1080);
     expect(result.left).toBe(1080);
   });
+  it("uses a caller-supplied threshold on both axes", () => {
+    const targets = [{ x: 100, y: 195, width: 80, height: 60 }];
+    expect(findAlignment(bounds, targets, 2.5)).toEqual({ dx: 0, dy: 0 });
+    expect(findAlignment(bounds, targets, 10)).toEqual({
+      x: 100,
+      y: 195,
+      dx: -5,
+      dy: -5,
+      left: 100,
+      top: 195,
+    });
+  });
 });

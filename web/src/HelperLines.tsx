@@ -59,7 +59,11 @@ export const HelperLines = memo(function HelperLines({
               !ids.has(node.id) && !(node.parentId && ids.has(node.parentId)),
           )
           .map(rect);
-        const alignment = findAlignment(bounds, targets);
+        const alignment = findAlignment(
+          bounds,
+          targets,
+          5 / flow.getViewport().zoom,
+        );
         setGuides((previous) =>
           previous.x === alignment.x && previous.y === alignment.y
             ? previous

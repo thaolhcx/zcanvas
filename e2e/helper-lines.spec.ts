@@ -93,6 +93,40 @@ test("pilot node snaps to another left edge, draws viewport guides only during d
   expect(after.groups).toEqual(before.groups);
 });
 
+test("snap tolerance is five screen pixels at half zoom", async ({ page }) => {
+  const before = await pilot(page);
+  await page.getByLabel("Zoom", { exact: true }).fill("0.5");
+  const moving = before.nodes.find((node) => node.type === "video.generate")!;
+  const target = before.nodes.find((node) => node.type === "image.edit")!;
+  const from = await beginDrag(page, moving);
+  expect(from.zoom).toBeCloseTo(0.5);
+  const vertical = page
+    .getByTestId("alignment-guides")
+    .locator('line[data-axis="x"]');
+  await page.mouse.move(
+    from.x + (target.position.x + 11 - moving.position.x) * from.zoom,
+    from.y + 63 * from.zoom,
+    { steps: 15 },
+  );
+  await expect(vertical).toHaveCount(0);
+  await page.mouse.move(
+    from.x + (target.position.x + 8 - moving.position.x) * from.zoom,
+    from.y + 63 * from.zoom,
+  );
+  await expect(vertical).toHaveCount(1);
+  await expect(vertical).toHaveAttribute("x1", String(target.position.x));
+  expect(await snapshot(page)).toEqual(before);
+  await page.mouse.up();
+  await expect
+    .poll(
+      async () =>
+        (await snapshot(page)).nodes.find((node) => node.id === moving.id)!
+          .position.x,
+    )
+    .toBe(target.position.x);
+  expect((await snapshot(page)).meta.version).toBe(before.meta.version + 1);
+});
+
 test("pilot drag away from alignment has no guides or grid snapping", async ({
   page,
 }) => {

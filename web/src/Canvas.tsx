@@ -481,25 +481,15 @@ function Workspace({
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
+        onNodesChange={(changes) =>
+          onNodesChange(changes, helperLines.current?.snap)
+        }
         onEdgesChange={onEdgesChange}
         onSelectionChange={select}
         onConnect={connect}
         onConnectStart={connectStart}
         isValidConnection={validConnection}
         onConnectEnd={connectEnd}
-        onNodeDrag={(_, __, dragged) => {
-          const snapped = helperLines.current?.snap(dragged) ?? dragged;
-          if (snapped !== dragged)
-            onNodesChange(
-              snapped.map((node) => ({
-                id: node.id,
-                type: "position",
-                position: node.position,
-                dragging: true,
-              })),
-            );
-        }}
         onNodeDragStop={(_, __, dragged) => {
           // React Flow's stop payload contains its unsnapped drag positions.
           const snapped = helperLines.current?.snap(dragged) ?? dragged;
