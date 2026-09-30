@@ -328,6 +328,21 @@ a {
 .react-flow__attribution {
   display: none;
 }
+.alignment-guides {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 100;
+}
+.alignment-guides line {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
 .react-flow__edge-textbg {
   fill: var(--surface);
 }
