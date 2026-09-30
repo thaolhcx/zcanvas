@@ -170,11 +170,6 @@ export function bindGraph(graph: Graph) {
         sourceHandle: e.sourcePort,
         targetHandle: e.targetPort,
         selected: old?.selected,
-        data: {
-          active:
-            previous.selected.includes(e.source) ||
-            previous.selected.includes(e.target),
-        },
       };
       return old && equal(old, next) ? old : next;
     });

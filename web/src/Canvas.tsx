@@ -188,17 +188,10 @@ function Workspace({
   const select = useCallback(
     ({ nodes, edges }: { nodes: Node[]; edges: { id: string }[] }) => {
       const ids = nodes.map((n) => n.id);
-      const selected = new Set(ids);
-      useCanvas.setState((state) => ({
+      useCanvas.setState({
         selected: ids,
         selectedEdges: edges.map((e) => e.id),
-        edges: state.edges.map((edge) => {
-          const active = selected.has(edge.source) || selected.has(edge.target);
-          return edge.data?.active === active
-            ? edge
-            : { ...edge, data: { ...edge.data, active } };
-        }),
-      }));
+      });
       setInspector(ids.length === 1 ? ids[0] : undefined);
     },
     [],
