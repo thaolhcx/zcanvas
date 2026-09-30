@@ -1,5 +1,7 @@
 # Zcanvas
 
+**v0.1.0** — first end-to-end mock POC release. See the [release notes](CHANGELOG.md).
+
 A local-first node canvas for creative media workflows. This POC implements the [PRD](docs/prd.md) with **mock workers**: it exercises the real graph, sync, queue, asset storage, streaming status, and ffmpeg export without calling paid model APIs.
 
 ## Run locally
@@ -52,9 +54,11 @@ Append `?debug=1` (or `&debug=1`) to show an FPS meter, frame-duration measureme
 
 ## Use the canvas
 
-- `/`, `+`, or double-click empty space opens the node palette. Dragging an output to empty space opens a compatible palette.
-- Select a node for the full registry-driven form. The node body shows common params. Invalid fields stay visible, and Run is blocked until fixed.
-- Drag a connection onto an occupied input to replace its edge. Select an edge and press Delete to remove it.
+- `/`, `+`, or double-click empty space opens the node palette. Each node has one input and one output +: click one, or drop its connection on empty space, to open a compatible palette. The canvas resolves the actual recipe ports automatically.
+- Select a node for the registry-driven editor anchored beneath it. The editor follows dragging and pan/zoom; the node body shows common params. Invalid fields stay visible, and Run is blocked until fixed.
+- Occupied single-value inputs reject new connections. Select an edge and press Delete to remove it before reconnecting. Multiple-value inputs accept additional connections.
+- Drag nodes near an edge or center to align them: guides appear during dragging and snap within 5 screen pixels at every zoom. Multi-node selections and groups move together.
+- Hover near the + icons to reveal their magnetic controls. Selected nodes signal along attached connections; reduced-motion preferences disable animation.
 - `Cmd/Ctrl+Z`, `Shift+Cmd/Ctrl+Z`: undo/redo. `Cmd/Ctrl+C/V/D`: copy/paste/duplicate. `Cmd/Ctrl+G`: group. `Cmd/Ctrl+Enter`: run. `F`: fit view. Space-drag pans.
 - The canvas-name menu exports/imports recipe JSON and saves presets. Opening a preset creates a new canvas.
 - A run uses an immutable graph snapshot. Editing the graph does not change a running job. Use a fresh Run after changing params; cache reuse makes unchanged work free. Retry uses the previous run snapshot and reruns the selected node plus its descendants.

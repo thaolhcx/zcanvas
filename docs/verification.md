@@ -1,6 +1,32 @@
 # POC verification
 
-Verified on 29 September 2026. Scope: end-to-end mock POC; real providers deferred by the user.
+Initial POC baseline verified on 29 September 2026. Scope: end-to-end mock POC; real providers deferred by the user.
+
+## v0.1.0 release verification — 30 September 2026
+
+The integrated motion and connection UX passed typecheck, production build, formatting,
+20 contract assertions, 32 unit/integration tests and all 26 production Playwright
+scenarios. Motion was merged into the init branch with an identical code tree to the
+tested preview. Release preparation changes version metadata and documentation only.
+
+All five 128-node scenarios recorded 60 FPS: magnetic hover (33.3 ms maximum frame),
+drag/pan (16.8 ms), connection dragging (50.0 ms), panning with four edge signals
+(33.4 ms), and dragging with helper lines (33.3 ms). The original >=50 FPS and
+<100 ms maximum-frame gates are unchanged. These are local production Chromium
+observations, not measurements on the 16 GB reference laptop. Frame benchmarks in
+`performance.spec.ts` disable trace snapshots to avoid measurement interference;
+functional tests retain failure traces.
+
+A temporary development React Profiler confirmed five controlled selection changes
+render exactly the edges whose signal activation changes, preserving the edge-array
+reference. A real React Flow drag at 50% zoom published one corrected nodes batch.
+Committed regression tests cover multi-node publication and the 5 screen-pixel snap
+boundary at 50% zoom. Profiling instrumentation stays outside the shipped source.
+
+Counts, sampled frame metrics and profiler/store observations are retained in
+[v0.1.0-validation.json](evidence/v0.1.0-validation.json).
+
+The following sections preserve the original POC baseline evidence.
 
 ## Automated evidence
 
