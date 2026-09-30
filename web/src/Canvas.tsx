@@ -50,6 +50,7 @@ import { BaseNode } from "./BaseNode.tsx";
 import { ParamForm } from "./Params.tsx";
 import { NodeInspector } from "./NodeInspector.tsx";
 import { SignalEdge } from "./SignalEdge.tsx";
+import { HelperLines, type HelperLinesHandle } from "./HelperLines.tsx";
 import { useGraph } from "./context.ts";
 import { action, useCanvas, useRun, updateRun, EMPTY_ISSUES } from "./store.ts";
 import { post, followRun, request } from "./api.ts";
@@ -135,6 +136,7 @@ function Workspace({
     [inspector, setInspector] = useState<string>(),
     [viewportFitting, setViewportFitting] = useState(false);
   const clipboard = useRef<Recipe | undefined>(undefined),
+    helperLines = useRef<HelperLinesHandle>(null),
     upload = useRef<HTMLInputElement>(null),
     stopRun = useRef<(() => void) | undefined>(undefined),
     fitSequence = useRef(0),
@@ -479,34 +481,56 @@ function Workspace({
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
+        onNodesChange={(changes) =>
+          onNodesChange(changes, helperLines.current?.snap)
+        }
         onEdgesChange={onEdgesChange}
         onSelectionChange={select}
         onConnect={connect}
         onConnectStart={connectStart}
         isValidConnection={validConnection}
         onConnectEnd={connectEnd}
-        onNodeDragStop={(_, node, dragged) =>
+        onNodeDragStop={(_, __, dragged) => {
+          // React Flow's stop payload contains its unsnapped drag positions.
+          const snapped = helperLines.current?.snap(dragged) ?? dragged;
+          helperLines.current?.clear();
+          onNodesChange(
+            snapped.map((node) => ({
+              id: node.id,
+              type: "position",
+              position: node.position,
+              dragging: false,
+            })),
+          );
+          const groups = new Map(
+            snapped
+              .filter((node) => node.type === "group")
+              .map((node) => [node.id, node.position]),
+          );
+          const moves = snapped
+            .filter((node) => node.type !== "group")
+            .map((node) => {
+              const parent = node.parentId
+                ? (groups.get(node.parentId) ??
+                  flow.getInternalNode(node.parentId)?.internals
+                    .positionAbsolute)
+                : undefined;
+              return {
+                id: node.id,
+                position: {
+                  x: node.position.x + (parent?.x ?? 0),
+                  y: node.position.y + (parent?.y ?? 0),
+                },
+              };
+            });
           action(() => {
-            if (node.type === "group")
-              graph.updateGroup(node.id, { position: node.position });
-            else
-              graph.moveNodes(
-                dragged.map((n) => {
-                  const parent = n.parentId
-                    ? flow.getNode(n.parentId)
-                    : undefined;
-                  return {
-                    id: n.id,
-                    position: {
-                      x: n.position.x + (parent?.position.x ?? 0),
-                      y: n.position.y + (parent?.position.y ?? 0),
-                    },
-                  };
-                }),
-              );
-          })
-        }
+            graph.transaction("user", () => {
+              for (const [id, position] of groups)
+                graph.updateGroup(id, { position });
+              if (moves.length) graph.moveNodes(moves);
+            });
+          });
+        }}
         onNodeDoubleClick={(_, node) => {
           if (node.type === "group") {
             const name = prompt("Group name", String(node.data.label));
@@ -533,6 +557,7 @@ function Workspace({
             useCanvas.setState({ compact: view.zoom < 0.4 });
         }}
         fitView
+        snapToGrid={false}
         fitViewOptions={{ maxZoom: 0.9 }}
         minZoom={0.08}
         maxZoom={2}
@@ -549,6 +574,7 @@ function Workspace({
         defaultEdgeOptions={{ type: "default" }}
         proOptions={{ hideAttribution: true }}
       >
+        <HelperLines ref={helperLines} />
         <Background gap={24} size={1} color="#c7cdd6" />
         {minimap && <MiniMap pannable zoomable />}
       </ReactFlow>
