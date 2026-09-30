@@ -1,0 +1,13 @@
+{
+  "name": "@zcanvas/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.0.0",
+    "ajv-formats": "^3.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "flow.if", "version": 1, "title": "If", "category": "flow",
+  "description": "Passes the input to one of two branches. The other branch is skipped.",
+  "inputs": [{ "key": "value", "kind": "any", "required": true }],
+  "outputs": [{ "key": "then", "kind": "any" }, { "key": "else", "kind": "any" }],
+  "params": {
+    "field": { "type": "string", "required": true, "placeholder": "meta.width" },
+    "op": { "type": "enum", "options": ["eq", "neq", "gt", "lt", "contains"], "default": "eq" },
+    "compare": { "type": "string", "required": true }
+  },
+  "runner": { "kind": "flow" },
+  "cost": { "unit": "credit_per_run", "estimate": 0 }
+}

@@ -1,0 +1,6 @@
+packages:
+  - contracts
+  - graph
+  - server
+  - workers
+  - web

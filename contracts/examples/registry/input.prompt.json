@@ -1,0 +1,9 @@
+{
+  "type": "input.prompt", "version": 1, "title": "Prompt", "category": "input",
+  "description": "A text value. The start of most flows.",
+  "inputs": [],
+  "outputs": [{ "key": "text", "kind": "text" }],
+  "params": { "text": { "type": "string", "multiline": true, "required": true, "placeholder": "Describe the scene" } },
+  "runner": { "kind": "flow" },
+  "cost": { "unit": "credit_per_run", "estimate": 0 }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "zcanvas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm --filter @zcanvas/contracts test && vitest run",
+    "dev": "concurrently -k -n api,runner,web \"pnpm --filter @zcanvas/server dev\" \"pnpm --filter @zcanvas/server runner\" \"pnpm --filter @zcanvas/web dev\"",
+    "start": "concurrently -k -n api,runner,web \"tsx server/src/main.ts\" \"tsx server/src/runner-main.ts\" \"pnpm --filter @zcanvas/web preview\"",
+    "build": "pnpm --filter @zcanvas/web build",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "fixtures": "node scripts/fixtures.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "concurrently": "^10.0.5",
+    "prettier": "3.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

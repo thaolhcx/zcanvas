@@ -1,0 +1,16 @@
+{
+  "type": "video.generate", "version": 1, "title": "Generate video", "category": "video",
+  "description": "Image-to-video. Long job.",
+  "inputs": [
+    { "key": "image", "kind": "image", "required": true },
+    { "key": "prompt", "kind": "text", "required": false }
+  ],
+  "outputs": [{ "key": "video", "kind": "video" }],
+  "params": {
+    "model": { "type": "enum", "options": ["seedance-1.5", "kling-2"], "default": "seedance-1.5" },
+    "durationSec": { "type": "number", "min": 3, "max": 15, "step": 1, "default": 5, "unit": "s" }
+  },
+  "runner": { "kind": "job", "worker": "video-gen", "timeoutSec": 900, "concurrency": 2 },
+  "cost": { "unit": "credit_per_second", "estimate": 2 },
+  "ui": { "previewPort": "video" }
+}

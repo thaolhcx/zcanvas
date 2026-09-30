@@ -1,0 +1,132 @@
+{
+  "version": "0.1.0",
+  "verifiedOn": "2026-09-30",
+  "testedCodeCommit": "c090a2ec9e2e8941df6d6e7c1041da3200c0ea8c",
+  "checks": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "contractAssertions": 20,
+    "unitIntegrationTests": 32,
+    "productionE2EScenarios": 26
+  },
+  "performanceGates": {
+    "minimumFps": 50,
+    "maximumFrameMsExclusive": 100
+  },
+  "productionChromium128NodeMetrics": {
+    "edge-signal-pans-a-128-nod-46116--four-selected-edges-signal": {
+      "fps": 60,
+      "maxFrameMs": 33.399999999999636,
+      "frames": 905,
+      "measuring": true
+    },
+    "helper-lines-128-image-nod-9c315--dragging-with-helper-lines": {
+      "fps": 60,
+      "maxFrameMs": 33.29999999999927,
+      "frames": 910,
+      "measuring": true
+    },
+    "performance-keeps-edge-dra-5d86b-h-128-nodes-and-input-ports": {
+      "fps": 60,
+      "maxFrameMs": 50,
+      "frames": 624,
+      "measuring": true
+    },
+    "performance-keeps-magnet-h-340e1-s-without-writing-the-graph": {
+      "fps": 60,
+      "maxFrameMs": 33.30000000000109,
+      "frames": 531,
+      "measuring": true
+    },
+    "performance-measures-drag--4c700-canvas-with-128-image-nodes": {
+      "fps": 60,
+      "maxFrameMs": 16.80000000000109,
+      "frames": 446,
+      "measuring": true
+    }
+  },
+  "developmentProfilerProof": {
+    "tool": "React Profiler in a temporary Vite development transform; actual SignalEdge and React Flow drag",
+    "selectionProof": [
+      {
+        "selected": ["n_img"],
+        "expectedEdges": ["e_1", "e_2"],
+        "renderedEdges": ["e_1", "e_2"],
+        "renders": [
+          {
+            "id": "e_1",
+            "phase": "update"
+          },
+          {
+            "id": "e_2",
+            "phase": "update"
+          }
+        ],
+        "edgesUnchanged": true
+      },
+      {
+        "selected": ["n_img", "n_prompt"],
+        "expectedEdges": ["e_5"],
+        "renderedEdges": ["e_5"],
+        "renders": [
+          {
+            "id": "e_5",
+            "phase": "update"
+          }
+        ],
+        "edgesUnchanged": true
+      },
+      {
+        "selected": ["n_prompt"],
+        "expectedEdges": ["e_2"],
+        "renderedEdges": ["e_2"],
+        "renders": [
+          {
+            "id": "e_2",
+            "phase": "update"
+          }
+        ],
+        "edgesUnchanged": true
+      },
+      {
+        "selected": [],
+        "expectedEdges": ["e_1", "e_5"],
+        "renderedEdges": ["e_1", "e_5"],
+        "renders": [
+          {
+            "id": "e_1",
+            "phase": "update"
+          },
+          {
+            "id": "e_5",
+            "phase": "update"
+          }
+        ],
+        "edgesUnchanged": true
+      },
+      {
+        "selected": [],
+        "expectedEdges": [],
+        "renderedEdges": [],
+        "renders": [],
+        "edgesUnchanged": true
+      }
+    ],
+    "dragProof": {
+      "zoom": 0.5,
+      "screenDeltaWithinTolerance": 4,
+      "writes": [
+        [
+          {
+            "id": "n_vid",
+            "position": {
+              "x": 720,
+              "y": -6
+            }
+          }
+        ]
+      ]
+    }
+  },
+  "scope": "Local mock-worker POC. Metrics are observations on the local host; real model providers and reference-laptop acceptance remain deferred."
+}
