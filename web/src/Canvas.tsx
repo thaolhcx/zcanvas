@@ -49,6 +49,7 @@ import { estimateCredits } from "../../contracts/estimate.ts";
 import { BaseNode } from "./BaseNode.tsx";
 import { ParamForm } from "./Params.tsx";
 import { NodeInspector } from "./NodeInspector.tsx";
+import { SignalEdge } from "./SignalEdge.tsx";
 import { useGraph } from "./context.ts";
 import { action, useCanvas, useRun, updateRun, EMPTY_ISSUES } from "./store.ts";
 import { post, followRun, request } from "./api.ts";
@@ -59,7 +60,7 @@ const nodeTypes = {
     <span className="group-name">{String(data.label ?? "Group")}</span>
   ),
 };
-const edgeTypes = {};
+const edgeTypes = { default: SignalEdge };
 const categoryIcons = {
   input: Type,
   image: ImageIcon,
@@ -187,10 +188,17 @@ function Workspace({
   const select = useCallback(
     ({ nodes, edges }: { nodes: Node[]; edges: { id: string }[] }) => {
       const ids = nodes.map((n) => n.id);
-      useCanvas.setState({
+      const selected = new Set(ids);
+      useCanvas.setState((state) => ({
         selected: ids,
         selectedEdges: edges.map((e) => e.id),
-      });
+        edges: state.edges.map((edge) => {
+          const active = selected.has(edge.source) || selected.has(edge.target);
+          return edge.data?.active === active
+            ? edge
+            : { ...edge, data: { ...edge.data, active } };
+        }),
+      }));
       setInspector(ids.length === 1 ? ids[0] : undefined);
     },
     [],

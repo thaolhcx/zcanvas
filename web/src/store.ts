@@ -187,6 +187,11 @@ export function bindGraph(graph: Graph) {
         targetHandle: e.targetPort,
         label: fan ? `×${source?.params.count ?? "n"}` : undefined,
         selected: old?.selected,
+        data: {
+          active:
+            previous.selected.includes(e.source) ||
+            previous.selected.includes(e.target),
+        },
       };
       return old && equal(old, next) ? old : next;
     });
