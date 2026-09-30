@@ -47,12 +47,8 @@ async function connect(
   if (await page.getByRole("button", { name: "Close inspector" }).isVisible())
     await page.getByRole("button", { name: "Close inspector" }).click();
   await page.waitForTimeout(300);
-  const from = page
-    .getByTestId(`node-${source}`)
-    .locator(`.react-flow__handle-right[data-handleid="out"]`);
-  const to = page
-    .getByTestId(`node-${target}`)
-    .locator(`.react-flow__handle-left[data-handleid="in"]`);
+  const from = page.getByTestId(`node-${source}`).locator(".handle-source");
+  const to = page.getByTestId(`node-${target}`).locator(".handle-target");
   const a = await from.boundingBox(),
     b = await to.boundingBox();
   if (!a || !b) throw new Error("Missing handle");

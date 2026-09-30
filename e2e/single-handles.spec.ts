@@ -39,18 +39,20 @@ const node = (page: Page, id: string) =>
   page.locator(`.react-flow__node[data-id="${id}"] .canvas-node`);
 const handle = (page: Page, id: string, side: "source" | "target") =>
   node(page, id).locator(`.handle-${side} .react-flow__handle`);
+const hit = (page: Page, id: string, side: "source" | "target") =>
+  node(page, id).locator(`.handle-${side}`);
 async function drag(
   page: Page,
   source: string,
   target: string,
   reverse = false,
 ) {
-  const from = handle(
+  const from = hit(
     page,
     reverse ? target : source,
     reverse ? "target" : "source",
   );
-  const to = handle(
+  const to = hit(
     page,
     reverse ? source : target,
     reverse ? "source" : "target",
@@ -153,7 +155,7 @@ test("dropping on empty canvas opens a filtered palette and connects a new node 
 }) => {
   await open(page);
   const before = await snapshot(page),
-    box = (await handle(page, "n_img", "source").boundingBox())!;
+    box = (await hit(page, "n_img", "source").boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(1050, 700, { steps: 15 });
@@ -187,9 +189,9 @@ test("clicking either plus opens the adjacent compatible palette without draggin
   page,
 }) => {
   await open(page);
-  const hit = (await handle(page, "n_prompt", "source").boundingBox())!;
+  const box = (await hit(page, "n_prompt", "source").boundingBox())!;
   // Exercise the 25px hit area outside the transparent 2px anchor.
-  await page.mouse.click(hit.x + hit.width / 2 + 8, hit.y + hit.height / 2);
+  await page.mouse.click(box.x + box.width / 2 + 8, box.y + box.height / 2);
   const palette = page.getByRole("dialog", { name: "Node palette" });
   await expect(palette).toBeVisible();
   await expect(palette).toHaveClass(/attached/);
@@ -201,7 +203,7 @@ test("clicking either plus opens the adjacent compatible palette without draggin
     targetPort: "prompt",
   });
   await page.getByRole("button", { name: "Close inspector" }).click();
-  await handle(page, "n_edit", "target").click();
+  await hit(page, "n_edit", "target").click();
   await expect(palette).toBeVisible();
   await palette.getByRole("button", { name: /Generate image/ }).click();
   await expect.poll(async () => (await snapshot(page)).edges.length).toBe(2);
@@ -212,4 +214,119 @@ test("clicking either plus opens the adjacent compatible palette without draggin
     target: "n_edit",
     targetPort: "image",
   });
+});
+
+test("larger plus icons sit outside the node and magnet follows the pointer without moving the hit area", async ({
+  page,
+}, info) => {
+  await open(page);
+  await node(page, "n_edit").locator(".node-title").click();
+  await expect(
+    page.getByRole("complementary", { name: "Node inspector" }),
+  ).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  const before = await snapshot(page);
+  for (const zoom of [1, 0.5]) {
+    await page.getByLabel("Zoom", { exact: true }).fill(String(zoom));
+    for (const side of ["source", "target"] as const) {
+      const area = hit(page, "n_edit", side),
+        plus = area.locator(".handle-plus");
+      const box = (await area.boundingBox())!,
+        bounds = (await node(page, "n_edit").boundingBox())!;
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const anchor = (await handle(page, "n_edit", side).boundingBox())!;
+      const anchorX = anchor.x + anchor.width / 2;
+      expect(center.x).toBeCloseTo(
+        anchorX + (side === "source" ? 34 : -34) * zoom,
+        1,
+      );
+      expect(
+        Math.abs(
+          anchorX - (side === "source" ? bounds.x + bounds.width : bounds.x),
+        ),
+      ).toBeLessThanOrEqual(1.1 * zoom);
+      await expect(area).toHaveCSS("cursor", "crosshair");
+      await expect(plus.locator("svg")).toHaveAttribute("width", "16");
+      await page.mouse.move(center.x + 6 * zoom, center.y + 6 * zoom);
+      await expect(plus).toHaveCSS("opacity", "1");
+      await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -6, -6)");
+      expect(await area.boundingBox()).toEqual(box);
+      const cursor = await page.evaluate(
+        ({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
+        { x: center.x + 6 * zoom, y: center.y + 6 * zoom },
+      );
+      expect(cursor).toBe("crosshair");
+      const outside = await page.evaluate(
+        ({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
+        { x: center.x, y: center.y + 20 * zoom },
+      );
+      expect(outside).not.toBe("crosshair");
+      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 30 * zoom);
+      await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
+      if (zoom === 1 && side === "source")
+        await page.screenshot({
+          path: info.outputPath("larger-plus-outside-node.png"),
+        });
+    }
+  }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const area = hit(page, "n_edit", "source"),
+    box = (await area.boundingBox())!,
+    plus = area.locator(".handle-plus");
+  await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 3);
+  await expect(plus).toHaveCSS("transition-duration", "0s");
+  await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -6, -6)");
+  await page.mouse.move(1000, 800);
+  await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
+  expect(await snapshot(page)).toEqual(before);
+});
+
+test("resting handles are invisible and three edges share one anchor and a 60px horizontal stem", async ({
+  page,
+}) => {
+  await open(page);
+  for (const target of ["n_img", "n_img2", "n_edit"])
+    await drag(page, "n_prompt", target);
+  await expect(page.locator(".react-flow__edge-path")).toHaveCount(3);
+  await page
+    .locator(".react-flow__pane")
+    .click({ position: { x: 1300, y: 120 } });
+  await page.mouse.move(1000, 800);
+  for (const side of ["source", "target"] as const) {
+    await expect(handle(page, "n_prompt", side)).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
+    await expect(handle(page, "n_prompt", side)).toHaveCSS(
+      "border-width",
+      "0px",
+    );
+    await expect(hit(page, "n_prompt", side).locator(".handle-plus")).toHaveCSS(
+      "opacity",
+      "0",
+    );
+  }
+  const paths = await page
+    .locator(".react-flow__edge-path")
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const path = element as SVGPathElement;
+        const start = path.getPointAtLength(0),
+          stem = path.getPointAtLength(60),
+          near = path.getPointAtLength(30);
+        return {
+          d: path.getAttribute("d")!,
+          start: { x: start.x, y: start.y },
+          stem: { x: stem.x, y: stem.y },
+          near: { x: near.x, y: near.y },
+        };
+      }),
+    );
+  for (const path of paths) {
+    expect(path.start).toEqual(paths[0].start);
+    expect(path.stem.x).toBeCloseTo(path.start.x + 60, 3);
+    expect(path.near.x).toBeCloseTo(path.start.x + 30, 3);
+    expect(path.stem.y).toBe(path.start.y);
+    expect(path.near.y).toBe(path.start.y);
+    expect(path.d.split(" C")[0]).toBe(paths[0].d.split(" C")[0]);
+  }
 });

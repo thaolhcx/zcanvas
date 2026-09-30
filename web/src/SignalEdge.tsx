@@ -1,5 +1,5 @@
 import { memo, useSyncExternalStore } from "react";
-import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, type EdgeProps } from "@xyflow/react";
 
 import { useCanvas } from "./store.ts";
 
@@ -16,11 +16,20 @@ export const SignalEdge = memo(function SignalEdge(props: EdgeProps) {
       s.selected.includes(props.source) || s.selected.includes(props.target),
   );
   const reduced = useSyncExternalStore(subscribe, getReducedMotion);
-  const [path] = getBezierPath({
-    ...props,
-    curvature: props.pathOptions?.curvature,
-  });
   const { id, sourceX, sourceY, targetX, targetY } = props;
+  // Single horizontal anchors share a 60px stem before the curves separate.
+  const sourceLead = sourceX + 60,
+    targetLead = targetX - 60,
+    gap = targetLead - sourceLead;
+  const offset = Math.max(
+    60,
+    gap >= 0
+      ? gap / 2
+      : 25 * (props.pathOptions?.curvature ?? 0.25) * Math.sqrt(-gap),
+  );
+  const path = `M${sourceX},${sourceY} L${sourceLead},${sourceY} C${sourceLead + offset},${sourceY} ${targetLead - offset},${targetY} ${targetLead},${targetY} L${targetX},${targetY}`;
+  const left = Math.min(sourceX, targetX, targetLead - offset) - 24,
+    right = Math.max(sourceX, targetX, sourceLead + offset) + 24;
   return (
     <>
       <BaseEdge
@@ -41,9 +50,9 @@ export const SignalEdge = memo(function SignalEdge(props: EdgeProps) {
             <mask
               id={`${id}-m`}
               maskUnits="userSpaceOnUse"
-              x={Math.min(sourceX, targetX) - 24}
+              x={left}
               y={Math.min(sourceY, targetY) - 24}
-              width={Math.abs(targetX - sourceX) + 48}
+              width={right - left}
               height={Math.abs(targetY - sourceY) + 48}
             >
               <circle r="15" fill={`url(#${id}-g)`}>

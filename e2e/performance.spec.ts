@@ -120,7 +120,7 @@ test("keeps edge dragging above 50 FPS with 128 nodes and input ports", async ({
     .toBe(64);
   const sourceHandles = await page
     .getByTestId("node-input.asset")
-    .locator('.react-flow__handle-right[data-handleid="out"]')
+    .locator(".handle-source")
     .all();
   let source: { x: number; y: number } | undefined;
   for (const handle of sourceHandles) {
