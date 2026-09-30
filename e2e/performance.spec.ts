@@ -120,7 +120,7 @@ test("keeps edge dragging above 50 FPS with 128 nodes and input ports", async ({
     .toBe(64);
   const sourceHandles = await page
     .getByTestId("node-input.asset")
-    .locator('.react-flow__handle-right[data-handleid="asset"]')
+    .locator('.react-flow__handle-right[data-handleid="out"]')
     .all();
   let source: { x: number; y: number } | undefined;
   for (const handle of sourceHandles) {
@@ -139,12 +139,10 @@ test("keeps edge dragging above 50 FPS with 128 nodes and input ports", async ({
   await page.mouse.down();
   await page.mouse.move(source!.x + 40, source!.y + 10);
   const target = page.getByTestId("node-image.generate").first();
-  await expect(
-    target.locator('.react-flow__handle-left[data-handleid="reference"]'),
-  ).toHaveCSS("opacity", "1");
-  await expect(
-    target.locator('.react-flow__handle-left[data-handleid="prompt"]'),
-  ).toHaveCSS("opacity", "0.15");
+  await expect(target.locator(".handle-target")).not.toHaveClass(
+    /incompatible/,
+  );
+  await expect(target.locator(".react-flow__handle-left")).toHaveCount(1);
   for (let cycle = 0; cycle < 3; cycle++) {
     for (let step = 0; step < 90; step++) {
       const phase = (step / 89) * Math.PI * 2;
@@ -156,9 +154,9 @@ test("keeps edge dragging above 50 FPS with 128 nodes and input ports", async ({
     }
   }
   await page.mouse.up();
-  await expect(
-    target.locator('.react-flow__handle-left[data-handleid="prompt"]'),
-  ).toHaveCSS("opacity", "1");
+  await expect(target.locator(".handle-target")).not.toHaveClass(
+    /incompatible/,
+  );
   await page.waitForTimeout(1100);
   const measurement = await page.evaluate(() => window.__zcanvasPerf);
   await testInfo.attach("edge-drag-128-frame-metrics", {

@@ -741,33 +741,68 @@ a {
   letter-spacing: 2px;
   font-size: 18px;
 }
-.react-flow__handle {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--surface);
-  background: #31815b;
+.handle-hit {
+  position: absolute;
+  top: 50%;
+  width: 25px;
+  height: 25px;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+}
+.handle-target {
+  left: 0;
+}
+.handle-source {
+  left: 100%;
+}
+.handle-hit .react-flow__handle {
+  left: 50%;
+  right: auto;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+}
+.handle-hit .react-flow__handle::before {
+  content: "";
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  left: -11.5px;
+  top: -11.5px;
+}
+.handle-plus {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--text) 55%, transparent);
+  opacity: 0;
   transition:
     transform var(--motion-medium) var(--motion-spring),
     opacity var(--motion-medium) var(--motion-spring);
 }
-.react-flow__handle-left:hover,
-.react-flow__handle-left.compatible {
-  transform: translate(-50%, -50%) scale(1.35);
+.handle-target .handle-plus {
+  transform: translate(28px, -12px);
 }
-.react-flow__handle-right:hover {
-  transform: translate(50%, -50%) scale(1.35);
+.handle-source .handle-plus {
+  transform: translate(-52px, -12px);
 }
-.react-flow__handle.kind-text {
-  background: #a8791e;
+.canvas-node:hover .handle-plus,
+.canvas-node.selected .handle-plus,
+.handle-hit:focus-within .handle-plus {
+  opacity: 1;
+  transform: translate(-12px, -12px);
 }
-.react-flow__handle.kind-video {
-  background: #4877c5;
-}
-.react-flow__handle.kind-audio {
-  background: #b25479;
-}
-.react-flow__handle.kind-any {
-  background: #8763b8;
+.handle-hit.incompatible .handle-plus {
+  color: var(--line-strong);
 }
 .status {
   margin-left: auto;
@@ -887,6 +922,10 @@ a {
   padding: 19px 18px 12px;
   font-size: 14px;
   font-weight: 600;
+}
+.palette.attached {
+  transform: none;
+  animation-name: panel-enter;
 }
 .palette-heading > span {
   display: block;

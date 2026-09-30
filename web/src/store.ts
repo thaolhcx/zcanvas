@@ -193,8 +193,8 @@ export function bindGraph(graph: Graph) {
         id: e.id,
         source: e.source,
         target: e.target,
-        sourceHandle: e.sourcePort,
-        targetHandle: e.targetPort,
+        sourceHandle: "out",
+        targetHandle: "in",
         selected: old?.selected,
       };
       return old && equal(old, next) ? old : next;

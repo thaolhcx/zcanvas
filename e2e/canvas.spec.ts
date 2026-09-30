@@ -49,10 +49,10 @@ async function connect(
   await page.waitForTimeout(300);
   const from = page
     .getByTestId(`node-${source}`)
-    .locator(`.react-flow__handle-right[data-handleid="${sourcePort}"]`);
+    .locator(`.react-flow__handle-right[data-handleid="out"]`);
   const to = page
     .getByTestId(`node-${target}`)
-    .locator(`.react-flow__handle-left[data-handleid="${targetPort}"]`);
+    .locator(`.react-flow__handle-left[data-handleid="in"]`);
   const a = await from.boundingBox(),
     b = await to.boundingBox();
   if (!a || !b) throw new Error("Missing handle");
@@ -60,6 +60,29 @@ async function connect(
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 15 });
   await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const recipe = await snapshot(page);
+      const sourceNode = recipe.nodes.find(
+        (node: { type: string }) => node.type === source,
+      );
+      const targetNode = recipe.nodes.find(
+        (node: { type: string }) => node.type === target,
+      );
+      return recipe.edges.some(
+        (edge: {
+          source: string;
+          target: string;
+          sourcePort: string;
+          targetPort: string;
+        }) =>
+          edge.source === sourceNode?.id &&
+          edge.target === targetNode?.id &&
+          edge.sourcePort === sourcePort &&
+          edge.targetPort === targetPort,
+      );
+    })
+    .toBe(true);
 }
 test("builds pilot by palette and port dragging, runs, exports, saves and opens preset", async ({
   page,
