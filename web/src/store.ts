@@ -29,7 +29,10 @@ export interface CanvasState {
   compat?: Set<string>;
   error: string;
   fieldErrors: Record<string, string>;
-  onNodesChange: (changes: NodeChange[]) => void;
+  onNodesChange: (
+    changes: NodeChange[],
+    snap?: (nodes: Node[]) => Node[],
+  ) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
 }
 export const useCanvas = create<CanvasState>((set, get) => ({
@@ -44,11 +47,34 @@ export const useCanvas = create<CanvasState>((set, get) => ({
   compat: undefined,
   error: "",
   fieldErrors: {},
-  onNodesChange(changes) {
+  onNodesChange(changes, snap) {
+    const nodes = get().nodes;
+    if (snap) {
+      const byId = new Map(nodes.map((node) => [node.id, node]));
+      const dragged: Node[] = [];
+      for (const change of changes) {
+        if (change.type !== "position" || !change.dragging || !change.position)
+          continue;
+        const node = byId.get(change.id);
+        if (node) dragged.push({ ...node, position: change.position });
+      }
+      if (dragged.length) {
+        const snapped = new Map(
+          snap(dragged).map((node) => [node.id, node.position]),
+        );
+        changes = changes.map((change) =>
+          change.type === "position" &&
+          change.dragging &&
+          snapped.has(change.id)
+            ? { ...change, position: snapped.get(change.id)! }
+            : change,
+        );
+      }
+    }
     set({
       nodes: applyNodeChanges(
         changes.filter((c) => c.type !== "remove"),
-        get().nodes,
+        nodes,
       ),
     });
   },
@@ -163,29 +189,12 @@ export function bindGraph(graph: Graph) {
     }
     const edges = r.edges.map((e) => {
       const old = oldEdges.get(e.id);
-      const source = recipeNodes.get(e.source),
-        port =
-          source &&
-          graph.registry
-            .get(source.type)
-            ?.outputs.find((p) => p.key === e.sourcePort);
-      const target = recipeNodes.get(e.target),
-        targetPort =
-          target &&
-          graph.registry
-            .get(target.type)
-            ?.inputs.find((p) => p.key === e.targetPort);
-      const fan =
-        typeof port?.kind === "string" &&
-        port.kind.startsWith("list<") &&
-        targetPort?.kind !== "any";
       const next: Edge = {
         id: e.id,
         source: e.source,
         target: e.target,
-        sourceHandle: e.sourcePort,
-        targetHandle: e.targetPort,
-        label: fan ? `×${source?.params.count ?? "n"}` : undefined,
+        sourceHandle: "out",
+        targetHandle: "in",
         selected: old?.selected,
       };
       return old && equal(old, next) ? old : next;

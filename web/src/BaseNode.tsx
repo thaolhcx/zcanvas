@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useContext, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
   Image,
@@ -9,9 +9,10 @@ import {
   ArrowUpRight,
   Upload,
   WandSparkles,
+  CirclePlus,
 } from "lucide-react";
 import type { Asset, Output, RecipeNode } from "../../contracts/index.ts";
-import { useGraph } from "./context.ts";
+import { useGraph, PortPaletteContext } from "./context.ts";
 import { ParamForm } from "./Params.tsx";
 import {
   action,
@@ -91,7 +92,7 @@ export function Preview({ id }: { id: string }) {
   const output: Output | undefined = values[0] ?? uploaded;
   if (output && "id" in output)
     return (
-      <div className="preview nodrag">
+      <div className={`preview nodrag ${values[0] ? "result-preview" : ""}`}>
         <img
           src={output.thumbUrl ?? undefined}
           alt={output.kind === "audio" ? "" : `${type.title} preview`}
@@ -118,13 +119,76 @@ export function Preview({ id }: { id: string }) {
     );
   if (node.type === "input.prompt") return null;
   return (
-    <div className="preview empty">
+    <div
+      className="preview empty"
+      data-aspect={
+        node.type === "image.generate"
+          ? String(node.params.aspect ?? "9:16")
+          : undefined
+      }
+    >
       <WandSparkles size={22} />
       <span>
         {type.outputs[0]?.kind
           .toString()
           .replace("list<", "")
           .replace(">", "") ?? "output"}
+      </span>
+    </div>
+  );
+}
+function ConnectionPoint({
+  id,
+  side,
+  connectable,
+  compatible,
+}: {
+  id: string;
+  side: "source" | "target";
+  connectable: boolean;
+  compatible?: boolean;
+}) {
+  const openPalette = useContext(PortPaletteContext);
+  const down = useRef<{ x: number; y: number } | undefined>(undefined);
+  return (
+    <div
+      className={`handle-hit handle-${side} ${compatible === false ? "incompatible" : ""}`}
+    >
+      <Handle
+        id={side === "source" ? "out" : "in"}
+        type={side}
+        position={side === "source" ? Position.Right : Position.Left}
+        isConnectable={connectable}
+        isConnectableStart={connectable}
+        isConnectableEnd={connectable}
+        aria-label={side === "source" ? "Connect output" : "Connect input"}
+        role="button"
+        tabIndex={0}
+        onMouseDown={(event) => {
+          down.current = { x: event.clientX, y: event.clientY };
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (
+            !down.current ||
+            Math.hypot(
+              event.clientX - down.current.x,
+              event.clientY - down.current.y,
+            ) <= 4
+          )
+            openPalette(id, side);
+          down.current = undefined;
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            openPalette(id, side);
+          }
+        }}
+      />
+      <span className="handle-plus">
+        <CirclePlus size={21} />
       </span>
     </div>
   );
@@ -196,31 +260,17 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
           )}
         </>
       )}
-      {entry.inputs.map((p, i) => (
-        <Handle
-          key={p.key}
-          id={p.key}
-          type="target"
-          position={Position.Left}
-          title={`${p.label ?? p.key} · ${p.kind}`}
-          style={{
-            top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)`,
-            opacity: !compat || compat.has(`${id}.${p.key}`) ? 1 : 0.15,
-          }}
-          className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
-        />
-      ))}
-      {entry.outputs.map((p, i) => (
-        <Handle
-          key={p.key}
-          id={p.key}
-          type="source"
-          position={Position.Right}
-          title={`${p.label ?? p.key} · ${p.kind}`}
-          style={{ top: compact ? 14 + i * 20 : `calc(50% + ${i * 28}px)` }}
-          className={`kind-${String(p.kind).replace("list<", "").replace(">", "")}`}
-        />
-      ))}
+      <ConnectionPoint
+        id={id}
+        side="target"
+        connectable={entry.inputs.length > 0}
+        compatible={compat ? compat.has(id) : undefined}
+      />
+      <ConnectionPoint
+        id={id}
+        side="source"
+        connectable={entry.outputs.length > 0}
+      />
       {running && (
         <div
           className="node-progress"

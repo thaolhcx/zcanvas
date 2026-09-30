@@ -18,6 +18,7 @@ import {
   Redo2,
   Workflow,
   Play,
+  LoaderCircle,
   Square,
   ArrowLeft,
   Download,
@@ -37,18 +38,21 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  validate,
-  type Recipe,
-  type Run,
-  type NodeType,
-  type Kind,
-} from "../../contracts/index.ts";
+import { type Recipe, type Run, type NodeType } from "../../contracts/index.ts";
 import { estimateCredits } from "../../contracts/estimate.ts";
 import { BaseNode } from "./BaseNode.tsx";
 import { ParamForm } from "./Params.tsx";
 import { NodeInspector } from "./NodeInspector.tsx";
-import { useGraph } from "./context.ts";
+import { SignalEdge } from "./SignalEdge.tsx";
+import { HelperLines, type HelperLinesHandle } from "./HelperLines.tsx";
+import { useGraph, PortPaletteContext } from "./context.ts";
+import { useHandleMagnet } from "./useHandleMagnet.ts";
+import {
+  outputKinds,
+  reachable,
+  resolveInput,
+  resolvePorts,
+} from "./connections.ts";
 import { action, useCanvas, useRun, updateRun, EMPTY_ISSUES } from "./store.ts";
 import { post, followRun, request } from "./api.ts";
 import { Debug } from "./Debug.tsx";
@@ -58,7 +62,7 @@ const nodeTypes = {
     <span className="group-name">{String(data.label ?? "Group")}</span>
   ),
 };
-const edgeTypes = {};
+const edgeTypes = { default: SignalEdge };
 const categoryIcons = {
   input: Type,
   image: ImageIcon,
@@ -69,23 +73,10 @@ const categoryIcons = {
   text: Type,
 };
 const incomplete = new Set(["INPUT_REQUIRED", "PARAM_REQUIRED"]);
-const acceptsKind = (output: Kind | Kind[], input: Kind | Kind[]) => {
-  const outputs = Array.isArray(output) ? output : [output],
-    inputs = Array.isArray(input) ? input : [input];
-  return outputs.some((actual) =>
-    inputs.some(
-      (declared) =>
-        declared === "any" ||
-        actual === "any" ||
-        declared === actual ||
-        (actual.startsWith("list<") && declared === actual.slice(5, -1)),
-    ),
-  );
-};
-type Palette = {
-  position: XYPosition;
-  source?: { nodeId: string; port: string };
-};
+const motionDuration = (ms: number) =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms;
+type Endpoint = { nodeId: string; side: "source" | "target" };
+type Palette = { position: XYPosition; endpoint?: Endpoint };
 export function Canvas({
   syncStatus,
   onBack,
@@ -108,6 +99,7 @@ function Workspace({
 }) {
   const graph = useGraph(),
     flow = useReactFlow();
+  const magnet = useHandleMagnet();
   const { nodes, edges, onNodesChange, onEdgesChange } = useCanvas(
     useShallow((s) => ({
       nodes: s.nodes,
@@ -128,10 +120,17 @@ function Workspace({
     [zoom, setZoom] = useState(1),
     [menu, setMenu] = useState(false),
     [name, setName] = useState(graph.toRecipe().meta.name),
-    [inspector, setInspector] = useState<string>();
+    [inspector, setInspector] = useState<string>(),
+    [viewportFitting, setViewportFitting] = useState(false);
   const clipboard = useRef<Recipe | undefined>(undefined),
+    helperLines = useRef<HelperLinesHandle>(null),
+    connectionOrigin = useRef<(Endpoint & { point: XYPosition }) | undefined>(
+      undefined,
+    ),
     upload = useRef<HTMLInputElement>(null),
     stopRun = useRef<(() => void) | undefined>(undefined),
+    fitSequence = useRef(0),
+    fitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     [submitting, setSubmitting] = useState(false);
   const activeNode = useCanvas((s) =>
       inspector ? s.byId[inspector] : undefined,
@@ -169,13 +168,13 @@ function Workspace({
         ...previous.filter((r) => r.runId !== run.runId),
       ]);
   }, [run?.runId, run?.status]);
-  const openPalette = (position?: XYPosition, source?: Palette["source"]) => {
+  const openPalette = (position?: XYPosition, endpoint?: Endpoint) => {
     setSearch("");
     setPalette({
       position:
         position ??
         flow.screenToFlowPosition({ x: innerWidth / 2, y: innerHeight / 2 }),
-      source,
+      endpoint,
     });
   };
   const select = useCallback(
@@ -189,85 +188,113 @@ function Workspace({
     },
     [],
   );
-  const validConnection = (connection: {
-    source: string;
-    target: string;
-    sourceHandle?: string | null;
-    targetHandle?: string | null;
-  }) => {
-    const recipe = graph.toRecipe();
-    const target = recipe.nodes.find((n) => n.id === connection.target),
-      type = target && graph.registry.get(target.type);
-    if (!type?.inputs.find((p) => p.key === connection.targetHandle)?.multiple)
-      recipe.edges = recipe.edges.filter(
-        (e) =>
-          e.target !== connection.target ||
-          e.targetPort !== connection.targetHandle,
-      );
-    recipe.edges.push({
-      id: "candidate_edge",
-      source: connection.source,
-      target: connection.target,
-      sourcePort: connection.sourceHandle ?? "",
-      targetPort: connection.targetHandle ?? "",
-    });
-    return !validate(recipe, graph.registry).some(
-      (i) => !incomplete.has(i.code),
+  const validConnection = (connection: { source: string; target: string }) => {
+    const origin = connectionOrigin.current;
+    return (
+      !!origin &&
+      !!useCanvas
+        .getState()
+        .compat?.has(
+          origin.side === "source" ? connection.target : connection.source,
+        )
     );
   };
   const connect = (connection: Connection) =>
-    action(() =>
+    action(() => {
+      const recipe = graph.toRecipe();
+      const ports = resolvePorts(
+        recipe,
+        graph.registry,
+        outputKinds(recipe, graph.registry),
+        connection.source,
+        connection.target,
+      );
+      if (!ports) throw new Error("KIND: No compatible free input.");
       graph.connect({
         source: connection.source,
         target: connection.target,
-        sourcePort: connection.sourceHandle ?? "",
-        targetPort: connection.targetHandle ?? "",
-      }),
-    );
-  const connectStart: OnConnectStart = (
-    _,
-    { nodeId, handleId, handleType },
-  ) => {
-    if (handleType !== "source" || !nodeId || !handleId) {
-      useCanvas.setState({ compat: undefined });
-      return;
-    }
-    const byId = useCanvas.getState().byId,
-      source = byId[nodeId],
-      output =
-        source &&
-        graph.registry
-          .get(source.type)
-          ?.outputs.find((p) => p.key === handleId);
-    if (!output) {
-      useCanvas.setState({ compat: undefined });
-      return;
-    }
+        ...ports,
+      });
+    });
+  const connectStart: OnConnectStart = (event, { nodeId, handleType }) => {
+    if (!nodeId || !handleType) return;
+    const point = "touches" in event ? event.touches[0] : event;
+    connectionOrigin.current = {
+      nodeId,
+      side: handleType,
+      point: { x: point.clientX, y: point.clientY },
+    };
+    const recipe = graph.toRecipe(),
+      kinds = outputKinds(recipe, graph.registry);
+    const blocked = reachable(recipe, nodeId, handleType === "source");
     const compat = new Set<string>();
-    for (const [id, node] of Object.entries(byId)) {
-      if (id === nodeId) continue;
-      for (const input of graph.registry.get(node.type)?.inputs ?? [])
-        if (acceptsKind(output.kind, input.kind))
-          compat.add(`${id}.${input.key}`);
+    for (const node of recipe.nodes) {
+      if (blocked.has(node.id)) continue;
+      const ports =
+        handleType === "source"
+          ? resolvePorts(recipe, graph.registry, kinds, nodeId, node.id)
+          : resolvePorts(recipe, graph.registry, kinds, node.id, nodeId);
+      if (ports) compat.add(node.id);
     }
-    useCanvas.setState({ compat });
+    useCanvas.setState({ compat, error: "" });
   };
   const connectEnd: OnConnectEnd = (event, state) => {
+    const endpoint = connectionOrigin.current;
+    connectionOrigin.current = undefined;
     useCanvas.setState({ compat: undefined });
-    if (
-      state.isValid ||
-      state.toNode ||
-      state.fromHandle?.type !== "source" ||
-      !state.fromNode
-    )
+    if (!endpoint || state.isValid) return;
+    if (state.toNode) {
+      useCanvas.setState({
+        error:
+          "KIND: No compatible free input, or this connection would create a cycle.",
+      });
       return;
+    }
     const point = "changedTouches" in event ? event.changedTouches[0] : event;
-    openPalette(
-      flow.screenToFlowPosition({ x: point.clientX, y: point.clientY }),
-      { nodeId: state.fromNode.id, port: state.fromHandle.id ?? "" },
-    );
+    // A click on the handle opens its adjacent palette through PortPaletteContext.
+    if (
+      state.fromNode &&
+      Math.hypot(
+        point.clientX - endpoint.point.x,
+        point.clientY - endpoint.point.y,
+      ) > 4
+    )
+      openPalette(
+        flow.screenToFlowPosition({ x: point.clientX, y: point.clientY }),
+        endpoint,
+      );
   };
-  const fit = () => void flow.fitView({ padding: 0.15, duration: 200 });
+  const openPortPalette = useCallback(
+    (nodeId: string, side: "source" | "target") => {
+      const node = flow.getInternalNode(nodeId);
+      if (!node) return;
+      setSearch("");
+      setPalette({
+        position: {
+          x:
+            node.internals.positionAbsolute.x +
+            (side === "source" ? (node.measured.width ?? 280) + 60 : -340),
+          y: node.internals.positionAbsolute.y,
+        },
+        endpoint: { nodeId, side },
+      });
+    },
+    [flow],
+  );
+  const fitTo = (options: Parameters<typeof flow.fitView>[0], delay = 0) => {
+    clearTimeout(fitTimer.current);
+    const sequence = ++fitSequence.current;
+    setViewportFitting(true);
+    const apply = () =>
+      void flow.fitView(options).finally(() => {
+        if (sequence === fitSequence.current) setViewportFitting(false);
+      });
+    if (delay) fitTimer.current = setTimeout(apply, delay);
+    else apply();
+  };
+  const fit = () => fitTo({ padding: 0.15, duration: motionDuration(200) });
+  const scheduleFit = () =>
+    fitTo({ padding: 0.15, duration: motionDuration(200) }, 50);
   const remove = () =>
     action(() =>
       graph.transaction("user", () => {
@@ -314,7 +341,7 @@ function Workspace({
   const layout = () =>
     action(() => {
       graph.autoLayout();
-      setTimeout(fit, 50);
+      scheduleFit();
     });
   const start = async () => {
     const invalid = graph.validate()[0];
@@ -324,7 +351,11 @@ function Workspace({
         Object.keys(useCanvas.getState().fieldErrors)[0]?.split(".")[0];
       if (id) {
         setInspector(id);
-        void flow.fitView({ nodes: [{ id }], maxZoom: 1, duration: 250 });
+        fitTo({
+          nodes: [{ id }],
+          maxZoom: 1,
+          duration: motionDuration(250),
+        });
       }
       return;
     }
@@ -393,46 +424,62 @@ function Workspace({
     addEventListener("keydown", keyboard);
     return () => removeEventListener("keydown", keyboard);
   });
+  const paletteRecipe = palette?.endpoint ? graph.toRecipe() : undefined;
+  const paletteScreen =
+    palette?.endpoint && flow.flowToScreenPosition(palette.position);
+  const paletteTop = paletteScreen
+    ? Math.max(94, Math.min(paletteScreen.y, innerHeight - 340))
+    : 0;
+  const paletteKinds =
+    paletteRecipe && outputKinds(paletteRecipe, graph.registry);
   const compatiblePort = (entry: NodeType) => {
-    if (!palette?.source) return undefined;
-    const recipe = graph.toRecipe();
-    recipe.nodes.push({
-      id: "candidate_node",
-      type: entry.type,
-      typeVersion: entry.version,
-      params: {},
-      position: { x: 0, y: 0 },
-    });
-    return entry.inputs.find((p) => {
-      const next = structuredClone(recipe);
-      next.edges.push({
-        id: "candidate_edge",
-        source: palette.source!.nodeId,
-        sourcePort: palette.source!.port,
-        target: "candidate_node",
-        targetPort: p.key,
-      });
-      return !validate(next, graph.registry).some(
-        (i) => !incomplete.has(i.code),
-      );
-    })?.key;
+    const endpoint = palette?.endpoint;
+    if (!endpoint || !paletteRecipe || !paletteKinds) return undefined;
+    const node = paletteRecipe.nodes.find(
+      (node) => node.id === endpoint.nodeId,
+    );
+    if (!node) return undefined;
+    if (endpoint.side === "source") {
+      const output = graph.registry.get(node.type)?.outputs[0];
+      const kind = output && paletteKinds.get(`${node.id}.${output.key}`);
+      return kind && resolveInput(entry, kind)?.key;
+    }
+    const target = graph.registry.get(node.type);
+    const occupied = new Set(
+      paletteRecipe.edges
+        .filter((edge) => edge.target === node.id)
+        .map((edge) => edge.targetPort),
+    );
+    return (
+      target &&
+      entry.outputs[0] &&
+      resolveInput(target, entry.outputs[0].kind, occupied)?.key
+    );
   };
   const choices = [...graph.registry.values()].filter(
     (t) =>
       `${t.title} ${t.type}`.toLowerCase().includes(search.toLowerCase()) &&
-      (!palette?.source || compatiblePort(t)),
+      (!palette?.endpoint || compatiblePort(t)),
   );
   const add = (entry: NodeType) =>
     action(() => {
       graph.transaction("user", () => {
+        const endpoint = palette?.endpoint;
         const id = graph.addNode(entry.type, { position: palette!.position });
-        if (palette?.source)
-          graph.connect({
-            source: palette.source.nodeId,
-            sourcePort: palette.source.port,
-            target: id,
-            targetPort: compatiblePort(entry)!,
-          });
+        if (endpoint) {
+          const source = endpoint.side === "source" ? endpoint.nodeId : id;
+          const target = endpoint.side === "source" ? id : endpoint.nodeId;
+          const recipe = graph.toRecipe();
+          const ports = resolvePorts(
+            recipe,
+            graph.registry,
+            outputKinds(recipe, graph.registry),
+            source,
+            target,
+          );
+          if (!ports) throw new Error("KIND: No compatible free input.");
+          graph.connect({ source, target, ...ports });
+        }
         setInspector(id);
       });
       setPalette(undefined);
@@ -450,84 +497,117 @@ function Workspace({
   };
   return (
     <main className="workspace">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onSelectionChange={select}
-        onConnect={connect}
-        onConnectStart={connectStart}
-        isValidConnection={validConnection}
-        onConnectEnd={connectEnd}
-        onNodeDragStop={(_, node, dragged) =>
-          action(() => {
-            if (node.type === "group")
-              graph.updateGroup(node.id, { position: node.position });
-            else
-              graph.moveNodes(
-                dragged.map((n) => {
-                  const parent = n.parentId
-                    ? flow.getNode(n.parentId)
-                    : undefined;
-                  return {
-                    id: n.id,
-                    position: {
-                      x: n.position.x + (parent?.position.x ?? 0),
-                      y: n.position.y + (parent?.position.y ?? 0),
-                    },
-                  };
+      <PortPaletteContext.Provider value={openPortPalette}>
+        <ReactFlow
+          {...magnet}
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={(changes) =>
+            onNodesChange(changes, helperLines.current?.snap)
+          }
+          onEdgesChange={onEdgesChange}
+          onSelectionChange={select}
+          connectOnClick={false}
+          onConnect={connect}
+          onConnectStart={connectStart}
+          isValidConnection={validConnection}
+          onConnectEnd={connectEnd}
+          onNodeDragStop={(_, __, dragged) => {
+            // React Flow's stop payload contains its unsnapped drag positions.
+            const snapped = helperLines.current?.snap(dragged) ?? dragged;
+            helperLines.current?.clear();
+            onNodesChange(
+              snapped.map((node) => ({
+                id: node.id,
+                type: "position",
+                position: node.position,
+                dragging: false,
+              })),
+            );
+            const groups = new Map(
+              snapped
+                .filter((node) => node.type === "group")
+                .map((node) => [node.id, node.position]),
+            );
+            const moves = snapped
+              .filter((node) => node.type !== "group")
+              .map((node) => {
+                const parent = node.parentId
+                  ? (groups.get(node.parentId) ??
+                    flow.getInternalNode(node.parentId)?.internals
+                      .positionAbsolute)
+                  : undefined;
+                return {
+                  id: node.id,
+                  position: {
+                    x: node.position.x + (parent?.x ?? 0),
+                    y: node.position.y + (parent?.y ?? 0),
+                  },
+                };
+              });
+            action(() => {
+              graph.transaction("user", () => {
+                for (const [id, position] of groups)
+                  graph.updateGroup(id, { position });
+                if (moves.length) graph.moveNodes(moves);
+              });
+            });
+          }}
+          onNodeDoubleClick={(_, node) => {
+            if (node.type === "group") {
+              const name = prompt("Group name", String(node.data.label));
+              if (name !== null)
+                action(() => graph.updateGroup(node.id, { name }));
+            }
+          }}
+          onPaneClick={() => {
+            setInspector(undefined);
+            setPalette(undefined);
+            setMenu(false);
+          }}
+          onDoubleClick={(event) => {
+            if (
+              (event.target as HTMLElement).classList.contains(
+                "react-flow__pane",
+              )
+            )
+              openPalette(
+                flow.screenToFlowPosition({
+                  x: event.clientX,
+                  y: event.clientY,
                 }),
               );
-          })
-        }
-        onNodeDoubleClick={(_, node) => {
-          if (node.type === "group") {
-            const name = prompt("Group name", String(node.data.label));
-            if (name !== null)
-              action(() => graph.updateGroup(node.id, { name }));
-          }
-        }}
-        onPaneClick={() => {
-          setInspector(undefined);
-          setPalette(undefined);
-          setMenu(false);
-        }}
-        onDoubleClick={(event) => {
-          if (
-            (event.target as HTMLElement).classList.contains("react-flow__pane")
-          )
-            openPalette(
-              flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-            );
-        }}
-        onMove={(_, view) => {
-          setZoom(view.zoom);
-          if (useCanvas.getState().compact !== view.zoom < 0.4)
-            useCanvas.setState({ compact: view.zoom < 0.4 });
-        }}
-        fitView
-        fitViewOptions={{ maxZoom: 0.9 }}
-        minZoom={0.08}
-        maxZoom={2}
-        onlyRenderVisibleElements={nodes.length > 128}
-        deleteKeyCode={null}
-        panOnScroll
-        zoomOnScroll={false}
-        zoomActivationKeyCode="Meta"
-        panActivationKeyCode="Space"
-        selectionOnDrag
-        panOnDrag={[1, 2]}
-        multiSelectionKeyCode="Shift"
-        selectionKeyCode="Shift"
-        defaultEdgeOptions={{ type: "default" }}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={24} size={1} color="#c7cdd6" />
-        {minimap && <MiniMap pannable zoomable />}
-      </ReactFlow>
+          }}
+          onMove={(_, view) => {
+            setZoom(view.zoom);
+            if (useCanvas.getState().compact !== view.zoom < 0.4)
+              useCanvas.setState({ compact: view.zoom < 0.4 });
+          }}
+          fitView
+          snapToGrid={false}
+          fitViewOptions={{ maxZoom: 0.9 }}
+          minZoom={0.08}
+          maxZoom={2}
+          onlyRenderVisibleElements={nodes.length > 128}
+          deleteKeyCode={null}
+          panOnScroll
+          zoomOnScroll={false}
+          zoomActivationKeyCode="Meta"
+          panActivationKeyCode="Space"
+          selectionOnDrag
+          panOnDrag={[1, 2]}
+          multiSelectionKeyCode="Shift"
+          selectionKeyCode="Shift"
+          defaultEdgeOptions={{ type: "default" }}
+          proOptions={{ hideAttribution: true }}
+        >
+          <HelperLines ref={helperLines} />
+          <Background gap={24} size={1} color="#c7cdd6" />
+          {minimap && <MiniMap pannable zoomable />}
+        </ReactFlow>
+      </PortPaletteContext.Provider>
       <header className="topbar">
         <div className="workspace-navigation">
           <button
@@ -626,7 +706,11 @@ function Workspace({
                 : "Run snapshot · ⌘Enter"
             }
           >
-            <Play size={14} />
+            {submitting ? (
+              <LoaderCircle className="spinner" size={14} />
+            ) : (
+              <Play size={14} />
+            )}
             Run · ~{estimate.toFixed(1)} cr
           </button>
         </div>
@@ -668,7 +752,7 @@ function Workspace({
           try {
             const recipe = JSON.parse(await file.text());
             graph.fromRecipe(recipe, "replace");
-            setTimeout(fit, 50);
+            scheduleFit();
           } catch (error) {
             useCanvas.setState({ error: String(error) });
           }
@@ -760,9 +844,25 @@ function Workspace({
         </div>
       )}
       {palette && (
-        <div className="palette" role="dialog" aria-label="Node palette">
+        <div
+          className={`palette ${paletteScreen ? "attached" : ""}`}
+          role="dialog"
+          aria-label="Node palette"
+          style={
+            paletteScreen
+              ? {
+                  left: Math.max(
+                    16,
+                    Math.min(paletteScreen.x, innerWidth - 308),
+                  ),
+                  top: paletteTop,
+                  maxHeight: innerHeight - paletteTop - 20,
+                }
+              : undefined
+          }
+        >
           <div className="palette-heading">
-            {palette.source ? "Connect a node" : "Add a node"}
+            {palette.endpoint ? "Connect a node" : "Add a node"}
             <span>Build your next step</span>
           </div>
           <header>
@@ -770,7 +870,7 @@ function Workspace({
             <input
               autoFocus
               aria-label="Search nodes"
-              placeholder={palette.source ? "Connect to…" : "Search nodes…"}
+              placeholder={palette.endpoint ? "Connect to…" : "Search nodes…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -814,7 +914,11 @@ function Workspace({
         </div>
       )}
       {activeNode && (
-        <NodeInspector id={activeNode.id}>
+        <NodeInspector
+          key={activeNode.id}
+          id={activeNode.id}
+          viewportFitting={viewportFitting}
+        >
           <header>
             <div className="inspector-heading">
               <span className="eyebrow">
