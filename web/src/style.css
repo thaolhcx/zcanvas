@@ -750,12 +750,12 @@ a {
   cursor: crosshair;
 }
 .handle-target {
-  --handle-offset: -34px;
-  left: -34px;
+  --handle-offset: -12px;
+  left: -12px;
 }
 .handle-source {
-  --handle-offset: 34px;
-  left: calc(100% + 34px);
+  --handle-offset: 12px;
+  left: calc(100% + 12px);
 }
 .handle-hit .react-flow__handle {
   left: calc(50% - var(--handle-offset));
@@ -802,6 +802,7 @@ a {
   transform: translate(-52px, -12px);
 }
 .canvas-node:hover .handle-plus,
+.canvas-node.magnet-active .handle-plus,
 .canvas-node.selected .handle-plus,
 .handle-hit:focus-within .handle-plus {
   opacity: 1;

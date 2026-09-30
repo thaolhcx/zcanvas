@@ -46,6 +46,7 @@ import { NodeInspector } from "./NodeInspector.tsx";
 import { SignalEdge } from "./SignalEdge.tsx";
 import { HelperLines, type HelperLinesHandle } from "./HelperLines.tsx";
 import { useGraph, PortPaletteContext } from "./context.ts";
+import { useHandleMagnet } from "./useHandleMagnet.ts";
 import {
   outputKinds,
   reachable,
@@ -98,6 +99,7 @@ function Workspace({
 }) {
   const graph = useGraph(),
     flow = useReactFlow();
+  const magnet = useHandleMagnet();
   const { nodes, edges, onNodesChange, onEdgesChange } = useCanvas(
     useShallow((s) => ({
       nodes: s.nodes,
@@ -504,6 +506,7 @@ function Workspace({
     <main className="workspace">
       <PortPaletteContext.Provider value={openPortPalette}>
         <ReactFlow
+          {...magnet}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}

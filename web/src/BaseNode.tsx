@@ -150,25 +150,9 @@ function ConnectionPoint({
 }) {
   const openPalette = useContext(PortPaletteContext);
   const down = useRef<{ x: number; y: number } | undefined>(undefined);
-  const plus = useRef<HTMLSpanElement>(null);
   return (
     <div
       className={`handle-hit handle-${side} ${compatible === false ? "incompatible" : ""}`}
-      onPointerMove={(event) => {
-        const box = event.currentTarget.getBoundingClientRect();
-        // Pointer coordinates are in screen pixels; transforms use canvas pixels.
-        const ox = Math.max(
-          -12,
-          Math.min(12, ((event.clientX - box.x) / box.width - 0.5) * 25),
-        );
-        const oy = Math.max(
-          -12,
-          Math.min(12, ((event.clientY - box.y) / box.height - 0.5) * 25),
-        );
-        if (plus.current)
-          plus.current.style.transform = `translate(${-12 + ox}px, ${-12 + oy}px)`;
-      }}
-      onPointerLeave={() => plus.current?.style.removeProperty("transform")}
     >
       <Handle
         id={side === "source" ? "out" : "in"}
@@ -203,7 +187,7 @@ function ConnectionPoint({
           }
         }}
       />
-      <span ref={plus} className="handle-plus">
+      <span className="handle-plus">
         <CirclePlus size={16} />
       </span>
     </div>

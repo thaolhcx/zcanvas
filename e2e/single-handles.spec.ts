@@ -216,7 +216,7 @@ test("clicking either plus opens the adjacent compatible palette without draggin
   });
 });
 
-test("larger plus icons sit outside the node and magnet follows the pointer without moving the hit area", async ({
+test("plus icons sit near the node and attract the pointer before it reaches the fixed hit area", async ({
   page,
 }, info) => {
   await open(page);
@@ -236,7 +236,7 @@ test("larger plus icons sit outside the node and magnet follows the pointer with
       const anchor = (await handle(page, "n_edit", side).boundingBox())!;
       const anchorX = anchor.x + anchor.width / 2;
       expect(center.x).toBeCloseTo(
-        anchorX + (side === "source" ? 34 : -34) * zoom,
+        anchorX + (side === "source" ? 12 : -12) * zoom,
         1,
       );
       expect(
@@ -246,9 +246,43 @@ test("larger plus icons sit outside the node and magnet follows the pointer with
       ).toBeLessThanOrEqual(1.1 * zoom);
       await expect(area).toHaveCSS("cursor", "crosshair");
       await expect(plus.locator("svg")).toHaveAttribute("width", "16");
+      // The magnet starts outside the 25px click target, from either side.
+      const near = {
+        x: center.x + (side === "source" ? 24 : -24) * zoom,
+        y: center.y,
+      };
+      await page.mouse.move(near.x, near.y);
+      await expect(plus).toHaveCSS("opacity", "1");
+      await expect(plus).toHaveCSS(
+        "transform",
+        side === "source"
+          ? "matrix(1, 0, 0, 1, 0, -12)"
+          : "matrix(1, 0, 0, 1, -24, -12)",
+      );
+      expect(
+        await page.evaluate(
+          ({ x, y }) =>
+            document.elementFromPoint(x, y)?.closest(".handle-hit") === null,
+          near,
+        ),
+      ).toBe(true);
+      expect(await area.boundingBox()).toEqual(box);
       await page.mouse.move(center.x + 6 * zoom, center.y + 6 * zoom);
       await expect(plus).toHaveCSS("opacity", "1");
-      await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -6, -6)");
+      await expect
+        .poll(() =>
+          plus.evaluate((el) =>
+            Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).e),
+          ),
+        )
+        .toBe(-7);
+      await expect
+        .poll(() =>
+          plus.evaluate((el) =>
+            Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).f),
+          ),
+        )
+        .toBe(-7);
       expect(await area.boundingBox()).toEqual(box);
       const cursor = await page.evaluate(
         ({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
@@ -274,10 +308,46 @@ test("larger plus icons sit outside the node and magnet follows the pointer with
     plus = area.locator(".handle-plus");
   await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 3);
   await expect(plus).toHaveCSS("transition-duration", "0s");
-  await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -6, -6)");
+  await expect
+    .poll(() =>
+      plus.evaluate((el) =>
+        Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).e),
+      ),
+    )
+    .toBe(-7);
   await page.mouse.move(1000, 800);
   await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
   expect(await snapshot(page)).toEqual(before);
+});
+
+test("proximity stays visible across the node gap and leaves the surrounding pane available for panning", async ({
+  page,
+}) => {
+  await open(page);
+  const target = node(page, "n_edit"),
+    area = hit(page, "n_edit", "source"),
+    plus = area.locator(".handle-plus");
+  await target.locator(".preview").hover();
+  await expect(plus).toHaveCSS("opacity", "1");
+  const box = (await area.boundingBox())!,
+    zoom = box.width / 25;
+  const near = {
+    x: box.x + box.width / 2 + 24 * zoom,
+    y: box.y + box.height / 2 + 8 * zoom,
+  };
+  await page.mouse.move(near.x, near.y);
+  await expect(plus).toHaveCSS("opacity", "1");
+  await expect(target).not.toHaveClass(/selected/);
+  const before = await snapshot(page);
+  const view = page.locator(".react-flow__viewport"),
+    viewportBefore = await view.getAttribute("style");
+  await page.mouse.down({ button: "middle" });
+  await page.mouse.move(near.x - 80, near.y - 40, { steps: 10 });
+  await page.mouse.up({ button: "middle" });
+  expect(await view.getAttribute("style")).not.toBe(viewportBefore);
+  expect(await snapshot(page)).toEqual(before);
+  await page.mouse.move(1300, 120);
+  await expect(plus).toHaveCSS("opacity", "0");
 });
 
 test("resting handles are invisible and three edges share one anchor and a 60px horizontal stem", async ({
