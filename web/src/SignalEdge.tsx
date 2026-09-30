@@ -1,7 +1,6 @@
 import { memo, useSyncExternalStore } from "react";
 import {
   BaseEdge,
-  EdgeText,
   getBezierPath,
   type Edge,
   type EdgeProps,
@@ -18,7 +17,7 @@ export const SignalEdge = memo(function SignalEdge(
   props: EdgeProps<Edge<{ active: boolean }>>,
 ) {
   const reduced = useSyncExternalStore(subscribe, getReducedMotion);
-  const [path, labelX, labelY] = getBezierPath({
+  const [path] = getBezierPath({
     ...props,
     curvature: props.pathOptions?.curvature,
   });
@@ -63,18 +62,6 @@ export const SignalEdge = memo(function SignalEdge(
             aria-hidden="true"
           />
         </>
-      )}
-      {props.label && (
-        <EdgeText
-          x={labelX}
-          y={labelY}
-          label={props.label}
-          labelStyle={props.labelStyle}
-          labelShowBg={props.labelShowBg}
-          labelBgStyle={props.labelBgStyle}
-          labelBgPadding={props.labelBgPadding}
-          labelBgBorderRadius={props.labelBgBorderRadius}
-        />
       )}
     </>
   );

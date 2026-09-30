@@ -18,7 +18,7 @@ test("only edges attached to selected nodes signal, with no graph writes and no 
   await expect(page.locator(".react-flow__edge")).toHaveCount(7);
   await expect.poll(async () => (await snapshot(page)).nodes.length).toBe(7);
   const before = await snapshot(page);
-  const labels = await page.locator(".react-flow__edge-text").allTextContents();
+  await expect(page.locator(".react-flow__edge-text")).toHaveCount(0);
   const resting = await page
     .locator(".react-flow__edge-path")
     .evaluateAll((paths) =>
@@ -75,9 +75,7 @@ test("only edges attached to selected nodes signal, with no graph writes and no 
 
   await image.locator("header").click();
   await expectSignals([imageId]);
-  expect(
-    await page.locator(".react-flow__edge-text").allTextContents(),
-  ).toEqual(labels);
+  await expect(page.locator(".react-flow__edge-text")).toHaveCount(0);
   expect(
     await page.locator(".react-flow__edge-path").evaluateAll((paths) =>
       paths.map((path) => ({

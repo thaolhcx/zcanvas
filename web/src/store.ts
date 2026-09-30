@@ -163,29 +163,12 @@ export function bindGraph(graph: Graph) {
     }
     const edges = r.edges.map((e) => {
       const old = oldEdges.get(e.id);
-      const source = recipeNodes.get(e.source),
-        port =
-          source &&
-          graph.registry
-            .get(source.type)
-            ?.outputs.find((p) => p.key === e.sourcePort);
-      const target = recipeNodes.get(e.target),
-        targetPort =
-          target &&
-          graph.registry
-            .get(target.type)
-            ?.inputs.find((p) => p.key === e.targetPort);
-      const fan =
-        typeof port?.kind === "string" &&
-        port.kind.startsWith("list<") &&
-        targetPort?.kind !== "any";
       const next: Edge = {
         id: e.id,
         source: e.source,
         target: e.target,
         sourceHandle: e.sourcePort,
         targetHandle: e.targetPort,
-        label: fan ? `×${source?.params.count ?? "n"}` : undefined,
         selected: old?.selected,
         data: {
           active:
