@@ -20,6 +20,7 @@
   --error: #b53335;
   --gold: #926008;
   --motion-fast: 150ms;
+  --motion-magnet: 80ms;
   --motion-panel: 160ms;
   --motion-inspector: 200ms;
   --motion-medium: 300ms;
@@ -791,9 +792,11 @@ a {
   pointer-events: none;
   color: color-mix(in srgb, var(--text) 55%, transparent);
   opacity: 0;
+  translate: 0px 0px;
   transition:
     transform var(--motion-medium) var(--motion-spring),
-    opacity var(--motion-medium) var(--motion-spring);
+    opacity var(--motion-medium) var(--motion-spring),
+    translate var(--motion-magnet) ease-out;
 }
 .handle-target .handle-plus {
   transform: translate(28px, -12px);

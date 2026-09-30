@@ -1,10 +1,12 @@
 import { useCallback, useRef, type PointerEvent } from "react";
 
-const radius = 48;
+const radius = 64;
+const releaseRadius = 40;
+const maxPull = 12;
 function reset(node: HTMLElement | null) {
   node?.classList.remove("magnet-active");
   node?.querySelectorAll<HTMLElement>(".handle-plus").forEach((icon) => {
-    icon.style.removeProperty("transform");
+    icon.style.removeProperty("translate");
   });
 }
 
@@ -69,11 +71,17 @@ export function useHandleMagnet() {
     }
     nearest.node.classList.add("magnet-active");
     for (const { icon, x, y, distance } of nearest.handles) {
-      // Fade the pull to zero at the boundary, avoiding a jump as the pointer enters.
-      const strength = Math.max(0, 1 - distance / radius);
-      const ox = Math.max(-12, Math.min(12, x * strength)),
-        oy = Math.max(-12, Math.min(12, y * strength));
-      icon.style.transform = `translate(${-12 + ox}px, ${-12 + oy}px)`;
+      // Track every angle equally. Keep the pull until the outer release band,
+      // then ease it to zero without a jump at the proximity boundary.
+      const t = Math.max(
+        0,
+        Math.min(1, (distance - releaseRadius) / (radius - releaseRadius)),
+      );
+      const strength =
+        Math.min(1, maxPull / (distance || 1)) * (1 - t * t * (3 - 2 * t));
+      // Independent of the 300ms reveal transform, so changing direction does
+      // not restart the entrance spring on every pointer event.
+      icon.style.translate = `${x * strength}px ${y * strength}px`;
     }
   }, []);
   return {

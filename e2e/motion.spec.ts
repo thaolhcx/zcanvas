@@ -32,7 +32,7 @@ test("motion follows the selected node and respects reduced motion", async ({
   const plus = node.locator(".handle-target .handle-plus");
   await expect(plus).toHaveCSS("opacity", "1");
   await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
-  await expect(plus).toHaveCSS("transition-duration", "0.3s, 0.3s");
+  await expect(plus).toHaveCSS("transition-duration", "0.3s, 0.3s, 0.08s");
   const preview = node.locator(".preview.empty");
   const before = await preview.evaluate(
     (element) => getComputedStyle(element, "::before").aspectRatio,

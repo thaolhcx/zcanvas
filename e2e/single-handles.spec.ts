@@ -125,10 +125,10 @@ test("both plus icons slide 40px on hover, persist for selection, and respect re
   for (const plus of [left, right]) {
     await expect(plus).toHaveCSS("opacity", "1");
     await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
-    await expect(plus).toHaveCSS("transition-duration", "0.3s, 0.3s");
+    await expect(plus).toHaveCSS("transition-duration", "0.3s, 0.3s, 0.08s");
     await expect(plus).toHaveCSS(
       "transition-timing-function",
-      "cubic-bezier(0.34, 1.56, 0.64, 1), cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "cubic-bezier(0.34, 1.56, 0.64, 1), cubic-bezier(0.34, 1.56, 0.64, 1), ease-out",
     );
   }
   await expect(target.locator(".handle-target")).toHaveCSS("width", "25px");
@@ -254,10 +254,8 @@ test("plus icons sit near the node and attract the pointer before it reaches the
       await page.mouse.move(near.x, near.y);
       await expect(plus).toHaveCSS("opacity", "1");
       await expect(plus).toHaveCSS(
-        "transform",
-        side === "source"
-          ? "matrix(1, 0, 0, 1, 0, -12)"
-          : "matrix(1, 0, 0, 1, -24, -12)",
+        "translate",
+        side === "source" ? "12px" : "-12px",
       );
       expect(
         await page.evaluate(
@@ -269,20 +267,7 @@ test("plus icons sit near the node and attract the pointer before it reaches the
       expect(await area.boundingBox()).toEqual(box);
       await page.mouse.move(center.x + 6 * zoom, center.y + 6 * zoom);
       await expect(plus).toHaveCSS("opacity", "1");
-      await expect
-        .poll(() =>
-          plus.evaluate((el) =>
-            Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).e),
-          ),
-        )
-        .toBe(-7);
-      await expect
-        .poll(() =>
-          plus.evaluate((el) =>
-            Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).f),
-          ),
-        )
-        .toBe(-7);
+      await expect(plus).toHaveCSS("translate", "6px 6px");
       expect(await area.boundingBox()).toEqual(box);
       const cursor = await page.evaluate(
         ({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
@@ -295,7 +280,7 @@ test("plus icons sit near the node and attract the pointer before it reaches the
       );
       expect(outside).not.toBe("crosshair");
       await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 30 * zoom);
-      await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
+      await expect(plus).toHaveCSS("translate", "0px");
       if (zoom === 1 && side === "source")
         await page.screenshot({
           path: info.outputPath("larger-plus-outside-node.png"),
@@ -308,15 +293,76 @@ test("plus icons sit near the node and attract the pointer before it reaches the
     plus = area.locator(".handle-plus");
   await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 3);
   await expect(plus).toHaveCSS("transition-duration", "0s");
-  await expect
-    .poll(() =>
-      plus.evaluate((el) =>
-        Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).e),
-      ),
-    )
-    .toBe(-7);
+  await expect(plus).toHaveCSS("translate", "6px 6px");
   await page.mouse.move(1000, 800);
-  await expect(plus).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -12)");
+  await expect(plus).toHaveCSS("translate", "0px");
+  expect(await snapshot(page)).toEqual(before);
+});
+
+test("magnet follows vertical reversals and diagonal arcs equally at both zoom levels", async ({
+  page,
+}, info) => {
+  await open(page);
+  await node(page, "n_edit").locator(".node-title").click();
+  await expect(
+    page.getByRole("complementary", { name: "Node inspector" }),
+  ).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  const before = await snapshot(page);
+  for (const zoom of [1, 0.5]) {
+    await page.getByLabel("Zoom", { exact: true }).fill(String(zoom));
+    for (const side of ["source", "target"] as const) {
+      const area = hit(page, "n_edit", side),
+        plus = area.locator(".handle-plus"),
+        box = (await area.boundingBox())!;
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const direction = side === "source" ? 1 : -1;
+      // Reverse vertically, then sweep through the outward semicircle. The
+      // displacement should have the same length, regardless of pointer angle.
+      for (const degrees of [-90, 90, -90, -45, 0, 45, 90]) {
+        const angle = (degrees * Math.PI) / 180;
+        const x = direction * Math.cos(angle),
+          y = Math.sin(angle);
+        await page.mouse.move(
+          center.x + x * 32 * zoom,
+          center.y + y * 32 * zoom,
+        );
+        await expect
+          .poll(async () => {
+            const offset = await plus.evaluate((el) =>
+              getComputedStyle(el).translate.split(" ").map(parseFloat),
+            );
+            return Math.hypot(offset[0] - x * 12, (offset[1] ?? 0) - y * 12);
+          })
+          .toBeLessThan(0.1);
+        await expect(plus).toHaveCSS(
+          "transform",
+          "matrix(1, 0, 0, 1, -12, -12)",
+        );
+        expect(await area.boundingBox()).toEqual(box);
+      }
+      // Retain the full vertical pull farther out, release gradually, then reset.
+      for (const [distance, pull] of [
+        [40, 12],
+        [52, 6],
+        [64, 0],
+      ]) {
+        await page.mouse.move(center.x, center.y - distance * zoom);
+        await expect
+          .poll(async () => {
+            const offset = await plus.evaluate((el) =>
+              getComputedStyle(el).translate.split(" ").map(parseFloat),
+            );
+            return Math.abs((offset[1] ?? 0) + pull);
+          })
+          .toBeLessThan(0.1);
+      }
+      if (zoom === 1 && side === "source") {
+        await page.mouse.move(center.x + 24, center.y - 24);
+        await expect(plus).toHaveCSS("opacity", "1");
+        await page.screenshot({ path: info.outputPath("magnet-diagonal.png") });
+      }
+    }
+  }
   expect(await snapshot(page)).toEqual(before);
 });
 
