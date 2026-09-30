@@ -188,7 +188,7 @@ function ConnectionPoint({
         }}
       />
       <span className="handle-plus">
-        <CirclePlus size={16} />
+        <CirclePlus size={21} />
       </span>
     </div>
   );

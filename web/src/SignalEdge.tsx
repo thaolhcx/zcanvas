@@ -17,19 +17,16 @@ export const SignalEdge = memo(function SignalEdge(props: EdgeProps) {
   );
   const reduced = useSyncExternalStore(subscribe, getReducedMotion);
   const { id, sourceX, sourceY, targetX, targetY } = props;
-  // Single horizontal anchors share a 60px stem before the curves separate.
-  const sourceLead = sourceX + 60,
-    targetLead = targetX - 60,
-    gap = targetLead - sourceLead;
+  // Curve directly from each anchor. Give vertically separated nodes enough
+  // horizontal room to turn smoothly instead of folding around a fixed stem.
   const offset = Math.max(
-    60,
-    gap >= 0
-      ? gap / 2
-      : 25 * (props.pathOptions?.curvature ?? 0.25) * Math.sqrt(-gap),
+    48,
+    Math.abs(targetX - sourceX) / 2,
+    Math.min(180, Math.abs(targetY - sourceY) * 0.3),
   );
-  const path = `M${sourceX},${sourceY} L${sourceLead},${sourceY} C${sourceLead + offset},${sourceY} ${targetLead - offset},${targetY} ${targetLead},${targetY} L${targetX},${targetY}`;
-  const left = Math.min(sourceX, targetX, targetLead - offset) - 24,
-    right = Math.max(sourceX, targetX, sourceLead + offset) + 24;
+  const path = `M${sourceX},${sourceY} C${sourceX + offset},${sourceY} ${targetX - offset},${targetY} ${targetX},${targetY}`;
+  const left = Math.min(sourceX, targetX - offset) - 24,
+    right = Math.max(targetX, sourceX + offset) + 24;
   return (
     <>
       <BaseEdge

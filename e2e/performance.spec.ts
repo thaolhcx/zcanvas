@@ -1,5 +1,80 @@
 import { writeFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
+
+// Trace snapshots distort frame timings on the 128-node fixtures. Keep raw
+// metrics and failure screenshots; functional suites retain their traces.
+test.use({ trace: "off" });
+
+test("keeps magnet hover above 50 FPS with 128 nodes without writing the graph", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("button", { name: "New canvas", exact: true }).click();
+  await page.getByRole("button", { name: "+128 ports", exact: true }).click();
+  await expect(page.locator(".react-flow__node-base")).toHaveCount(128);
+  // The debug fixture schedules fitView after 80ms; let it finish before zooming.
+  await page.waitForTimeout(400);
+  await page.getByLabel("Zoom", { exact: true }).fill("0.5");
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("node-input.asset")
+        .locator("img")
+        .evaluateAll(
+          (images) =>
+            images.filter(
+              (image) =>
+                (image as HTMLImageElement).complete &&
+                (image as HTMLImageElement).naturalWidth > 0,
+            ).length,
+        ),
+    )
+    .toBe(64);
+  await page.waitForTimeout(750);
+  const id = new URL(page.url()).searchParams.get("canvas");
+  const endpoint = `http://127.0.0.1:4310/canvases/${id}`;
+  const before = await (await page.request.get(endpoint)).json();
+  let center: { x: number; y: number } | undefined;
+  for (const handle of await page.locator(".handle-source").all()) {
+    const box = await handle.boundingBox();
+    if (box && box.x > 180 && box.x < 1100 && box.y > 180 && box.y < 650) {
+      center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      break;
+    }
+  }
+  expect(center).toBeDefined();
+  await page.mouse.move(center!.x + 50, center!.y);
+  await expect(page.locator(".canvas-node.magnet-active")).toHaveCount(1);
+  // Finish the entrance spring before measuring continuous pointer tracking.
+  await page.waitForTimeout(400);
+  await page
+    .getByRole("button", { name: "Measure frames", exact: true })
+    .click();
+  for (let cycle = 0; cycle < 3; cycle++) {
+    for (let step = 0; step < 90; step++) {
+      const angle = (step / 89) * Math.PI * 2;
+      await page.mouse.move(
+        center!.x + Math.cos(angle) * 50,
+        center!.y + Math.sin(angle) * 50,
+      );
+      await page.waitForTimeout(16);
+    }
+  }
+  await expect(page.locator(".canvas-node.magnet-active")).toHaveCount(1);
+  const metrics = await page.evaluate(() => window.__zcanvasPerf);
+  await writeFile(
+    testInfo.outputPath("hover-metrics.json"),
+    JSON.stringify(metrics, null, 2),
+  );
+  expect(metrics?.frames).toBeGreaterThan(240);
+  expect(metrics?.fps).toBeGreaterThanOrEqual(50);
+  expect(metrics?.maxFrameMs).toBeLessThan(100);
+  await page
+    .getByRole("button", { name: "Stop measuring", exact: true })
+    .click();
+  expect(await (await page.request.get(endpoint)).json()).toEqual(before);
+});
+
 test("measures drag and pan on a production canvas with 128 image nodes", async ({
   page,
 }, testInfo) => {
@@ -9,6 +84,8 @@ test("measures drag and pan on a production canvas with 128 image nodes", async 
   await expect(page.getByTestId("node-input.asset")).toHaveCount(128, {
     timeout: 30000,
   });
+  // Finish the fixture's delayed fit before overriding its zoom.
+  await page.waitForTimeout(400);
   await page.locator('input[aria-label="Zoom"]').fill("0.5");
   await page.locator('input[aria-label="Zoom"]').dispatchEvent("change");
   await expect
@@ -101,6 +178,8 @@ test("keeps edge dragging above 50 FPS with 128 nodes and input ports", async ({
     timeout: 30000,
   });
   await expect(page.getByTestId("node-image.generate")).toHaveCount(64);
+  // Finish the fixture's delayed fit before overriding its zoom.
+  await page.waitForTimeout(400);
   await page.locator('input[aria-label="Zoom"]').fill("0.5");
   await page.locator('input[aria-label="Zoom"]').dispatchEvent("change");
   await expect

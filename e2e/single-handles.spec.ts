@@ -216,7 +216,7 @@ test("clicking either plus opens the adjacent compatible palette without draggin
   });
 });
 
-test("plus icons sit near the node and attract the pointer before it reaches the fixed hit area", async ({
+test("plus icons keep fixed anchors while their click target follows the magnet", async ({
   page,
 }, info) => {
   await open(page);
@@ -245,26 +245,30 @@ test("plus icons sit near the node and attract the pointer before it reaches the
         ),
       ).toBeLessThanOrEqual(1.1 * zoom);
       await expect(area).toHaveCSS("cursor", "crosshair");
-      await expect(plus.locator("svg")).toHaveAttribute("width", "16");
-      // The magnet starts outside the 25px click target, from either side.
+      await expect(plus.locator("svg")).toHaveAttribute("width", "21");
+      // The icon and its 25px click target move together; the edge anchor stays fixed.
       const near = {
-        x: center.x + (side === "source" ? 24 : -24) * zoom,
+        x: center.x + (side === "source" ? 24 : -24),
         y: center.y,
       };
       await page.mouse.move(near.x, near.y);
       await expect(plus).toHaveCSS("opacity", "1");
       await expect(plus).toHaveCSS(
         "translate",
-        side === "source" ? "12px" : "-12px",
+        `${(side === "source" ? 16 : -16) / zoom}px`,
       );
+      const visual = (await plus.boundingBox())!;
       expect(
         await page.evaluate(
           ({ x, y }) =>
-            document.elementFromPoint(x, y)?.closest(".handle-hit") === null,
-          near,
+            Boolean(
+              document.elementFromPoint(x, y)?.closest(".react-flow__handle"),
+            ),
+          { x: visual.x + visual.width / 2, y: visual.y + visual.height / 2 },
         ),
       ).toBe(true);
       expect(await area.boundingBox()).toEqual(box);
+      expect(await handle(page, "n_edit", side).boundingBox()).toEqual(anchor);
       await page.mouse.move(center.x + 6 * zoom, center.y + 6 * zoom);
       await expect(plus).toHaveCSS("opacity", "1");
       await expect(plus).toHaveCSS("translate", "6px 6px");
@@ -276,7 +280,7 @@ test("plus icons sit near the node and attract the pointer before it reaches the
       expect(cursor).toBe("crosshair");
       const outside = await page.evaluate(
         ({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
-        { x: center.x, y: center.y + 20 * zoom },
+        { x: center.x, y: center.y + 40 },
       );
       expect(outside).not.toBe("crosshair");
       await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 30 * zoom);
@@ -322,16 +326,16 @@ test("magnet follows vertical reversals and diagonal arcs equally at both zoom l
         const angle = (degrees * Math.PI) / 180;
         const x = direction * Math.cos(angle),
           y = Math.sin(angle);
-        await page.mouse.move(
-          center.x + x * 32 * zoom,
-          center.y + y * 32 * zoom,
-        );
+        await page.mouse.move(center.x + x * 32, center.y + y * 32);
         await expect
           .poll(async () => {
             const offset = await plus.evaluate((el) =>
               getComputedStyle(el).translate.split(" ").map(parseFloat),
             );
-            return Math.hypot(offset[0] - x * 12, (offset[1] ?? 0) - y * 12);
+            return Math.hypot(
+              offset[0] * zoom - x * 16,
+              (offset[1] ?? 0) * zoom - y * 16,
+            );
           })
           .toBeLessThan(0.1);
         await expect(plus).toHaveCSS(
@@ -342,17 +346,17 @@ test("magnet follows vertical reversals and diagonal arcs equally at both zoom l
       }
       // Retain the full vertical pull farther out, release gradually, then reset.
       for (const [distance, pull] of [
-        [40, 12],
-        [52, 6],
-        [64, 0],
+        [64, 16],
+        [80, 8],
+        [96, 0],
       ]) {
-        await page.mouse.move(center.x, center.y - distance * zoom);
+        await page.mouse.move(center.x, center.y - distance);
         await expect
           .poll(async () => {
             const offset = await plus.evaluate((el) =>
               getComputedStyle(el).translate.split(" ").map(parseFloat),
             );
-            return Math.abs((offset[1] ?? 0) + pull);
+            return Math.abs((offset[1] ?? 0) * zoom + pull);
           })
           .toBeLessThan(0.1);
       }
@@ -362,6 +366,53 @@ test("magnet follows vertical reversals and diagonal arcs equally at both zoom l
         await page.screenshot({ path: info.outputPath("magnet-diagonal.png") });
       }
     }
+  }
+  expect(await snapshot(page)).toEqual(before);
+});
+
+test("an untouched standalone node attracts from the pane and its moved plus remains clickable", async ({
+  page,
+}) => {
+  await open(page);
+  const target = node(page, "n_img2"),
+    area = hit(page, "n_img2", "source"),
+    plus = area.locator(".handle-plus");
+  const before = await snapshot(page);
+  for (const zoom of [1, 0.5]) {
+    await page.getByLabel("Zoom", { exact: true }).fill(String(zoom));
+    await page.mouse.move(1300, 120);
+    await expect(plus).toHaveCSS("opacity", "0");
+    const box = (await area.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2 + 50, box.y + box.height / 2);
+    await expect(target).not.toHaveClass(/selected/);
+    await expect(plus).toHaveCSS("opacity", "1");
+    await expect(plus).toHaveCSS("translate", `${16 / zoom}px`);
+    const visual = (await plus.boundingBox())!;
+    const point = {
+      x: visual.x + visual.width / 2,
+      y: visual.y + visual.height / 2,
+    };
+    await page.mouse.move(point.x, point.y);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          ({ x, y }) =>
+            document
+              .elementFromPoint(x, y)
+              ?.closest(".react-flow__handle")
+              ?.getAttribute("data-handleid"),
+          point,
+        ),
+      )
+      .toBe("out");
+    await page.mouse.click(point.x, point.y);
+    await expect(
+      page.getByRole("dialog", { name: "Node palette" }),
+    ).toBeVisible();
+    await page.mouse.click(1300, 120);
+    await expect(
+      page.getByRole("dialog", { name: "Node palette" }),
+    ).toHaveCount(0);
   }
   expect(await snapshot(page)).toEqual(before);
 });
@@ -396,7 +447,7 @@ test("proximity stays visible across the node gap and leaves the surrounding pan
   await expect(plus).toHaveCSS("opacity", "0");
 });
 
-test("resting handles are invisible and three edges share one anchor and a 60px horizontal stem", async ({
+test("resting handles are invisible and fan-out edges curve directly from their shared anchor", async ({
   page,
 }) => {
   await open(page);
@@ -427,22 +478,24 @@ test("resting handles are invisible and three edges share one anchor and a 60px 
       elements.map((element) => {
         const path = element as SVGPathElement;
         const start = path.getPointAtLength(0),
-          stem = path.getPointAtLength(60),
           near = path.getPointAtLength(30);
         return {
           d: path.getAttribute("d")!,
           start: { x: start.x, y: start.y },
-          stem: { x: stem.x, y: stem.y },
           near: { x: near.x, y: near.y },
         };
       }),
     );
   for (const path of paths) {
     expect(path.start).toEqual(paths[0].start);
-    expect(path.stem.x).toBeCloseTo(path.start.x + 60, 3);
-    expect(path.near.x).toBeCloseTo(path.start.x + 30, 3);
-    expect(path.stem.y).toBe(path.start.y);
-    expect(path.near.y).toBe(path.start.y);
-    expect(path.d.split(" C")[0]).toBe(paths[0].d.split(" C")[0]);
+    expect(path.d.match(/[A-Za-z]/g)).toEqual(["M", "C"]);
+    const coordinates = path.d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    // Horizontal tangents at the anchors, with no straight segment before the curve.
+    expect(coordinates[3]).toBe(coordinates[1]);
+    expect(coordinates[5]).toBe(coordinates[7]);
+    expect(coordinates[2]).toBeGreaterThan(coordinates[0]);
+    expect(coordinates[4]).toBeLessThan(coordinates[6]);
+    if (coordinates[1] !== coordinates[7])
+      expect(Math.abs(path.near.y - path.start.y)).toBeGreaterThan(0.01);
   }
 });
