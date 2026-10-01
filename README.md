@@ -41,7 +41,7 @@ pnpm exec playwright install chromium
 pnpm e2e
 ```
 
-`pnpm test` reproduces the supplied 20 contract tests, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres, pg-boss, MinIO and ffmpeg. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
+`pnpm test` reproduces the supplied 20 contract tests, checks the template contract and every built-in template, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres, pg-boss, MinIO and ffmpeg. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
 
 For a persistent production preview:
 
@@ -60,7 +60,9 @@ Append `?debug=1` (or `&debug=1`) to show an FPS meter, frame-duration measureme
 - Drag nodes near an edge or center to align them: guides appear during dragging and snap within 5 screen pixels at every zoom. Multi-node selections and groups move together.
 - Hover near the + icons to reveal their magnetic controls. Selected nodes signal along attached connections; reduced-motion preferences disable animation.
 - `Cmd/Ctrl+Z`, `Shift+Cmd/Ctrl+Z`: undo/redo. `Cmd/Ctrl+C/V/D`: copy/paste/duplicate. `Cmd/Ctrl+G`: group. `Cmd/Ctrl+Enter`: run. `F`: fit view. Space-drag pans.
-- The canvas-name menu exports/imports recipe JSON and saves presets. Opening a preset creates a new canvas.
+- The canvas-name menu exports/imports recipe JSON and saves the canvas as a template: title, description, tags, an optional cover from run outputs or uploads, and the params a user must fill. Ticked params are left empty in the saved template.
+- **Templates** in the tool rail inserts a template into the open canvas, centred on the view; one Undo removes it. On the start screen, the Templates tab starts a new canvas from a template. Unfilled template inputs are outlined in yellow and the view moves to the first one.
+- Drop image, video or audio files on the canvas to add one Asset node per file; one Undo removes the batch.
 - A run uses an immutable graph snapshot. Editing the graph does not change a running job. Use a fresh Run after changing params; cache reuse makes unchanged work free. Retry uses the previous run snapshot and reruns the selected node plus its descendants.
 - Select older runs in the header. On reconnect, the client reloads their current state and resumes events from its last event ID.
 - Edits persist in IndexedDB and sync through Hocuspocus. The production build caches its app shell for offline reload after the first successful visit; dev mode needs the Vite server to reload.

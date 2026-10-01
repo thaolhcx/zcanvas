@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Template flows ([#10](https://github.com/thaolhcx/zcanvas/issues/10)): recipes may carry an optional `meta.template` (title, description, cover, tags, inputs). `GET /templates` lists metadata only, `GET /templates/:id` returns the recipe, `POST /templates` saves one with its inputs cleared, and `POST /canvases` accepts `templateId`.
+- A template browser in the Media browser layout inserts templates into the open canvas or starts a new canvas from the start screen. "Save as preset" becomes "Save as template". Unfilled inputs are outlined in yellow.
+- Built-in templates live in `contracts/examples/templates/` and are seeded on startup. The set is empty for now.
+- Drop files on the canvas to add Asset nodes in one undoable step.
+
 ## 0.1.0 — 2026-09-30
 
 First end-to-end local mock POC release.
