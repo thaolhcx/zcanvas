@@ -1,0 +1,87 @@
+{
+  "query": "cô gái áo đỏ",
+  "spaceId": "spc_local",
+  "limit": 20,
+  "mode": "hybrid",
+  "semantic": {
+    "state": "ok",
+    "model": "local:Xenova/paraphrase-multilingual-MiniLM-L12-v2"
+  },
+  "items": [
+    {
+      "asset": {
+        "id": "ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d",
+        "kind": "video",
+        "mime": "video/mp4",
+        "bytes": 2210943,
+        "url": "http://127.0.0.1:4310/assets/ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d/file",
+        "thumbUrl": "http://127.0.0.1:4310/assets/ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d/thumbnail",
+        "meta": {
+          "durationSec": 12,
+          "width": 720,
+          "height": 1280
+        },
+        "createdBy": {
+          "runId": "run_0b9e",
+          "nodeId": "n_vid"
+        },
+        "createdAt": "2026-10-01T08:10:00.000Z",
+        "name": "Generate video 1.mp4",
+        "spaceId": "spc_local",
+        "creatorId": "usr_local",
+        "source": {
+          "type": "generated",
+          "canvasId": "rcp_pilot",
+          "runId": "run_0b9e",
+          "nodeId": "n_vid"
+        },
+        "status": "ready",
+        "previewStatus": "pending",
+        "generation": {
+          "nodeType": "video.generate",
+          "typeVersion": 1,
+          "prompt": "A girl in a red coat on a rainy street, cinematic",
+          "model": "seedance-1.5",
+          "settings": {
+            "durationSec": 5
+          },
+          "references": ["Hero portrait.png"]
+        },
+        "updatedAt": "2026-10-01T08:10:00.000Z"
+      },
+      "score": 1,
+      "matchedBy": ["semantic"],
+      "semanticScore": 0.6312
+    },
+    {
+      "asset": {
+        "id": "ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80",
+        "kind": "image",
+        "mime": "image/png",
+        "bytes": 412331,
+        "url": "http://127.0.0.1:4310/assets/ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80/file",
+        "thumbUrl": "http://127.0.0.1:4310/assets/ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80/thumbnail",
+        "meta": {
+          "width": 720,
+          "height": 1280
+        },
+        "createdAt": "2026-10-01T08:00:00.000Z",
+        "name": "Hero portrait.png",
+        "spaceId": "spc_local",
+        "creatorId": "usr_local",
+        "source": {
+          "type": "upload",
+          "canvasId": "rcp_pilot"
+        },
+        "status": "ready",
+        "previewStatus": "ready",
+        "description": "Main character, red coat",
+        "tags": ["hero", "red"],
+        "updatedAt": "2026-10-01T08:05:00.000Z"
+      },
+      "score": 0.9836,
+      "matchedBy": ["semantic"],
+      "semanticScore": 0.5127
+    }
+  ]
+}

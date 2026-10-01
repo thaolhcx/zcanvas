@@ -42,7 +42,10 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
     listAssets(actor, parseListQuery(request.query as Record<string, unknown>)),
   );
   app.get("/assets/search", async (request) =>
-    searchAssets(actor, parseSearchQuery(request.query as Record<string, unknown>)),
+    searchAssets(
+      actor,
+      parseSearchQuery(request.query as Record<string, unknown>),
+    ),
   );
   app.post("/assets", async (request, reply) => {
     const query = request.query as { spaceId?: string; canvasId?: string };
@@ -51,10 +54,16 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
       canvasId = checkId(query.canvasId, "canvasId");
       spaceId = await requireCanvas(actor, canvasId, "write");
       if (query.spaceId !== undefined && query.spaceId !== spaceId)
-        throw new ApiProblem(400, "VALIDATION", "spaceId does not match the canvas space");
+        throw new ApiProblem(
+          400,
+          "VALIDATION",
+          "spaceId does not match the canvas space",
+        );
     } else {
       spaceId =
-        query.spaceId === undefined ? personalSpaceId(actor.id) : checkId(query.spaceId, "spaceId");
+        query.spaceId === undefined
+          ? personalSpaceId(actor.id)
+          : checkId(query.spaceId, "spaceId");
       await requireSpace(actor, spaceId, "write", "Space not found");
     }
     const file = await request.file({
@@ -80,12 +89,20 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
     try {
       spooled = await spool(file.file);
       if (file.file.truncated)
-        throw new ApiProblem(413, "TOO_LARGE", `Files are limited to ${Math.floor(config.storage.maxUploadBytes / 1024 / 1024)} MB`);
+        throw new ApiProblem(
+          413,
+          "TOO_LARGE",
+          `Files are limited to ${Math.floor(config.storage.maxUploadBytes / 1024 / 1024)} MB`,
+        );
     } catch (error) {
       await failAsset(id, error);
       if (spooled) await rm(spooled.dir, { recursive: true, force: true });
       if (error instanceof ApiProblem) throw error;
-      throw new ApiProblem(400, "UPLOAD_INTERRUPTED", "The upload did not finish");
+      throw new ApiProblem(
+        400,
+        "UPLOAD_INTERRUPTED",
+        "The upload did not finish",
+      );
     }
     return reply.code(201).send(await finishAsset(id, spooled, "ready"));
   });
@@ -93,7 +110,11 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
     toAsset(await getAssetFor(actor, checkId(request.params.id, "asset ID"))),
   );
   app.patch<{ Params: { id: string } }>("/assets/:id", async (request) =>
-    patchAsset(actor, checkId(request.params.id, "asset ID"), parsePatch(request.body)),
+    patchAsset(
+      actor,
+      checkId(request.params.id, "asset ID"),
+      parsePatch(request.body),
+    ),
   );
   app.delete<{ Params: { id: string }; Querystring: { canvasId?: string } }>(
     "/assets/:id",
@@ -101,7 +122,9 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
       deleteAsset(
         actor,
         checkId(request.params.id, "asset ID"),
-        request.query.canvasId === undefined ? undefined : checkId(request.query.canvasId, "canvasId"),
+        request.query.canvasId === undefined
+          ? undefined
+          : checkId(request.query.canvasId, "canvasId"),
       ),
   );
   app.get<{ Params: { id: string }; Querystring: { canvasId?: string } }>(
@@ -119,7 +142,10 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
   ) => {
     const { kind } = request.params;
     if (kind !== "file" && kind !== "thumbnail") throw notFound();
-    const asset = await getAssetFor(actor, checkId(request.params.id, "asset ID"));
+    const asset = await getAssetFor(
+      actor,
+      checkId(request.params.id, "asset ID"),
+    );
     let role = "original";
     const headers: Record<string, string> = {};
     if (kind === "thumbnail") {
@@ -128,14 +154,27 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
         // Never block a valid original behind a missing preview.
         headers["X-Preview-Status"] = asset.preview_status;
       else if (asset.preview_status === "pending")
-        throw new ApiProblem(404, "PREVIEW_PENDING", "The preview is being prepared", { retryAfterSec: 2 });
+        throw new ApiProblem(
+          404,
+          "PREVIEW_PENDING",
+          "The preview is being prepared",
+          { retryAfterSec: 2 },
+        );
       else if (asset.preview_status === "failed")
-        throw new ApiProblem(404, "PREVIEW_FAILED", "The preview could not be made");
+        throw new ApiProblem(
+          404,
+          "PREVIEW_FAILED",
+          "The preview could not be made",
+        );
       else throw notFound("This asset has no preview");
     }
     const object = await objectFor(asset.id, role);
     if (!object || object.state !== "stored")
-      throw new ApiProblem(503, "STORAGE_UNAVAILABLE", "The stored file is not available");
+      throw new ApiProblem(
+        503,
+        "STORAGE_UNAVAILABLE",
+        "The stored file is not available",
+      );
     let bytes = object.bytes === null ? undefined : Number(object.bytes);
     try {
       bytes ??= (await storeFor(object.profile).stat(object.key))?.bytes;
@@ -143,7 +182,11 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
       bytes = undefined;
     }
     if (bytes === undefined)
-      throw new ApiProblem(503, "STORAGE_UNAVAILABLE", "The stored file is not available");
+      throw new ApiProblem(
+        503,
+        "STORAGE_UNAVAILABLE",
+        "The stored file is not available",
+      );
     const name = asset.name ?? asset.id;
     return deliver(
       request,
@@ -154,7 +197,10 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
         bytes,
         mime: role === "thumbnail" ? "image/jpeg" : (object.mime ?? asset.mime),
         fingerprint: etagFor({ ...object, bytes }),
-        name: role === "thumbnail" ? `${name.replace(/\.[^.]+$/, "")}-preview.jpg` : name,
+        name:
+          role === "thumbnail"
+            ? `${name.replace(/\.[^.]+$/, "")}-preview.jpg`
+            : name,
       },
       headers,
     );

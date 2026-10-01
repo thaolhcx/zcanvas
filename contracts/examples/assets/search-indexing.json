@@ -1,0 +1,43 @@
+{
+  "query": "red coat",
+  "spaceId": "spc_local",
+  "limit": 20,
+  "mode": "hybrid",
+  "semantic": {
+    "state": "indexing",
+    "model": "local:Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+    "pending": 42
+  },
+  "items": [
+    {
+      "asset": {
+        "id": "ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80",
+        "kind": "image",
+        "mime": "image/png",
+        "bytes": 412331,
+        "url": "http://127.0.0.1:4310/assets/ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80/file",
+        "thumbUrl": "http://127.0.0.1:4310/assets/ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80/thumbnail",
+        "meta": {
+          "width": 720,
+          "height": 1280
+        },
+        "createdAt": "2026-10-01T08:00:00.000Z",
+        "name": "Hero portrait.png",
+        "spaceId": "spc_local",
+        "creatorId": "usr_local",
+        "source": {
+          "type": "upload",
+          "canvasId": "rcp_pilot"
+        },
+        "status": "ready",
+        "previewStatus": "ready",
+        "description": "Main character, red coat",
+        "tags": ["hero", "red"],
+        "updatedAt": "2026-10-01T08:05:00.000Z"
+      },
+      "score": 1,
+      "matchedBy": ["semantic"],
+      "semanticScore": 0.5821
+    }
+  ]
+}

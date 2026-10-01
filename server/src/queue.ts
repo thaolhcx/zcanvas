@@ -16,6 +16,8 @@ export function startQueue() {
     // Previews: retried with backoff; a final failure marks the preview failed.
     await boss.createQueue("asset-derive", {
       name: "asset-derive",
+      // One queued + one active job per asset (singletonKey = asset ID).
+      policy: "stately",
       retryLimit: 3,
       retryDelay: 2,
       retryBackoff: true,
@@ -24,14 +26,18 @@ export function startQueue() {
     // Physical cleanup of deleted/failed assets and orphaned writes.
     await boss.createQueue("asset-cleanup", {
       name: "asset-cleanup",
+      // One queued + one active job per asset (singletonKey = asset ID).
+      policy: "stately",
       retryLimit: 5,
       retryDelay: 30,
       retryBackoff: true,
       expireInSeconds: 300,
     });
-    // Semantic index. Jobs carry the revision they were created for.
+    // Semantic index. Each job indexes the asset's current revision.
     await boss.createQueue("asset-index", {
       name: "asset-index",
+      // One queued + one active job per asset (singletonKey = asset ID).
+      policy: "stately",
       retryLimit: 3,
       retryDelay: 5,
       retryBackoff: true,

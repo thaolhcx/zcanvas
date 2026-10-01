@@ -10,8 +10,18 @@ import type {
 import { capabilities, db } from "./db.ts";
 import { config } from "./config.ts";
 import { boss } from "./queue.ts";
-import { ApiProblem, type Actor, personalSpaceId, requireSpace } from "./access.ts";
-import { likePattern, onAssetsChanged, parseListQuery, toAsset } from "./assets.ts";
+import {
+  ApiProblem,
+  type Actor,
+  personalSpaceId,
+  requireSpace,
+} from "./access.ts";
+import {
+  likePattern,
+  onAssetsChanged,
+  parseListQuery,
+  toAsset,
+} from "./assets.ts";
 import { configuredProvider, type EmbeddingProvider } from "./embeddings.ts";
 const COLUMNS = `a.id, a.space_id, a.creator_id, a.source_type, a.source_canvas_id, a.source_run_id, a.source_node_id,
   a.name, a.kind, a.mime, a.bytes, a.meta, a.status, a.preview_status, a.description, a.tags, a.generation, a.revision,
@@ -43,7 +53,9 @@ export function searchText(asset: {
     asset.description,
     asset.tags?.length ? asset.tags.join(", ") : "",
     asset.generation?.prompt,
-    asset.generation?.references?.length ? asset.generation.references.join(", ") : "",
+    asset.generation?.references?.length
+      ? asset.generation.references.join(", ")
+      : "",
   ]
     .filter(Boolean)
     .join("\n")
@@ -52,12 +64,14 @@ export function searchText(asset: {
 // ---------------------------------------------------------------- indexing
 export async function enqueueIndex(ids: string[], force = false) {
   if (!semanticReady() || !ids.length) return;
-  const { rows } = await db.query(
-    "SELECT id, revision FROM assets WHERE id = ANY($1)",
-    [ids],
+  // Batched; duplicates of an already queued job are dropped by the queue policy.
+  await boss.insert(
+    ids.map((assetId) => ({
+      name: "asset-index",
+      data: { assetId, force },
+      singletonKey: assetId,
+    })),
   );
-  for (const row of rows)
-    await boss.send("asset-index", { assetId: row.id, revision: row.revision, force });
 }
 onAssetsChanged((ids) => enqueueIndex(ids));
 /**
@@ -98,11 +112,15 @@ export async function indexAsset(
   );
   const asset = rows[0];
   if (!asset || asset.status !== "ready") {
-    await db.query("DELETE FROM asset_search_index WHERE asset_id=$1", [assetId]);
+    await db.query("DELETE FROM asset_search_index WHERE asset_id=$1", [
+      assetId,
+    ]);
     return "removed";
   }
   const text = searchText(asset);
-  const contentHash = createHash("sha256").update(`${model.id}\n${text}`).digest("hex");
+  const contentHash = createHash("sha256")
+    .update(`${model.id}\n${text}`)
+    .digest("hex");
   const existing = (
     await db.query(
       "SELECT revision, state, content_hash FROM asset_search_index WHERE asset_id=$1 AND model=$2",
@@ -110,7 +128,11 @@ export async function indexAsset(
     )
   ).rows[0];
   if (existing && existing.revision > asset.revision) return "stale";
-  if (!options.force && existing?.state === "indexed" && existing.content_hash === contentHash) {
+  if (
+    !options.force &&
+    existing?.state === "indexed" &&
+    existing.content_hash === contentHash
+  ) {
     // Same text (e.g. a revision bump without searchable change): no new embedding.
     await db.query(
       `UPDATE asset_search_index s SET revision=a.revision, updated_at=now() FROM assets a
@@ -121,7 +143,13 @@ export async function indexAsset(
   }
   try {
     const [vector] = await model.embed([text], "document");
-    return (await writeIndexEntry(assetId, model.id, asset.revision, vector, contentHash))
+    return (await writeIndexEntry(
+      assetId,
+      model.id,
+      asset.revision,
+      vector,
+      contentHash,
+    ))
       ? "indexed"
       : "stale";
   } catch (error) {
@@ -131,7 +159,14 @@ export async function indexAsset(
          SELECT $1, $2, $3, 'failed', $4, 1 WHERE EXISTS (SELECT 1 FROM assets WHERE id=$1 AND revision=$3 AND status='ready')
          ON CONFLICT (asset_id, model) DO UPDATE SET state=CASE WHEN asset_search_index.revision < EXCLUDED.revision THEN 'failed' ELSE asset_search_index.state END,
            error=EXCLUDED.error, attempts=asset_search_index.attempts+1, updated_at=now()`,
-        [assetId, model.id, asset.revision, error instanceof Error ? error.message.slice(0, 300) : "Embedding failed"],
+        [
+          assetId,
+          model.id,
+          asset.revision,
+          error instanceof Error
+            ? error.message.slice(0, 300)
+            : "Embedding failed",
+        ],
       );
     throw error;
   }
@@ -140,11 +175,17 @@ export async function indexAsset(
  * Backfill: queue ready assets whose current-model entry is missing or older
  * than the asset. `all` re-embeds everything; `prune` drops other models.
  */
-export async function reindex(options: { all?: boolean; prune?: boolean } = {}) {
+export async function reindex(
+  options: { all?: boolean; prune?: boolean } = {},
+) {
   if (!semanticReady()) return { queued: 0, pruned: 0, model: undefined };
   const model = provider!.id;
   const pruned = options.prune
-    ? ((await db.query("DELETE FROM asset_search_index WHERE model<>$1", [model])).rowCount ?? 0)
+    ? ((
+        await db.query("DELETE FROM asset_search_index WHERE model<>$1", [
+          model,
+        ])
+      ).rowCount ?? 0)
     : 0;
   const { rows } = await db.query(
     `SELECT a.id FROM assets a LEFT JOIN asset_search_index s ON s.asset_id=a.id AND s.model=$1
@@ -153,7 +194,10 @@ export async function reindex(options: { all?: boolean; prune?: boolean } = {}) 
     [model, Boolean(options.all)],
   );
   for (let i = 0; i < rows.length; i += 500)
-    await enqueueIndex(rows.slice(i, i + 500).map((r) => r.id), Boolean(options.all));
+    await enqueueIndex(
+      rows.slice(i, i + 500).map((r) => r.id),
+      Boolean(options.all),
+    );
   return { queued: rows.length, pruned, model };
 }
 export async function startSearchWorkers() {
@@ -168,7 +212,8 @@ export async function startSearchWorkers() {
         });
     },
   );
-  await reindex();
+  // Backfill in the background so startup is not delayed by a large catalog.
+  void reindex().catch((error) => console.error("Search backfill:", error));
 }
 // ---------------------------------------------------------------- query
 const queryCache = new Map<string, number[]>();
@@ -182,19 +227,36 @@ async function embedQuery(q: string, signal: AbortSignal) {
   if (queryCache.size > 500) queryCache.delete(queryCache.keys().next().value!);
   return vector;
 }
-export function parseSearchQuery(query: Record<string, unknown>): AssetSearchQuery {
+export function parseSearchQuery(
+  query: Record<string, unknown>,
+): AssetSearchQuery {
   const { q, limit, ...rest } = query;
   if (typeof q !== "string" || !q.trim() || q.length > 200)
     throw new ApiProblem(400, "VALIDATION", "q is required (1–200 characters)");
   const limitValue = limit === undefined ? 20 : Number(limit);
   if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 50)
-    throw new ApiProblem(400, "VALIDATION", "limit must be an integer from 1 to 50");
-  const unknown = Object.keys(rest).filter((k) => !["spaceId", "kind", "source"].includes(k));
-  if (unknown.length) throw new ApiProblem(400, "VALIDATION", `Unknown parameters: ${unknown.join(", ")}`);
+    throw new ApiProblem(
+      400,
+      "VALIDATION",
+      "limit must be an integer from 1 to 50",
+    );
+  const unknown = Object.keys(rest).filter(
+    (k) => !["spaceId", "kind", "source"].includes(k),
+  );
+  if (unknown.length)
+    throw new ApiProblem(
+      400,
+      "VALIDATION",
+      `Unknown parameters: ${unknown.join(", ")}`,
+    );
   const filters = parseListQuery(rest);
   return { q: q.trim(), limit: limitValue, ...filters } as AssetSearchQuery;
 }
-function filters(params: unknown[], kind?: AssetKind, source?: AssetSourceType) {
+function filters(
+  params: unknown[],
+  kind?: AssetKind,
+  source?: AssetSourceType,
+) {
   const where: string[] = [];
   if (kind) {
     params.push(kind);
@@ -233,19 +295,27 @@ export async function searchAssets(
   let semanticRows: Record<string, any>[] = [];
   if (!config.search.enabled || !provider) semantic = { state: "disabled" };
   else if (!capabilities.vector)
-    semantic = { state: "unavailable", message: "The pgvector extension is not installed" };
+    semantic = {
+      state: "unavailable",
+      message: "The pgvector extension is not installed",
+    };
   else {
     const started = Date.now();
     try {
       const signal = AbortSignal.timeout(config.search.queryTimeoutMs);
       const vector = await embedQuery(q, signal);
-      const remaining = Math.max(100, config.search.queryTimeoutMs - (Date.now() - started));
+      const remaining = Math.max(
+        100,
+        config.search.queryTimeoutMs - (Date.now() - started),
+      );
       const params: unknown[] = [spaceId, provider.id, JSON.stringify(vector)];
       const extra = filters(params, query.kind, query.source);
       const client = await db.connect();
       try {
         await client.query("BEGIN");
-        await client.query(`SET LOCAL statement_timeout = ${Math.floor(remaining)}`);
+        await client.query(
+          `SET LOCAL statement_timeout = ${Math.floor(remaining)}`,
+        );
         semanticRows = (
           await client.query(
             `SELECT ${COLUMNS}, 1 - (s.embedding <=> $3::vector) AS similarity
@@ -265,7 +335,11 @@ export async function searchAssets(
         );
         await client.query("COMMIT");
         const n = pending.rows[0].n;
-        semantic = { state: n ? "indexing" : "ok", model: provider.id, ...(n ? { pending: n } : {}) };
+        semantic = {
+          state: n ? "indexing" : "ok",
+          model: provider.id,
+          ...(n ? { pending: n } : {}),
+        };
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
         throw error;
@@ -279,14 +353,40 @@ export async function searchAssets(
         (error as Error)?.name === "AbortError" ||
         (error as { code?: string })?.code === "57014";
       semantic = timedOut
-        ? { state: "timeout", model: provider.id, message: "Semantic search took too long" }
-        : { state: "unavailable", model: provider.id, message: "Semantic search is unavailable" };
+        ? {
+            state: "timeout",
+            model: provider.id,
+            message: "Semantic search took too long",
+          }
+        : {
+            state: "unavailable",
+            model: provider.id,
+            message: "Semantic search is unavailable",
+          };
     }
   }
   // 3. Reciprocal-rank fusion; exact names stay on top.
-  const hits = new Map<string, { row: Record<string, any>; score: number; matchedBy: Set<"name" | "semantic">; semanticScore?: number; exact: boolean }>();
-  const add = (row: Record<string, any>, rank: number, by: "name" | "semantic") => {
-    const hit = hits.get(row.id) ?? { row, score: 0, matchedBy: new Set(), exact: false };
+  const hits = new Map<
+    string,
+    {
+      row: Record<string, any>;
+      score: number;
+      matchedBy: Set<"name" | "semantic">;
+      semanticScore?: number;
+      exact: boolean;
+    }
+  >();
+  const add = (
+    row: Record<string, any>,
+    rank: number,
+    by: "name" | "semantic",
+  ) => {
+    const hit = hits.get(row.id) ?? {
+      row,
+      score: 0,
+      matchedBy: new Set(),
+      exact: false,
+    };
     hit.score += 1 / (60 + rank);
     hit.matchedBy.add(by);
     if (by === "name" && row.exact) hit.exact = true;
@@ -296,7 +396,12 @@ export async function searchAssets(
   nameRows.forEach((row, i) => add(row, i + 1, "name"));
   semanticRows.forEach((row, i) => add(row, i + 1, "semantic"));
   const ranked = [...hits.values()]
-    .sort((a, b) => Number(b.exact) - Number(a.exact) || b.score - a.score || (a.row.id < b.row.id ? -1 : 1))
+    .sort(
+      (a, b) =>
+        Number(b.exact) - Number(a.exact) ||
+        b.score - a.score ||
+        (a.row.id < b.row.id ? -1 : 1),
+    )
     .slice(0, limit);
   // 4. Final hydration rechecks scope and state at response time.
   const current = ranked.length
@@ -316,13 +421,18 @@ export async function searchAssets(
       asset: toAsset(current.get(hit.row.id)),
       score: Math.min(1, Number((hit.score / top).toFixed(4))),
       matchedBy: [...hit.matchedBy].sort() as AssetSearchHit["matchedBy"],
-      ...(hit.semanticScore !== undefined ? { semanticScore: Number(hit.semanticScore.toFixed(4)) } : {}),
+      ...(hit.semanticScore !== undefined
+        ? { semanticScore: Number(hit.semanticScore.toFixed(4)) }
+        : {}),
     }));
   return {
     query: q,
     spaceId,
     limit,
-    mode: semantic.state === "ok" || semantic.state === "indexing" ? "hybrid" : "name",
+    mode:
+      semantic.state === "ok" || semantic.state === "indexing"
+        ? "hybrid"
+        : "name",
     semantic,
     items,
   };

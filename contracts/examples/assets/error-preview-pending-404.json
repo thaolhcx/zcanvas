@@ -1,0 +1,7 @@
+{
+  "error": "The preview is being prepared",
+  "code": "PREVIEW_PENDING",
+  "details": {
+    "retryAfterSec": 2
+  }
+}

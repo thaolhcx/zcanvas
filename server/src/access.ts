@@ -78,7 +78,11 @@ export async function requireSpace(
   const role = await roleIn(actor, spaceId);
   if (!role) throw notFound(what);
   if (!allows(role, access))
-    throw new ApiProblem(403, "FORBIDDEN", "You can view but not change this space");
+    throw new ApiProblem(
+      403,
+      "FORBIDDEN",
+      "You can view but not change this space",
+    );
   return role;
 }
 export async function readableSpaceIds(actor: Actor): Promise<string[]> {
@@ -89,10 +93,9 @@ export async function readableSpaceIds(actor: Actor): Promise<string[]> {
   return rows.map((r) => r.space_id);
 }
 export async function canvasSpace(canvasId: string) {
-  const { rows } = await db.query(
-    "SELECT space_id FROM canvases WHERE id=$1",
-    [canvasId],
-  );
+  const { rows } = await db.query("SELECT space_id FROM canvases WHERE id=$1", [
+    canvasId,
+  ]);
   return rows.length ? (rows[0].space_id as string | null) : undefined;
 }
 export async function requireCanvas(

@@ -1,0 +1,17 @@
+{
+  "assetId": "ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80",
+  "status": "deleted",
+  "deletedAt": "2026-10-01T09:00:00.000Z",
+  "affected": {
+    "assetId": "ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80",
+    "canvasId": "rcp_pilot",
+    "nodes": [
+      {
+        "nodeId": "n_ref",
+        "type": "input.asset",
+        "label": "Hero",
+        "paramKey": "asset"
+      }
+    ]
+  }
+}

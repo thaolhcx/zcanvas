@@ -53,16 +53,27 @@ export async function newCanvas(app: App, body: Record<string, unknown> = {}) {
   return response.json<{ canvasId: string; spaceId: string }>();
 }
 /** A team space with explicit members; team admin UI is out of scope. */
-export async function teamSpace(members: Record<string, "owner" | "editor" | "viewer">) {
+export async function teamSpace(
+  members: Record<string, "owner" | "editor" | "viewer">,
+) {
   const id = `spc_team_${crypto.randomUUID().slice(0, 8)}`;
-  await db.query("INSERT INTO spaces(id,kind,name) VALUES($1,'team',$2)", [id, `Team ${id.slice(-4)}`]);
+  await db.query("INSERT INTO spaces(id,kind,name) VALUES($1,'team',$2)", [
+    id,
+    `Team ${id.slice(-4)}`,
+  ]);
   for (const [user, role] of Object.entries(members)) {
     await ensureActor(user);
-    await db.query("INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,$3)", [id, user, role]);
+    await db.query(
+      "INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,$3)",
+      [id, user, role],
+    );
   }
   return id;
 }
-export async function until<T>(fn: () => Promise<T | undefined | false>, ms = 15000) {
+export async function until<T>(
+  fn: () => Promise<T | undefined | false>,
+  ms = 15000,
+) {
   const end = Date.now() + ms;
   for (;;) {
     const value = await fn();

@@ -35,7 +35,11 @@ export function assetReferences(recipe: Recipe) {
     const entry = registry.get(node.type);
     for (const [paramKey, param] of Object.entries(entry?.params ?? {}))
       if (param.type === "asset" && typeof node.params[paramKey] === "string")
-        refs.push({ nodeId: node.id, paramKey, assetId: node.params[paramKey] as string });
+        refs.push({
+          nodeId: node.id,
+          paramKey,
+          assetId: node.params[paramKey] as string,
+        });
   }
   return refs;
 }
@@ -48,20 +52,27 @@ export async function createApp(options: { actorId?: string } = {}) {
   await ensureActor(actor.id);
   const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024 });
   app.setErrorHandler((error, _request, reply) => {
-    if (error instanceof ApiProblem) return reply.code(error.status).send(error.body());
+    if (error instanceof ApiProblem)
+      return reply.code(error.status).send(error.body());
     if (error instanceof StorageError)
-      return reply.code(503).send({ error: "Storage is unavailable", code: "STORAGE_UNAVAILABLE" });
+      return reply
+        .code(503)
+        .send({ error: "Storage is unavailable", code: "STORAGE_UNAVAILABLE" });
     const status = (error as { statusCode?: number }).statusCode ?? 500;
     if (status < 500)
       return reply.code(status).send({
         error: (error as Error).message,
-        code: (error as { validation?: unknown }).validation ? "VALIDATION" : "BAD_REQUEST",
+        code: (error as { validation?: unknown }).validation
+          ? "VALIDATION"
+          : "BAD_REQUEST",
       });
     console.error(error);
     return reply.code(500).send({ error: "Internal server error" });
   });
   const requireRun = async (id: string, access: Access) => {
-    const { rows } = await db.query("SELECT space_id FROM runs WHERE id=$1", [id]);
+    const { rows } = await db.query("SELECT space_id FROM runs WHERE id=$1", [
+      id,
+    ]);
     await requireSpace(actor, rows[0]?.space_id, access, "Run not found");
     return rows[0].space_id as string;
   };
@@ -88,7 +99,7 @@ export async function createApp(options: { actorId?: string } = {}) {
     async () =>
       (
         await db.query(
-          "SELECT id, name, version, updated_at, space_id AS \"spaceId\", project_id AS \"projectId\" FROM canvases WHERE space_id = ANY($1) ORDER BY updated_at DESC",
+          'SELECT id, name, version, updated_at, space_id AS "spaceId", project_id AS "projectId" FROM canvases WHERE space_id = ANY($1) ORDER BY updated_at DESC',
           [await readableSpaceIds(actor)],
         )
       ).rows,
@@ -114,9 +125,18 @@ export async function createApp(options: { actorId?: string } = {}) {
       const projectId = request.body.projectId ?? null;
       if (
         projectId &&
-        !(await db.query("SELECT 1 FROM projects WHERE id=$1 AND space_id=$2", [projectId, spaceId])).rowCount
+        !(
+          await db.query("SELECT 1 FROM projects WHERE id=$1 AND space_id=$2", [
+            projectId,
+            spaceId,
+          ])
+        ).rowCount
       )
-        throw new ApiProblem(400, "VALIDATION", "The project is not in this space");
+        throw new ApiProblem(
+          400,
+          "VALIDATION",
+          "The project is not in this space",
+        );
       const recipe = emptyRecipe(undefined, request.body.name);
       const graph = new Graph(new Y.Doc(), registry, recipe);
       const bytes = Buffer.from(Y.encodeStateAsUpdate(graph.doc));
@@ -195,7 +215,12 @@ export async function createApp(options: { actorId?: string } = {}) {
     // Assets must be ready and in the canvas space. Deleted, missing and
     // other-space assets look the same: the input needs a new file.
     const refs = assetReferences(recipe);
-    const missing = new Set(await unavailableAssets([...new Set(refs.map((r) => r.assetId))], spaceId));
+    const missing = new Set(
+      await unavailableAssets(
+        [...new Set(refs.map((r) => r.assetId))],
+        spaceId,
+      ),
+    );
     const inputIssues = refs
       .filter((r) => missing.has(r.assetId))
       .map((r) => ({
@@ -203,7 +228,8 @@ export async function createApp(options: { actorId?: string } = {}) {
         severity: "error",
         nodeId: r.nodeId,
         paramKey: r.paramKey,
-        message: "This file was deleted or is not available in this space. Choose another file.",
+        message:
+          "This file was deleted or is not available in this space. Choose another file.",
       }));
     if (inputIssues.length) return reply.code(422).send(inputIssues);
     const run: Run = {

@@ -190,7 +190,9 @@ export async function spool(
   source: Readable,
   maxBytes = config.storage.maxUploadBytes,
 ): Promise<Spooled> {
-  const dir = await mkdtemp(join(config.storage.tmpDir ?? tmpdir(), "zcanvas-upload-"));
+  const dir = await mkdtemp(
+    join(config.storage.tmpDir ?? tmpdir(), "zcanvas-upload-"),
+  );
   const path = join(dir, "data");
   const hash = createHash("sha256");
   let bytes = 0;
@@ -202,7 +204,11 @@ export async function spool(
           bytes += chunk.length;
           if (bytes > maxBytes)
             return done(
-              new ApiProblem(413, "TOO_LARGE", `Files are limited to ${Math.floor(maxBytes / 1024 / 1024)} MB`),
+              new ApiProblem(
+                413,
+                "TOO_LARGE",
+                `Files are limited to ${Math.floor(maxBytes / 1024 / 1024)} MB`,
+              ),
             );
           hash.update(chunk);
           done(null, chunk);
@@ -245,7 +251,11 @@ export async function beginAsset(input: NewAsset) {
   const id = `ast_${crypto.randomUUID()}`;
   const kind = input.kind ?? (input.mime.split("/")[0] as AssetKind);
   if (!KINDS.includes(kind as AssetKind) || !MIME.test(input.mime))
-    throw new ApiProblem(415, "UNSUPPORTED_MEDIA", "Choose an image, video or audio");
+    throw new ApiProblem(
+      415,
+      "UNSUPPORTED_MEDIA",
+      "Choose an image, video or audio",
+    );
   const store = writeStore();
   await db.query(
     `INSERT INTO assets(id, catalog_version, space_id, creator_id, source_type, source_canvas_id, source_run_id, source_node_id, source_job_id,
@@ -337,14 +347,20 @@ export async function finishAsset(
       throw new ApiProblem(
         400,
         "UNSUPPORTED_MEDIA",
-        error instanceof Error ? `Unreadable media: ${error.message}` : "Unreadable media",
+        error instanceof Error
+          ? `Unreadable media: ${error.message}`
+          : "Unreadable media",
       );
     }
     const object = (await objectFor(id, "original"))!;
-    await storeFor(object.profile).put(object.key, createReadStream(spooled.path), {
-      bytes: spooled.bytes,
-      contentType: probed.mime,
-    });
+    await storeFor(object.profile).put(
+      object.key,
+      createReadStream(spooled.path),
+      {
+        bytes: spooled.bytes,
+        contentType: probed.mime,
+      },
+    );
     await db.query(
       "UPDATE asset_objects SET state='stored', bytes=$2, sha256=$3, mime=$4 WHERE asset_id=$1 AND role='original'",
       [id, spooled.bytes, spooled.sha256, probed.mime],
@@ -355,10 +371,25 @@ export async function finishAsset(
       [id, publish, spooled.bytes, probed.mime, probed.meta],
     );
     if (!rows.length) throw new Error("Upload was cancelled");
-    if (rows[0].preview_status === "pending")
-      await boss.send("asset-derive", { assetId: id });
+    let saved = rows[0];
+    if (saved.preview_status === "pending") {
+      // Image thumbnails take milliseconds, so they are made now from the
+      // temp file. Video posters, and any image retry, run in the background.
+      const inline =
+        saved.kind === "image" &&
+        (await deriveAsset(id, {
+          finalAttempt: false,
+          sourcePath: spooled.path,
+        }).then(
+          () => true,
+          () => false,
+        ));
+      if (inline) saved = (await row(id)) ?? saved;
+      else
+        await boss.send("asset-derive", { assetId: id }, { singletonKey: id });
+    }
     if (publish === "ready") await afterReady([id]);
-    return toAsset(rows[0]);
+    return toAsset(saved);
   } catch (error) {
     await failAsset(id, error);
     throw error;
@@ -373,7 +404,9 @@ export async function failAsset(id: string, reason?: unknown) {
       id,
       {
         failure:
-          reason instanceof Error ? reason.message.slice(0, 300) : "Write failed",
+          reason instanceof Error
+            ? reason.message.slice(0, 300)
+            : "Write failed",
       },
     ],
   );
@@ -385,7 +418,8 @@ export async function putAsset(
   input: Omit<NewAsset, "mime"> & { mime?: string },
 ): Promise<Asset> {
   const mime =
-    input.mime ?? (file instanceof Blob ? file.type : "application/octet-stream");
+    input.mime ??
+    (file instanceof Blob ? file.type : "application/octet-stream");
   const { id } = await beginAsset({ ...input, mime });
   let spooled: Spooled;
   try {
@@ -406,7 +440,10 @@ export async function publishJobAssets(jobId: string) {
   await afterReady(rows.map((r) => r.id));
 }
 /** A job failed, was cancelled or superseded: its partial outputs never become ready. */
-export async function failJobAssets(jobId: string, reason = "Job did not finish") {
+export async function failJobAssets(
+  jobId: string,
+  reason = "Job did not finish",
+) {
   const { rows } = await db.query(
     "SELECT id FROM assets WHERE source_job_id=$1 AND status IN ('uploading','processing')",
     [jobId],
@@ -442,7 +479,10 @@ export function parseListQuery(query: Record<string, unknown>): AssetListQuery {
   const out: AssetListQuery = {};
   const bad = (message: string) => new ApiProblem(400, "VALIDATION", message);
   if (query.spaceId !== undefined) {
-    if (typeof query.spaceId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(query.spaceId))
+    if (
+      typeof query.spaceId !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,100}$/.test(query.spaceId)
+    )
       throw bad("Invalid spaceId");
     out.spaceId = query.spaceId;
   }
@@ -452,7 +492,8 @@ export function parseListQuery(query: Record<string, unknown>): AssetListQuery {
     if (query.q.trim()) out.q = query.q.trim();
   }
   if (query.kind !== undefined) {
-    if (!KINDS.includes(query.kind as AssetKind)) throw bad("kind must be image, video or audio");
+    if (!KINDS.includes(query.kind as AssetKind))
+      throw bad("kind must be image, video or audio");
     out.kind = query.kind as AssetKind;
   }
   if (query.source !== undefined) {
@@ -461,7 +502,9 @@ export function parseListQuery(query: Record<string, unknown>): AssetListQuery {
     out.source = query.source;
   }
   if (query.sort !== undefined) {
-    if (!["created_desc", "created_asc", "name_asc"].includes(String(query.sort)))
+    if (
+      !["created_desc", "created_asc", "name_asc"].includes(String(query.sort))
+    )
       throw bad("sort must be created_desc, created_asc or name_asc");
     out.sort = query.sort as AssetListQuery["sort"];
   }
@@ -501,10 +544,25 @@ export async function listAssets(
   // Stable keyset pagination: the ID breaks ties between equal sort values.
   const order =
     sort === "name_asc"
-      ? { sql: "lower(name) ASC, id ASC", cursor: (r: Row) => [String(r.name).toLowerCase(), r.id], cmp: ">", expr: "(lower(name), id)" }
+      ? {
+          sql: "lower(name) ASC, id ASC",
+          cursor: (r: Row) => [String(r.name).toLowerCase(), r.id],
+          cmp: ">",
+          expr: "(lower(name), id)",
+        }
       : sort === "created_asc"
-        ? { sql: "created_at ASC, id ASC", cursor: (r: Row) => [r.created_at_text, r.id], cmp: ">", expr: "(created_at, id)" }
-        : { sql: "created_at DESC, id DESC", cursor: (r: Row) => [r.created_at_text, r.id], cmp: "<", expr: "(created_at, id)" };
+        ? {
+            sql: "created_at ASC, id ASC",
+            cursor: (r: Row) => [r.created_at_text, r.id],
+            cmp: ">",
+            expr: "(created_at, id)",
+          }
+        : {
+            sql: "created_at DESC, id DESC",
+            cursor: (r: Row) => [r.created_at_text, r.id],
+            cmp: "<",
+            expr: "(created_at, id)",
+          };
   if (query.cursor) {
     const [value, id] = decodeCursor(query.cursor, 2);
     params.push(value, id);
@@ -528,14 +586,19 @@ export async function listAssets(
     spaceId,
     items: page.map(toAsset),
     nextCursor:
-      rows.length > limit ? encodeCursor(order.cursor(page[page.length - 1])) : null,
+      rows.length > limit
+        ? encodeCursor(order.cursor(page[page.length - 1]))
+        : null,
   };
 }
 export function parsePatch(body: unknown): AssetPatch {
   const bad = (message: string) => new ApiProblem(400, "VALIDATION", message);
-  if (!body || typeof body !== "object" || Array.isArray(body)) throw bad("Send a JSON object");
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw bad("Send a JSON object");
   const input = body as Record<string, unknown>;
-  const unknown = Object.keys(input).filter((k) => !["name", "description", "tags"].includes(k));
+  const unknown = Object.keys(input).filter(
+    (k) => !["name", "description", "tags"].includes(k),
+  );
   if (unknown.length) throw bad(`Unknown fields: ${unknown.join(", ")}`);
   const patch: AssetPatch = {};
   if (input.name !== undefined) {
@@ -544,15 +607,23 @@ export function parsePatch(body: unknown): AssetPatch {
     patch.name = name;
   }
   if (input.description !== undefined) {
-    if (input.description !== null && (typeof input.description !== "string" || input.description.length > 2000))
+    if (
+      input.description !== null &&
+      (typeof input.description !== "string" || input.description.length > 2000)
+    )
       throw bad("description must be at most 2000 characters");
-    patch.description = input.description === null ? null : String(input.description).trim() || null;
+    patch.description =
+      input.description === null
+        ? null
+        : String(input.description).trim() || null;
   }
   if (input.tags !== undefined) {
     if (
       !Array.isArray(input.tags) ||
       input.tags.length > 20 ||
-      input.tags.some((t) => typeof t !== "string" || !t.trim() || t.length > 40)
+      input.tags.some(
+        (t) => typeof t !== "string" || !t.trim() || t.length > 40,
+      )
     )
       throw bad("tags must be up to 20 strings of 1–40 characters");
     patch.tags = [...new Set(input.tags.map((t: string) => t.trim()))];
@@ -570,9 +641,20 @@ export async function patchAsset(actor: Actor, id: string, patch: AssetPatch) {
        tags=COALESCE($5,tags),
        revision=revision+1, updated_at=now()
      WHERE id=$1 AND status='ready' RETURNING ${COLUMNS}`,
-    [id, patch.name ?? null, patch.description !== undefined, patch.description ?? null, patch.tags ?? null],
+    [
+      id,
+      patch.name ?? null,
+      patch.description !== undefined,
+      patch.description ?? null,
+      patch.tags ?? null,
+    ],
   );
-  if (!rows.length) throw new ApiProblem(409, "CONFLICT", "Asset changed; reload and try again");
+  if (!rows.length)
+    throw new ApiProblem(
+      409,
+      "CONFLICT",
+      "Asset changed; reload and try again",
+    );
   await afterReady([id]);
   return toAsset(rows[0]);
 }
@@ -597,7 +679,9 @@ export async function assetUsage(
   const asset = await getAssetFor(actor, id, "read", { allowDeleted: true });
   const spaceId = await requireCanvas(actor, canvasId, "read");
   if (spaceId !== asset.space_id) return { assetId: id, canvasId, nodes: [] };
-  const { rows } = await db.query("SELECT snapshot FROM canvases WHERE id=$1", [canvasId]);
+  const { rows } = await db.query("SELECT snapshot FROM canvases WHERE id=$1", [
+    canvasId,
+  ]);
   return { assetId: id, canvasId, nodes: usageIn(rows[0]?.snapshot, id) };
 }
 export async function deleteAsset(
@@ -622,7 +706,9 @@ export async function deleteAsset(
     deletedAt = new Date(rows[0].deleted_at).toISOString();
     // Out of search immediately, in the same transaction as the state change.
     if (capabilities.vector)
-      await client.query("DELETE FROM asset_search_index WHERE asset_id=$1", [id]);
+      await client.query("DELETE FROM asset_search_index WHERE asset_id=$1", [
+        id,
+      ]);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
@@ -638,11 +724,18 @@ export async function scheduleCleanup(assetId: string, delaySec: number) {
   await boss.send(
     "asset-cleanup",
     { assetId },
-    delaySec > 0 ? { startAfter: delaySec } : {},
+    {
+      singletonKey: assetId,
+      ...(delaySec > 0 ? { startAfter: delaySec } : {}),
+    },
   );
 }
 /** Builds a 300 px preview. Retry-safe: a finished preview is not rebuilt. */
-export async function deriveAsset(assetId: string, finalAttempt = true) {
+export async function deriveAsset(
+  assetId: string,
+  options: { finalAttempt?: boolean; sourcePath?: string } = {},
+) {
+  const finalAttempt = options.finalAttempt ?? true;
   const current = await row(assetId);
   if (
     !current ||
@@ -650,14 +743,21 @@ export async function deriveAsset(assetId: string, finalAttempt = true) {
     current.preview_status !== "pending"
   )
     return;
-  const dir = await mkdtemp(join(config.storage.tmpDir ?? tmpdir(), "zcanvas-derive-"));
+  const dir = await mkdtemp(
+    join(config.storage.tmpDir ?? tmpdir(), "zcanvas-derive-"),
+  );
   try {
-    const source = join(dir, "source");
-    await copyAssetToFile(assetId, source);
+    const source = options.sourcePath ?? join(dir, "source");
+    if (!options.sourcePath) await copyAssetToFile(assetId, source);
     let thumb: Buffer;
     if (current.kind === "image")
       thumb = await sharp(source)
-        .resize({ width: 300, height: 300, fit: "inside", withoutEnlargement: true })
+        .resize({
+          width: 300,
+          height: 300,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
         .jpeg()
         .toBuffer();
     else {
@@ -685,11 +785,21 @@ export async function deriveAsset(assetId: string, finalAttempt = true) {
       [assetId, store.profile, key],
     );
     if (previous && previous.key !== key)
-      await storeFor(previous.profile).delete(previous.key).catch(() => {});
-    await store.put(key, Readable.from(thumb), { bytes: thumb.length, contentType: "image/jpeg" });
+      await storeFor(previous.profile)
+        .delete(previous.key)
+        .catch(() => {});
+    await store.put(key, Readable.from(thumb), {
+      bytes: thumb.length,
+      contentType: "image/jpeg",
+    });
     await db.query(
       "UPDATE asset_objects SET state='stored', bytes=$2, sha256=$3 WHERE asset_id=$1 AND role='thumbnail' AND key=$4",
-      [assetId, thumb.length, createHash("sha256").update(thumb).digest("hex"), key],
+      [
+        assetId,
+        thumb.length,
+        createHash("sha256").update(thumb).digest("hex"),
+        key,
+      ],
     );
     await db.query(
       "UPDATE assets SET preview_status='ready' WHERE id=$1 AND preview_status='pending'",
@@ -699,7 +809,15 @@ export async function deriveAsset(assetId: string, finalAttempt = true) {
     if (finalAttempt)
       await db.query(
         "UPDATE assets SET preview_status='failed', meta=meta || $2::jsonb WHERE id=$1 AND preview_status='pending'",
-        [assetId, { previewError: error instanceof Error ? error.message.slice(0, 300) : "Preview failed" }],
+        [
+          assetId,
+          {
+            previewError:
+              error instanceof Error
+                ? error.message.slice(0, 300)
+                : "Preview failed",
+          },
+        ],
       );
     throw error;
   } finally {
@@ -711,7 +829,9 @@ export async function deriveAsset(assetId: string, finalAttempt = true) {
  * the grace period and for running runs in their space that reference them.
  * The catalog row stays as history (status, name, source, timestamps).
  */
-export async function cleanupAsset(assetId: string): Promise<"purged" | "deferred" | "skipped"> {
+export async function cleanupAsset(
+  assetId: string,
+): Promise<"purged" | "deferred" | "skipped"> {
   const { rows } = await db.query(
     `SELECT id, status, space_id, purged_at,
        deleted_at > now() - make_interval(secs => $2) AS in_grace
@@ -719,7 +839,11 @@ export async function cleanupAsset(assetId: string): Promise<"purged" | "deferre
     [assetId, config.storage.cleanupDelaySec],
   );
   const current = rows[0];
-  if (!current || current.purged_at || !["deleted", "failed"].includes(current.status))
+  if (
+    !current ||
+    current.purged_at ||
+    !["deleted", "failed"].includes(current.status)
+  )
     return "skipped";
   if (current.status === "deleted") {
     const busy = await db.query(
@@ -727,7 +851,10 @@ export async function cleanupAsset(assetId: string): Promise<"purged" | "deferre
       [current.space_id, assetId],
     );
     if (current.in_grace || busy.rowCount) {
-      await scheduleCleanup(assetId, current.in_grace ? config.storage.cleanupDelaySec : 60);
+      await scheduleCleanup(
+        assetId,
+        current.in_grace ? config.storage.cleanupDelaySec : 60,
+      );
       return "deferred";
     }
   }
@@ -739,7 +866,8 @@ export async function cleanupAsset(assetId: string): Promise<"purged" | "deferre
     try {
       await storeFor(object.profile).delete(object.key);
     } catch (error) {
-      if (!(error instanceof StorageError && error.code === "NOT_FOUND")) throw error;
+      if (!(error instanceof StorageError && error.code === "NOT_FOUND"))
+        throw error;
     }
     await db.query(
       "UPDATE asset_objects SET state='deleted' WHERE asset_id=$1 AND role=$2",
@@ -747,7 +875,9 @@ export async function cleanupAsset(assetId: string): Promise<"purged" | "deferre
     );
   }
   if (capabilities.vector)
-    await db.query("DELETE FROM asset_search_index WHERE asset_id=$1", [assetId]);
+    await db.query("DELETE FROM asset_search_index WHERE asset_id=$1", [
+      assetId,
+    ]);
   await db.query("UPDATE assets SET purged_at=now() WHERE id=$1", [assetId]);
   return "purged";
 }
@@ -759,7 +889,8 @@ export async function sweepStaleWrites() {
        AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.id=a.source_run_id AND r.data->>'status'='running')`,
     [config.storage.staleWriteSec],
   );
-  for (const r of rows) await failAsset(r.id, new Error("Write did not finish"));
+  for (const r of rows)
+    await failAsset(r.id, new Error("Write did not finish"));
   return rows.length;
 }
 export async function startAssetWorkers() {
@@ -768,7 +899,9 @@ export async function startAssetWorkers() {
     { batchSize: 2, pollingIntervalSeconds: 0.5, includeMetadata: true },
     async (jobs) => {
       for (const job of jobs)
-        await deriveAsset(job.data.assetId, job.retryCount >= job.retryLimit);
+        await deriveAsset(job.data.assetId, {
+          finalAttempt: job.retryCount >= job.retryLimit,
+        });
     },
   );
   await boss.work<{ assetId: string }>(

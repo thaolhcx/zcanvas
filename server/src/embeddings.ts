@@ -15,11 +15,7 @@ export interface EmbeddingProvider {
   ): Promise<number[][]>;
 }
 export const normalizeText = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/đ/g, "d")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+  text.toLowerCase().replace(/đ/g, "d").normalize("NFD").replace(/\p{M}/gu, "");
 function unit(vector: number[]) {
   const length = Math.hypot(...vector) || 1;
   return vector.map((v) => v / length);
@@ -43,10 +39,12 @@ export function hashProvider(dims = 256): EmbeddingProvider {
     for (const word of normalizeText(text).match(/[\p{L}\p{N}]+/gu) ?? []) {
       const features = [`w:${word}`];
       const padded = `^${word}$`;
-      for (let i = 0; i + 3 <= padded.length; i++) features.push(`g:${padded.slice(i, i + 3)}`);
+      for (let i = 0; i + 3 <= padded.length; i++)
+        features.push(`g:${padded.slice(i, i + 3)}`);
       for (const feature of features) {
         const h = hash(feature);
-        vector[h % dims] += (h & 0x80000000 ? -1 : 1) * (feature.startsWith("w:") ? 2 : 1);
+        vector[h % dims] +=
+          (h & 0x80000000 ? -1 : 1) * (feature.startsWith("w:") ? 2 : 1);
       }
     }
     return unit(vector);
@@ -66,13 +64,13 @@ export function hashProvider(dims = 256): EmbeddingProvider {
  * Vietnamese). The model is downloaded once into the transformers.js cache.
  */
 export function localProvider(
-  model = config.search.model ?? "Xenova/multilingual-e5-small",
+  model = config.search.model ?? "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
   dims = config.search.dims ?? 384,
 ): EmbeddingProvider {
   let extractor: Promise<any> | undefined;
   const load = () =>
-    (extractor ??= import("@huggingface/transformers" as string).then((t: any) =>
-      t.pipeline("feature-extraction", model, { dtype: "q8" }),
+    (extractor ??= import("@huggingface/transformers" as string).then(
+      (t: any) => t.pipeline("feature-extraction", model, { dtype: "q8" }),
     ));
   // E5 models expect these prefixes; other models ignore them harmlessly.
   const prefix = (purpose: "query" | "document") =>
@@ -90,14 +88,19 @@ export function localProvider(
       );
       const vectors: number[][] = output.tolist();
       if (vectors[0]?.length !== dims)
-        throw new Error(`Model returned ${vectors[0]?.length} dimensions, expected ${dims}`);
+        throw new Error(
+          `Model returned ${vectors[0]?.length} dimensions, expected ${dims}`,
+        );
       return vectors;
     },
   };
 }
 /** Any OpenAI-compatible /embeddings endpoint (OpenAI, Ollama, vLLM, …). */
 export function openAiProvider(): EmbeddingProvider {
-  const url = (config.search.url ?? "https://api.openai.com/v1").replace(/\/$/, "");
+  const url = (config.search.url ?? "https://api.openai.com/v1").replace(
+    /\/$/,
+    "",
+  );
   const model = config.search.model ?? "text-embedding-3-small";
   const dims = config.search.dims ?? 1536;
   return {
@@ -110,7 +113,9 @@ export function openAiProvider(): EmbeddingProvider {
         signal,
         headers: {
           "Content-Type": "application/json",
-          ...(config.search.apiKey ? { Authorization: `Bearer ${config.search.apiKey}` } : {}),
+          ...(config.search.apiKey
+            ? { Authorization: `Bearer ${config.search.apiKey}` }
+            : {}),
         },
         body: JSON.stringify({
           model,
@@ -120,10 +125,16 @@ export function openAiProvider(): EmbeddingProvider {
       });
       if (!response.ok)
         throw new Error(`Embedding provider returned ${response.status}`);
-      const body = (await response.json()) as { data: { embedding: number[]; index: number }[] };
-      const vectors = body.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+      const body = (await response.json()) as {
+        data: { embedding: number[]; index: number }[];
+      };
+      const vectors = body.data
+        .sort((a, b) => a.index - b.index)
+        .map((d) => d.embedding);
       if (vectors[0]?.length !== dims)
-        throw new Error(`Model returned ${vectors[0]?.length} dimensions, expected ${dims}`);
+        throw new Error(
+          `Model returned ${vectors[0]?.length} dimensions, expected ${dims}`,
+        );
       return vectors;
     },
   };

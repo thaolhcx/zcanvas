@@ -8,7 +8,15 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { constants, createWriteStream } from "node:fs";
-import { mkdir, open, realpath, rename, rm, stat, unlink } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  realpath,
+  rename,
+  rm,
+  stat,
+  unlink,
+} from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { type Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -51,7 +59,11 @@ export interface ObjectStore {
 export class StorageError extends Error {
   constructor(
     message: string,
-    readonly code: "NOT_FOUND" | "INVALID_KEY" | "UNAVAILABLE" | "SIZE_MISMATCH",
+    readonly code:
+      | "NOT_FOUND"
+      | "INVALID_KEY"
+      | "UNAVAILABLE"
+      | "SIZE_MISMATCH",
   ) {
     super(message);
   }
@@ -79,7 +91,9 @@ function counter(expected: number) {
     transform(chunk: Buffer, _encoding, done) {
       seen += chunk.length;
       if (seen > expected)
-        return done(new StorageError("More bytes than declared", "SIZE_MISMATCH"));
+        return done(
+          new StorageError("More bytes than declared", "SIZE_MISMATCH"),
+        );
       done(null, chunk);
     },
     flush(done) {
@@ -158,7 +172,10 @@ export class LocalStore implements ObjectStore {
     try {
       await this.inside(dirname(path));
       // O_NOFOLLOW rejects a symlink placed at the object path itself.
-      const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const handle = await open(
+        path,
+        constants.O_RDONLY | constants.O_NOFOLLOW,
+      );
       return handle.createReadStream(
         options?.range
           ? { start: options.range.start, end: options.range.end }
@@ -252,7 +269,10 @@ export class S3Store implements ObjectStore {
       const head = await this.client.send(
         new HeadObjectCommand({ Bucket: this.bucket, Key: this.key(key) }),
       );
-      return { bytes: Number(head.ContentLength), lastModified: head.LastModified };
+      return {
+        bytes: Number(head.ContentLength),
+        lastModified: head.LastModified,
+      };
     } catch (error) {
       if (status(error) === 404) return undefined;
       throw error;

@@ -139,7 +139,9 @@ function condition(value: Output, params: Record<string, unknown>) {
   }
 }
 const isAsset = (value: unknown): value is Asset =>
-  Boolean(value && typeof value === "object" && "id" in value && "mime" in value);
+  Boolean(
+    value && typeof value === "object" && "id" in value && "mime" in value,
+  );
 export function outputAssetIds(outputs: Outputs | undefined) {
   return Object.values(outputs ?? {})
     .flatMap((v) => (Array.isArray(v) ? v : [v]))
@@ -147,7 +149,13 @@ export function outputAssetIds(outputs: Outputs | undefined) {
     .map((a) => a.id);
 }
 const extension = (mime: string) =>
-  ({ "image/png": "png", "image/jpeg": "jpg", "video/mp4": "mp4", "video/webm": "webm", "audio/wav": "wav" })[mime] ??
+  ({
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "audio/wav": "wav",
+  })[mime] ??
   mime.split("/")[1] ??
   "bin";
 /** Plain-text history saved on generated assets. Later edits never rewrite it. */
@@ -158,23 +166,39 @@ export function generationInfo(
 ): GenerationInfo {
   const texts = Object.values(inputs)
     .flatMap((v) => (Array.isArray(v) ? v : [v]))
-    .filter((v): v is { value: string } => !isAsset(v) && typeof (v as { value?: unknown }).value === "string")
+    .filter(
+      (v): v is { value: string } =>
+        !isAsset(v) && typeof (v as { value?: unknown }).value === "string",
+    )
     .map((v) => v.value);
-  const prompt = (texts.length ? texts.join("\n") : typeof params.prompt === "string" ? params.prompt : "").slice(0, 4000);
+  const prompt = (
+    texts.length
+      ? texts.join("\n")
+      : typeof params.prompt === "string"
+        ? params.prompt
+        : ""
+  ).slice(0, 4000);
   const references = Object.values(inputs)
     .flatMap((v) => (Array.isArray(v) ? v : [v]))
     .filter(isAsset)
     .map((a) => a.name ?? a.id);
   const settings = Object.fromEntries(
     Object.entries(params).filter(
-      ([key, value]) => key !== "prompt" && (value === null || ["string", "number", "boolean"].includes(typeof value)),
+      ([key, value]) =>
+        key !== "prompt" &&
+        (value === null ||
+          ["string", "number", "boolean"].includes(typeof value)),
     ),
   );
   return {
     nodeType: node.type,
     typeVersion: node.typeVersion,
     ...(prompt ? { prompt } : {}),
-    ...(typeof params.model === "string" ? { model: params.model } : config.mock ? { model: `mock:${node.type}` } : {}),
+    ...(typeof params.model === "string"
+      ? { model: params.model }
+      : config.mock
+        ? { model: `mock:${node.type}` }
+        : {}),
     ...(Object.keys(settings).length ? { settings } : {}),
     ...(references.length ? { references } : {}),
   };
@@ -265,7 +289,8 @@ async function executeRun(runId: string) {
         // A finished job whose output asset was deleted is rerun, never reused.
         if (
           previous?.status === "done" &&
-          (await unavailableAssets(outputAssetIds(previous.outputs), spaceId)).length
+          (await unavailableAssets(outputAssetIds(previous.outputs), spaceId))
+            .length
         )
           previous = { ...previous, status: "queued", outputs: undefined };
         const job: Job =
@@ -373,7 +398,8 @@ async function executeRun(runId: string) {
           // Never resurrect a deleted or failed asset from the cache.
           if (
             cached &&
-            (await unavailableAssets(outputAssetIds(cached.outputs), spaceId)).length
+            (await unavailableAssets(outputAssetIds(cached.outputs), spaceId))
+              .length
           ) {
             await db.query("DELETE FROM output_cache WHERE key=$1", [key]);
             cached = undefined;
@@ -431,7 +457,10 @@ async function executeRun(runId: string) {
               },
               putAsset: (file, meta) => {
                 const mime =
-                  meta.mime ?? (file instanceof Blob ? file.type : "application/octet-stream");
+                  meta.mime ??
+                  (file instanceof Blob
+                    ? file.type
+                    : "application/octet-stream");
                 const label =
                   typeof meta.meta?.name === "string" && meta.meta.name.trim()
                     ? meta.meta.name.trim()
@@ -519,7 +548,9 @@ async function executeRun(runId: string) {
         else
           await failJobAssets(
             job.jobId,
-            job.status === "done" ? "Run was cancelled or retried" : `Job ${job.status}`,
+            job.status === "done"
+              ? "Run was cancelled or retried"
+              : `Job ${job.status}`,
           );
         collect();
       };

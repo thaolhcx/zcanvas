@@ -30,7 +30,9 @@ const extension = (mime: string) =>
     "audio/wav": "wav",
     "audio/x-wav": "wav",
     "audio/mpeg": "mp3",
-  })[mime] ?? mime.split("/")[1]?.replace(/[^a-z0-9]/g, "") ?? "bin";
+  })[mime] ??
+  mime.split("/")[1]?.replace(/[^a-z0-9]/g, "") ??
+  "bin";
 /**
  * Moves POC records into the catalog. Safe to rerun: each step only touches
  * rows that have not been migrated yet.
