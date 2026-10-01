@@ -38,6 +38,7 @@ import {
   ArrowUpRight,
   LayoutTemplate,
   Check,
+  Images,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -57,6 +58,7 @@ import { HelperLines, type HelperLinesHandle } from "./HelperLines.tsx";
 import { useGraph, PortPaletteContext } from "./context.ts";
 import { useHandleMagnet } from "./useHandleMagnet.ts";
 import {
+  acceptedMediaKinds,
   outputKinds,
   reachable,
   resolveInput,
@@ -68,6 +70,15 @@ import { Debug } from "./Debug.tsx";
 import { TemplateBrowser } from "./TemplateBrowser.tsx";
 import { SaveTemplateDialog } from "./SaveTemplateDialog.tsx";
 import { insertTemplate } from "./templates.ts";
+import { MediaBrowser } from "./media/MediaBrowser.tsx";
+import { media, useMedia } from "./media/store.ts";
+import {
+  ASSET_NODE_HEIGHT,
+  nodeBoxes,
+  placeAssets,
+  placeBoxes,
+} from "./media/place.ts";
+import { hasAssets, readAssets, type DraggedAsset } from "./media/drag.ts";
 const nodeTypes = {
   base: BaseNode,
   group: ({ data }: { data: Record<string, unknown> }) => (
@@ -138,6 +149,7 @@ function Workspace({
     [saving, setSaving] = useState(false),
     [dropping, setDropping] = useState(false),
     [notice, setNotice] = useState("");
+  const mediaOpen = useMedia((s) => !!s.open);
   const clipboard = useRef<Recipe | undefined>(undefined),
     helperLines = useRef<HelperLinesHandle>(null),
     connectionOrigin = useRef<(Endpoint & { point: XYPosition }) | undefined>(
@@ -371,21 +383,7 @@ function Workspace({
     const failed = uploads.find(
       (u): u is PromiseRejectedResult => u.status === "rejected",
     );
-    const width = graph.registry.get("input.asset")?.ui?.width ?? 280;
-    if (assets.length)
-      action(() =>
-        graph.transaction("user", () => {
-          assets.forEach((asset, i) =>
-            graph.addNode("input.asset", {
-              position: {
-                x: Math.round(at.x + i * (width + 40)),
-                y: Math.round(at.y),
-              },
-              params: { asset: asset.id },
-            }),
-          );
-        }),
-      );
+    if (assets.length) action(() => placeAssets(graph, assets, at));
     if (failed)
       useCanvas.setState({
         error:
@@ -393,6 +391,114 @@ function Workspace({
             ? failed.reason.message
             : String(failed.reason),
       });
+  };
+  /** Media browser: adds the batch near the view centre, then shows it. */
+  const addAssets = (assets: Asset[]) => {
+    const center = flow.screenToFlowPosition({
+      x: innerWidth / 2,
+      y: innerHeight / 2,
+    });
+    const width = graph.registry.get("input.asset")?.ui?.width ?? 280;
+    const columns = Math.min(3, assets.length);
+    let ids: string[] = [];
+    action(() => {
+      ids = placeAssets(graph, assets, {
+        x: Math.round(center.x - (columns * (width + 40) - 40) / 2),
+        y: Math.round(center.y - ASSET_NODE_HEIGHT / 2),
+      });
+    });
+    if (!ids.length) return;
+    media.close();
+    fitTo(
+      {
+        nodes: ids.map((id) => ({ id })),
+        maxZoom: 1,
+        padding: 0.2,
+        duration: motionDuration(250),
+      },
+      50,
+    );
+  };
+  /**
+   * Media dragged from the browser: onto an input port it creates one Asset
+   * node and connects it, onto an Asset node it replaces the file, anywhere
+   * else it adds nodes at the pointer.
+   */
+  const dropAssets = (dragged: DraggedAsset[], event: React.DragEvent) => {
+    const element = event.target as HTMLElement;
+    const nodeId =
+      element.closest<HTMLElement>(".react-flow__node")?.dataset.id;
+    const recipe = graph.toRecipe();
+    const node = recipe.nodes.find((n) => n.id === nodeId);
+    const port = element.closest(".handle-target");
+    const at = flow.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+    if (!node || (!port && node.type !== "input.asset"))
+      return placeAssets(graph, dragged, at);
+    if (dragged.length > 1)
+      throw new Error("Choose one file for a node input.");
+    const [asset] = dragged;
+    if (!port) {
+      if (
+        !acceptedMediaKinds(recipe, graph.registry, node.id).includes(
+          asset.kind,
+        )
+      )
+        throw new Error(
+          `KIND: This node is connected to an input that does not accept ${asset.kind} files.`,
+        );
+      graph.setParam(node.id, "asset", asset.id);
+      return [node.id];
+    }
+    const entry = graph.registry.get(node.type)!;
+    const occupied = new Set(
+      recipe.edges.filter((e) => e.target === node.id).map((e) => e.targetPort),
+    );
+    const input = resolveInput(entry, asset.kind, occupied);
+    if (!input)
+      throw new Error(
+        `KIND: No free input on this node accepts ${asset.kind} files.`,
+      );
+    const width = graph.registry.get("input.asset")?.ui?.width ?? 280;
+    const [position] = placeBoxes(
+      nodeBoxes(recipe, graph.registry),
+      1,
+      { x: node.position.x - width - 80, y: node.position.y },
+      { w: width, h: ASSET_NODE_HEIGHT },
+    );
+    return graph.transaction("user", () => {
+      const id = graph.addNode("input.asset", {
+        position,
+        params: { asset: asset.id },
+      });
+      graph.connect({
+        source: id,
+        sourcePort: "asset",
+        target: node.id,
+        targetPort: input.key,
+      });
+      return [id];
+    });
+  };
+  /** A usage row in the Media browser: close it and show the node. */
+  const locate = (nodeId: string) => {
+    media.close();
+    useCanvas.setState((s) => ({
+      selected: [nodeId],
+      selectedEdges: [],
+      nodes: s.nodes.map((n) =>
+        n.selected === (n.id === nodeId)
+          ? n
+          : { ...n, selected: n.id === nodeId },
+      ),
+    }));
+    setInspector(nodeId);
+    fitTo(
+      { nodes: [{ id: nodeId }], maxZoom: 1, duration: motionDuration(250) },
+      50,
+    );
   };
   const remove = () =>
     action(() =>
@@ -480,7 +586,7 @@ function Workspace({
   };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (templates || saving) return;
+      if (templates || saving || useMedia.getState().open) return;
       if (
         (event.target as HTMLElement).closest(
           "input,textarea,select,[contenteditable]",
@@ -681,7 +787,11 @@ function Workspace({
               );
           }}
           onDragOver={(event) => {
-            if (!event.dataTransfer.types.includes("Files")) return;
+            if (
+              !event.dataTransfer.types.includes("Files") &&
+              !hasAssets(event.dataTransfer)
+            )
+              return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
             if (!dropping) setDropping(true);
@@ -696,6 +806,15 @@ function Workspace({
           }}
           onDrop={(event) => {
             setDropping(false);
+            if (hasAssets(event.dataTransfer)) {
+              event.preventDefault();
+              const dragged = readAssets(event.dataTransfer);
+              if (dragged.length) {
+                media.close();
+                action(() => void dropAssets(dragged, event));
+              }
+              return;
+            }
             const files = [...event.dataTransfer.files];
             if (!files.length) return;
             event.preventDefault();
@@ -903,6 +1022,17 @@ function Workspace({
           }}
         >
           <LayoutTemplate size={19} />
+        </button>
+        <button
+          aria-label="Media"
+          title="Media"
+          aria-expanded={mediaOpen}
+          onClick={() => {
+            setPalette(undefined);
+            media.openBrowser();
+          }}
+        >
+          <Images size={19} />
         </button>
         <button aria-label="Auto layout" title="Auto layout" onClick={layout}>
           <Workflow size={19} />
@@ -1132,6 +1262,14 @@ function Workspace({
           primaryLabel="Insert into canvas"
           onPick={insert}
           onClose={() => setTemplates(false)}
+        />
+      )}
+      {mediaOpen && (
+        <MediaBrowser
+          canvasId={canvasId}
+          canvasName={name}
+          onAdd={addAssets}
+          onLocate={locate}
         />
       )}
       {saving && (

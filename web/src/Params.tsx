@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   isUnfilled,
   type Asset,
+  type AssetKind,
   type Param,
   type RecipeNode,
 } from "../../contracts/index.ts";
+import { Images, LoaderCircle, Upload } from "lucide-react";
 import { useGraph } from "./context.ts";
-import { request } from "./api.ts";
 import { useCanvas } from "./store.ts";
+import { acceptedMediaKinds } from "./connections.ts";
+import { media, useMedia } from "./media/store.ts";
+import { getAsset, uploadAsset } from "./media/api.ts";
 export function ParamField({
   node,
   name,
@@ -108,38 +112,19 @@ export function ParamField({
           onChange={(e) => commit(e.target.checked)}
         />
       ) : param.type === "asset" ? (
-        <>
-          <input
-            aria-label={label}
-            type="file"
-            accept="image/*,video/*,audio/*"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const data = new FormData();
-              data.append("file", file);
-              try {
-                // Uploads land in the canvas space; the server checks access.
-                const canvasId = new URLSearchParams(location.search).get(
-                  "canvas",
-                );
-                const query = canvasId
-                  ? `?canvasId=${encodeURIComponent(canvasId)}`
-                  : "";
-                const asset = await request<Asset>(`/assets${query}`, {
-                  method: "POST",
-                  body: data,
-                });
-                commit(asset.id);
-              } catch (error) {
-                useCanvas.setState((s) => ({
-                  fieldErrors: { ...s.fieldErrors, [key]: String(error) },
-                }));
-              }
-            }}
-          />
-          <small>{value ? "Media selected" : "Choose a media file"}</small>
-        </>
+        <AssetField
+          label={label}
+          value={typeof value === "string" ? value : ""}
+          onPick={(id) => commit(id)}
+          onError={(message) =>
+            useCanvas.setState((s) => ({
+              fieldErrors: { ...s.fieldErrors, [key]: message },
+            }))
+          }
+          kinds={() =>
+            acceptedMediaKinds(graph.toRecipe(), graph.registry, node.id)
+          }
+        />
       ) : (param.type === "string" && param.multiline) ||
         param.type === "json" ? (
         <textarea
@@ -214,5 +199,100 @@ export function ParamForm({
           </button>
         )}
     </>
+  );
+}
+
+/** Upload a new file, or choose one from the Media browser (pick mode). */
+function AssetField({
+  label,
+  value,
+  kinds,
+  onPick,
+  onError,
+}: {
+  label: string;
+  value: string;
+  kinds: () => AssetKind[];
+  onPick: (id: string) => void;
+  onError: (message: string) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null),
+    [progress, setProgress] = useState<number>(),
+    [asset, setAsset] = useState<Asset>();
+  const revision = useMedia((s) => (value ? s.revisions[value] : 0));
+  useEffect(() => {
+    setAsset(undefined);
+    if (!value) return;
+    const abort = new AbortController();
+    void getAsset(value, abort.signal)
+      .then(setAsset)
+      .catch(() => {});
+    return () => abort.abort();
+  }, [value, revision]);
+  const accept = kinds()
+    .map((k) => `${k}/*`)
+    .join(",");
+  return (
+    <span className="asset-field">
+      <input
+        ref={input}
+        hidden
+        aria-label={label}
+        type="file"
+        accept={accept || "image/*,video/*,audio/*"}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          // Uploads land in the canvas space; the server checks access.
+          const canvasId =
+            new URLSearchParams(location.search).get("canvas") ?? undefined;
+          setProgress(0);
+          try {
+            const uploaded = await uploadAsset(file, { canvasId }, setProgress);
+            onPick(uploaded.id);
+          } catch (error) {
+            onError(error instanceof Error ? error.message : String(error));
+          } finally {
+            setProgress(undefined);
+          }
+        }}
+      />
+      <span className="asset-field-buttons">
+        <button
+          type="button"
+          disabled={progress !== undefined}
+          onClick={(e) => {
+            e.preventDefault();
+            input.current?.click();
+          }}
+        >
+          {progress !== undefined ? (
+            <LoaderCircle className="spinner" size={13} />
+          ) : (
+            <Upload size={13} />
+          )}
+          {progress !== undefined
+            ? `Uploading ${Math.round(progress * 100)}%`
+            : "Upload"}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            media.openPicker({
+              kinds: kinds(),
+              onPick: (picked) => onPick(picked.id),
+            });
+          }}
+        >
+          <Images size={13} />
+          Choose from library
+        </button>
+      </span>
+      <small>
+        {value ? (asset?.name ?? "Media selected") : "Choose a media file"}
+      </small>
+    </span>
   );
 }

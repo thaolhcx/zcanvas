@@ -7,21 +7,39 @@ export async function request<T>(
 ): Promise<T> {
   const response = await fetch(API + path, {
     ...options,
+    // JSON bodies only: Fastify rejects an empty body declared as JSON (DELETE).
     headers:
-      options?.body instanceof FormData
-        ? options.headers
+      options?.body === undefined || options.body instanceof FormData
+        ? options?.headers
         : { "Content-Type": "application/json", ...options?.headers },
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(
-      Array.isArray(body)
-        ? body.map((i) => i.message).join("; ")
-        : (body.error ?? `Request failed (${response.status})`),
-    );
-  }
+  if (!response.ok) throw await problem(response);
   return response.json();
 }
+/** A failed API call. `message` stays the server's readable text. */
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly body?: unknown,
+  ) {
+    super(message);
+  }
+}
+async function problem(response: Response) {
+  const body = await response.json().catch(() => ({}));
+  return new ApiRequestError(
+    Array.isArray(body)
+      ? body.map((i) => i.message).join("; ")
+      : (body.error ?? `Request failed (${response.status})`),
+    response.status,
+    Array.isArray(body) ? body[0]?.code : body.code,
+    body,
+  );
+}
+export const statusOf = (error: unknown) =>
+  error instanceof ApiRequestError ? error.status : undefined;
 export const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) });
 export function followRun(id: string, update: (run: Run) => void) {
