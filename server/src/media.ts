@@ -88,7 +88,14 @@ export async function deliver(
   reply.header("Content-Length", String(length));
   if (range)
     reply.code(206).header("Content-Range", `bytes ${range.start}-${range.end}/${object.bytes}`);
-  if (request.method === "HEAD" || length === 0) return reply.send();
+  if (request.method === "HEAD") {
+    // Send headers only, keeping the real Content-Length, without opening storage.
+    reply.hijack();
+    reply.raw.writeHead(reply.statusCode, reply.getHeaders() as Record<string, string>);
+    reply.raw.end();
+    return reply;
+  }
+  if (length === 0) return reply.send();
   const controller = new AbortController();
   let stream;
   try {

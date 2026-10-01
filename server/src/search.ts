@@ -61,6 +61,28 @@ export async function enqueueIndex(ids: string[], force = false) {
 }
 onAssetsChanged((ids) => enqueueIndex(ids));
 /**
+ * Lands only if the asset still has `revision` and is ready, and never
+ * replaces an entry for a newer revision. Returns whether it was written.
+ */
+export async function writeIndexEntry(
+  assetId: string,
+  model: string,
+  revision: number,
+  vector: number[],
+  contentHash: string,
+) {
+  const written = await db.query(
+    `INSERT INTO asset_search_index(asset_id, model, revision, state, embedding, content_hash, attempts, updated_at)
+     SELECT $1, $2, $3, 'indexed', $4::vector, $5, 0, now()
+     WHERE EXISTS (SELECT 1 FROM assets WHERE id=$1 AND revision=$3 AND status='ready')
+     ON CONFLICT (asset_id, model) DO UPDATE SET revision=EXCLUDED.revision, state='indexed',
+       embedding=EXCLUDED.embedding, content_hash=EXCLUDED.content_hash, error=NULL, attempts=0, updated_at=now()
+     WHERE asset_search_index.revision <= EXCLUDED.revision`,
+    [assetId, model, revision, JSON.stringify(vector), contentHash],
+  );
+  return Boolean(written.rowCount);
+}
+/**
  * Retry-safe and order-safe: the write only lands when the asset still has
  * the revision the text was built from, and never replaces a newer revision.
  */
@@ -99,16 +121,9 @@ export async function indexAsset(
   }
   try {
     const [vector] = await model.embed([text], "document");
-    const written = await db.query(
-      `INSERT INTO asset_search_index(asset_id, model, revision, state, embedding, content_hash, attempts, updated_at)
-       SELECT $1, $2, $3, 'indexed', $4::vector, $5, 0, now()
-       WHERE EXISTS (SELECT 1 FROM assets WHERE id=$1 AND revision=$3 AND status='ready')
-       ON CONFLICT (asset_id, model) DO UPDATE SET revision=EXCLUDED.revision, state='indexed',
-         embedding=EXCLUDED.embedding, content_hash=EXCLUDED.content_hash, error=NULL, attempts=0, updated_at=now()
-       WHERE asset_search_index.revision <= EXCLUDED.revision`,
-      [assetId, model.id, asset.revision, JSON.stringify(vector), contentHash],
-    );
-    return written.rowCount ? "indexed" : "stale";
+    return (await writeIndexEntry(assetId, model.id, asset.revision, vector, contentHash))
+      ? "indexed"
+      : "stale";
   } catch (error) {
     if (options.finalAttempt !== false)
       await db.query(
