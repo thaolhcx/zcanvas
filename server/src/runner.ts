@@ -5,6 +5,8 @@ import { createHash } from "node:crypto";
 import type {
   Asset,
   GenerationInfo,
+  GenerationProvider,
+  GenerationReference,
   Job,
   Output,
   Outputs,
@@ -158,42 +160,64 @@ const extension = (mime: string) =>
   })[mime] ??
   mime.split("/")[1] ??
   "bin";
+const PROMPT_LIMIT = 4000;
+const SETTINGS_LIMIT = 8000;
+const PROVIDER_LIMIT = 200;
 /** Plain-text history saved on generated assets. Later edits never rewrite it. */
 export function generationInfo(
   node: RecipeNode,
   params: Record<string, unknown>,
   inputs: Outputs,
+  provider?: unknown,
 ): GenerationInfo {
-  const texts = Object.values(inputs)
-    .flatMap((v) => (Array.isArray(v) ? v : [v]))
-    .filter(
-      (v): v is { value: string } =>
-        !isAsset(v) && typeof (v as { value?: unknown }).value === "string",
-    )
-    .map((v) => v.value);
-  const prompt = (
-    texts.length
-      ? texts.join("\n")
-      : typeof params.prompt === "string"
-        ? params.prompt
-        : ""
-  ).slice(0, 4000);
-  const references = Object.values(inputs)
-    .flatMap((v) => (Array.isArray(v) ? v : [v]))
-    .filter(isAsset)
-    .map((a) => a.name ?? a.id);
-  const settings = Object.fromEntries(
+  const truncated = new Set<"prompt" | "settings">();
+  const clip = (text: string) => {
+    if (text.length <= PROMPT_LIMIT) return text;
+    truncated.add("prompt");
+    return text.slice(0, PROMPT_LIMIT);
+  };
+  const prompts: Record<string, string> = {};
+  const references: GenerationReference[] = [];
+  for (const [port, value] of Object.entries(inputs)) {
+    const items = Array.isArray(value) ? value : [value];
+    const texts = items
+      .filter(
+        (v): v is { value: string } =>
+          !isAsset(v) && typeof (v as { value?: unknown }).value === "string",
+      )
+      .map((v) => v.value);
+    if (texts.length) prompts[port] = clip(texts.join("\n"));
+    for (const asset of items.filter(isAsset))
+      references.push({ name: asset.name ?? asset.id, id: asset.id, port });
+  }
+  if (!Object.keys(prompts).length && typeof params.prompt === "string")
+    prompts.prompt = clip(params.prompt);
+  const prompt = clip(Object.values(prompts).join("\n"));
+  const all = Object.fromEntries(
     Object.entries(params).filter(
       ([key, value]) =>
-        key !== "prompt" &&
-        (value === null ||
-          ["string", "number", "boolean"].includes(typeof value)),
+        key !== "prompt" && key !== "model" && value !== undefined,
     ),
   );
+  let settings = all;
+  if (JSON.stringify(all).length > SETTINGS_LIMIT) {
+    // Keep the scalar params, which are small, and say that the rest was dropped.
+    truncated.add("settings");
+    settings = Object.fromEntries(
+      Object.entries(all).filter(
+        ([, value]) =>
+          value === null ||
+          (["string", "number", "boolean"].includes(typeof value) &&
+            String(value).length <= PROVIDER_LIMIT),
+      ),
+    );
+  }
+  const reported = providerInfo(provider);
   return {
     nodeType: node.type,
     typeVersion: node.typeVersion,
     ...(prompt ? { prompt } : {}),
+    ...(Object.keys(prompts).length ? { prompts } : {}),
     ...(typeof params.model === "string"
       ? { model: params.model }
       : config.mock
@@ -201,6 +225,31 @@ export function generationInfo(
         : {}),
     ...(Object.keys(settings).length ? { settings } : {}),
     ...(references.length ? { references } : {}),
+    ...(reported ? { provider: reported } : {}),
+    ...(truncated.size ? { truncated: [...truncated] } : {}),
+  };
+}
+/** Keeps only the known, short fields a provider reported; ignores anything else. */
+function providerInfo(value: unknown): GenerationProvider | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const input = value as Record<string, unknown>;
+  const text = (v: unknown) =>
+    typeof v === "string" && v.trim() && v.length <= PROVIDER_LIMIT
+      ? v.trim()
+      : undefined;
+  const name = text(input.name);
+  if (!name) return undefined;
+  const model = text(input.model);
+  const requestId = text(input.requestId);
+  const seed =
+    typeof input.seed === "number" && Number.isFinite(input.seed)
+      ? input.seed
+      : text(input.seed);
+  return {
+    name,
+    ...(model ? { model } : {}),
+    ...(seed !== undefined ? { seed } : {}),
+    ...(requestId ? { requestId } : {}),
   };
 }
 // Values preserve list slots, including skipped branches, so later fan-outs stay aligned.
@@ -479,7 +528,12 @@ async function executeRun(runId: string) {
                     nodeId: node.id,
                     jobId: job.jobId,
                   },
-                  generation: generationInfo(node, ctx.params, inputs),
+                  generation: generationInfo(
+                    node,
+                    ctx.params,
+                    inputs,
+                    meta.provider,
+                  ),
                   // Visible only after the job finishes on the current run.
                   publish: "processing",
                 });

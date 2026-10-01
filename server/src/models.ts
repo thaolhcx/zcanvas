@@ -57,7 +57,10 @@ export function createModels(ctx: {
                 ? "audio/wav"
                 : "image/png",
         }),
-        meta: { kind: kind === "image-edit" ? "image" : kind },
+        meta: {
+          kind: kind === "image-edit" ? "image" : kind,
+          provider: { name: "mock", model: `mock:${kind}` },
+        },
         credits,
       };
     },

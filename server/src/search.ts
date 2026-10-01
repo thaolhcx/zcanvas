@@ -54,7 +54,7 @@ export function searchText(asset: {
     asset.tags?.length ? asset.tags.join(", ") : "",
     asset.generation?.prompt,
     asset.generation?.references?.length
-      ? asset.generation.references.join(", ")
+      ? asset.generation.references.map((r) => r.name).join(", ")
       : "",
   ]
     .filter(Boolean)

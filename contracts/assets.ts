@@ -42,15 +42,42 @@ export type AssetStatus =
   | "failed"
   | "deleted";
 export type PreviewStatus = "none" | "pending" | "ready" | "failed";
+/** An input file of the run that made an asset. */
+export interface GenerationReference {
+  /** File name at run time, as plain text. Never re-resolved. */
+  name: string;
+  /**
+   * Asset ID at run time: lineage only, not permission. It may since have been
+   * deleted. Absent on assets recorded before IDs were saved.
+   */
+  id?: string;
+  /** Input port the file was connected to. */
+  port?: string;
+}
+/** What the model provider reported for this output, when it reports it. */
+export interface GenerationProvider {
+  name: string;
+  /** The model and version that actually ran, which may differ from `model`. */
+  model?: string;
+  seed?: number | string;
+  requestId?: string;
+}
 /** Plain-text history captured from the run snapshot when the asset was made. */
 export interface GenerationInfo {
   nodeType: string;
   typeVersion: number;
+  /** All text inputs joined, or the `prompt` param. Used for display and search. */
   prompt?: string;
+  /** Text inputs by input port; `prompt` when the text came from the node param. */
+  prompts?: Record<string, string>;
+  /** The model the node asked for. */
   model?: string;
+  /** Node params other than the prompt and model, as JSON. */
   settings?: Record<string, unknown>;
-  /** Input file names as plain text at run time. Never re-resolved. */
-  references?: string[];
+  references?: GenerationReference[];
+  provider?: GenerationProvider;
+  /** Fields shortened or reduced to fit the size limits. */
+  truncated?: ("prompt" | "settings")[];
 }
 export type AssetSort = "created_desc" | "created_asc" | "name_asc";
 export interface AssetListQuery {

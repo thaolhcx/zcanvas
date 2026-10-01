@@ -315,7 +315,7 @@ describe("semantic search", () => {
           nodeType: "image.generate",
           typeVersion: 1,
           prompt: "lighthouse",
-          references: ["ref.png"],
+          references: [{ name: "ref.png", id: "ast_ref", port: "image" }],
         },
       }),
     ).toBe("IMG 0042\nimage\nA cliff\ncoast\nlighthouse\nref.png");

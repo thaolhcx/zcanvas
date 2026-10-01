@@ -65,6 +65,12 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS assets_lifecycle ON assets(status, updated_at) WHERE status <> 'ready' AND purged_at IS NULL;
     CREATE TABLE IF NOT EXISTS asset_objects (asset_id text NOT NULL REFERENCES assets(id), role text NOT NULL, profile text NOT NULL, key text NOT NULL, bytes bigint, mime text, sha256 text, state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','stored','deleted')), created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (asset_id, role));
     CREATE TABLE IF NOT EXISTS catalog_migration_issues (record_type text NOT NULL, record_id text NOT NULL, reason text NOT NULL, detected_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (record_type, record_id));
+    -- Reference names were saved as plain strings before IDs and ports were kept.
+    UPDATE assets SET generation = jsonb_set(generation, '{references}',
+      (SELECT jsonb_agg(CASE WHEN jsonb_typeof(r) = 'string' THEN jsonb_build_object('name', r #>> '{}') ELSE r END)
+         FROM jsonb_array_elements(generation->'references') r))
+    WHERE jsonb_typeof(generation->'references') = 'array'
+      AND EXISTS (SELECT 1 FROM jsonb_array_elements(generation->'references') r WHERE jsonb_typeof(r) = 'string');
     SELECT pg_advisory_unlock(hashtext('zcanvas.migrate'));
   `);
   try {

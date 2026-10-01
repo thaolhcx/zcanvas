@@ -37,6 +37,23 @@ Rules, enforced on the server in `server/src/access.ts`:
 
 Not built (extension points only): login, invitations, team admin UI, cross-space sharing, public links, ownership transfer, folders, collections and film roles. Future collections should reference asset IDs (for example a `collection_items(collection_id, asset_id)` table) and never file paths.
 
+## Generation history
+
+Only assets made by a run on the platform have `source.type = "generated"` and a `generation` record. Files made elsewhere are uploads: they have a name, description and tags, never a `generation` record, and clients cannot set one. The runner writes the record once, from the run snapshot, when the output is stored (`generationInfo` in `server/src/runner.ts`). Later node edits, renames and deletes never rewrite it.
+
+| Field | Content |
+| --- | --- |
+| `nodeType`, `typeVersion` | The node that made the asset |
+| `prompts` | Text inputs by input port (for example `prompt`, `negative`), or `prompt` when the text came from the node param |
+| `prompt` | All prompts joined. Used for display and search |
+| `model` | The model the node asked for |
+| `settings` | The other node params as JSON, including objects and lists |
+| `references` | One `{ name, id, port }` per input file. `name` is the file name at run time, as plain text. `id` is lineage only, not permission: the asset may since have been deleted. Records saved before IDs were kept have only `name`; `migrate()` converts the old plain-string form and is safe to rerun |
+| `provider` | What the model provider reported, when it reports it: `name`, the `model` and version that actually ran, `seed`, `requestId`. A worker passes it as `meta.provider` to `putAsset`; unknown fields are dropped. The mock provider reports `mock` |
+| `truncated` | `prompt` and/or `settings` when a value went over a limit: 4,000 characters per prompt and 8,000 characters of settings JSON. Over that limit only short scalar settings are kept. Nothing is dropped without this mark |
+
+Credits stay in the `usage` table by job, and `source.runId` leads to the run's full recipe snapshot.
+
 ## Lifecycle
 
 ```
@@ -92,7 +109,7 @@ The agent/MCP surface can call the same routes, or the service functions directl
 
 ## Semantic search
 
-- **What is searched**: one text per asset, built from the file name (stem, separators turned into spaces), kind, description, tags, the generation prompt and reference names (`searchText`). Media bytes are never embedded or sent anywhere. A file with only an opaque name, such as `IMG_0001.jpg`, has very little to match. Image captions, transcription and pixel or audio similarity are future metadata sources. They would feed `searchText` without changing the index.
+- **What is searched**: one text per asset, built from the file name (stem, separators turned into spaces), kind, description, tags, the generation prompt and reference file names (`searchText`). Media bytes are never embedded or sent anywhere. A file with only an opaque name, such as `IMG_0001.jpg`, has very little to match. Image captions, transcription and pixel or audio similarity are future metadata sources. They would feed `searchText` without changing the index.
 - **Providers** (`server/src/embeddings.ts`): `local` runs `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions, English and Vietnamese) in-process with transformers.js. It is an optional dependency, the model is downloaded once, and no text leaves the server. `openai` calls any OpenAI-compatible `/embeddings` endpoint; with it, the search text above (names, descriptions, tags, prompts, reference names) is sent to that provider. `hash` gives deterministic test vectors that match words, not meaning, and is used only in automated tests. `none` turns semantic search off.
 - **Index**: Postgres with pgvector. The `asset_search_index` table holds `(asset_id, model)`, the asset `revision`, state, vector and content hash. pgvector keeps vectors next to the catalog rows and access columns, so scope filters and retrieval run in one SQL statement and no extra service is needed. Retrieval is an exact scan inside the allowed space: 10k vectors take about 26 ms at p95 (below). That makes filtering exact, with no global top-k followed by a filter. HNSW is the next step once one space holds hundreds of thousands of assets; it needs pgvector ≥ 0.8 iterative scans to stay exact under filters.
 - **Jobs**: `asset-index` (pg-boss) runs after upload, publish, rename or metadata edit. Jobs are idempotent: unchanged text only moves the revision forward. A write lands only if the asset still has the revision the text came from, and it never replaces a newer revision, so late or duplicate jobs cannot overwrite newer data. Failures are recorded (`state=failed`, error, attempts) and retried. `pnpm assets reindex` backfills; `--all` re-embeds everything and `--prune` drops other models' vectors.

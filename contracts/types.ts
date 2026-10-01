@@ -243,11 +243,18 @@ export type RunEvent =
       credits: number;
       at: string;
     };
+/**
+ * Metadata a worker passes to `putAsset`. `provider` is what the model
+ * provider reported; the server records the rest of the generation history.
+ */
+export type OutputMeta = Partial<Asset> & {
+  provider?: import("./assets.ts").GenerationProvider;
+};
 export interface ModelsClient {
   generate(
     kind: AssetKind | "image-edit",
     request: { params: Params; inputs: Outputs; signal: AbortSignal },
-  ): Promise<{ file: Blob; meta: Partial<Asset>; credits: number }>;
+  ): Promise<{ file: Blob; meta: OutputMeta; credits: number }>;
 }
 export interface RunContext {
   runId: string;
@@ -258,7 +265,7 @@ export interface RunContext {
   params: Params;
   signal: AbortSignal;
   report(progress: number, message?: string): void;
-  putAsset(file: Blob | ReadableStream, meta: Partial<Asset>): Promise<Asset>;
+  putAsset(file: Blob | ReadableStream, meta: OutputMeta): Promise<Asset>;
   models: ModelsClient;
   log(level: "info" | "warn" | "error", msg: string): void;
 }

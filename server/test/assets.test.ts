@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { createApp } from "../src/app.ts";
 import { migrate, db } from "../src/db.ts";
 import { checkStorage, LocalStore, registerStore } from "../src/storage.ts";
-import { startRunner } from "../src/runner.ts";
+import { generationInfo, startRunner } from "../src/runner.ts";
 import { personalSpaceId } from "../src/access.ts";
 import {
   cleanupAsset,
@@ -381,8 +381,10 @@ describe("generated outputs", () => {
       generation: {
         nodeType: "image.generate",
         prompt,
+        prompts: { prompt },
         model: "flux-2",
         settings: { aspect: "1:1", count: 1 },
+        provider: { name: "mock", model: "mock:image" },
       },
     });
     const list = (
@@ -401,7 +403,7 @@ describe("generated outputs", () => {
         ?.prompt,
     ).toBe(prompt);
   });
-  it("saves reference names as plain text", async () => {
+  it("saves reference names as plain text, with their IDs and ports", async () => {
     const asset = (
       await upload(app, await png("reference-girl.png"))
     ).json<Asset>();
@@ -418,7 +420,107 @@ describe("generated outputs", () => {
       payload: { name: "renamed.png" },
     });
     const detail = (await app.inject(`/assets/${edited.id}`)).json<Asset>();
-    expect(detail.generation?.references).toEqual(["reference-girl.png"]);
+    expect(detail.generation?.references).toEqual([
+      { name: "reference-girl.png", id: asset.id, port: "image" },
+    ]);
+  });
+  it("keeps prompts by port, structured settings and what the provider reported", () => {
+    const node = {
+      id: "n",
+      type: "image.generate",
+      typeVersion: 2,
+      position: { x: 0, y: 0 },
+      params: {},
+    };
+    const ref = {
+      id: "ast_ref",
+      name: "pose.png",
+      kind: "image" as const,
+      mime: "image/png",
+      bytes: 1,
+      url: "",
+      meta: {},
+      createdAt: "",
+    };
+    const info = generationInfo(
+      node,
+      {
+        model: "flux-2",
+        size: { width: 1024, height: 768 },
+        loras: ["ink", "film"],
+        prompt: "ignored when a text input is connected",
+      },
+      {
+        prompt: { value: "a lighthouse" },
+        negative: { value: "blurry" },
+        image: [ref],
+      },
+      {
+        name: "acme",
+        model: "flux-2-pro-0901",
+        seed: 7,
+        requestId: "req_1",
+        apiKey: "never stored",
+      },
+    );
+    expect(info).toEqual({
+      nodeType: "image.generate",
+      typeVersion: 2,
+      prompt: "a lighthouse\nblurry",
+      prompts: { prompt: "a lighthouse", negative: "blurry" },
+      model: "flux-2",
+      settings: { size: { width: 1024, height: 768 }, loras: ["ink", "film"] },
+      references: [{ name: "pose.png", id: "ast_ref", port: "image" }],
+      provider: {
+        name: "acme",
+        model: "flux-2-pro-0901",
+        seed: 7,
+        requestId: "req_1",
+      },
+    });
+    expect(
+      generationInfo(node, { prompt: "from the param" }, {}),
+    ).toMatchObject({
+      prompt: "from the param",
+      prompts: { prompt: "from the param" },
+    });
+    // Oversized values are cut and marked, never silently dropped.
+    const big = generationInfo(
+      node,
+      { steps: 30, curve: Array.from({ length: 5000 }, (_, i) => i) },
+      { prompt: { value: "x".repeat(5000) } },
+      { model: "no name" },
+    );
+    expect(big.prompt).toHaveLength(4000);
+    expect(big.settings).toEqual({ steps: 30 });
+    expect(big.truncated?.sort()).toEqual(["prompt", "settings"]);
+    expect(big.provider).toBeUndefined();
+  });
+  it("migrates reference names saved as plain strings, and reruns safely", async () => {
+    const id = `ast_${crypto.randomUUID()}`;
+    await db.query(
+      `INSERT INTO assets(id, catalog_version, space_id, source_type, name, kind, mime, bytes, status, preview_status, generation)
+       VALUES($1,1,$2,'generated','old.png','image','image/png',0,'ready','none',$3)`,
+      [
+        id,
+        personalSpaceId("usr_local"),
+        {
+          nodeType: "image.edit",
+          typeVersion: 1,
+          references: ["a.png", "b.png"],
+        },
+      ],
+    );
+    await migrate();
+    await migrate();
+    const { rows } = await db.query(
+      "SELECT generation FROM assets WHERE id=$1",
+      [id],
+    );
+    expect(rows[0].generation.references).toEqual([
+      { name: "a.png" },
+      { name: "b.png" },
+    ]);
   });
   it("never publishes outputs of a job that did not finish", async () => {
     const jobId = `job_${crypto.randomUUID()}`;

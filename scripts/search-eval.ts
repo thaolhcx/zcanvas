@@ -70,7 +70,9 @@ for (const a of fixture.assets) {
             nodeType: `${a.kind}.generate`,
             typeVersion: 1,
             ...(a.prompt ? { prompt: a.prompt } : {}),
-            ...(a.references ? { references: a.references } : {}),
+            ...(a.references
+              ? { references: a.references.map((name) => ({ name })) }
+              : {}),
           }
         : null,
     ],

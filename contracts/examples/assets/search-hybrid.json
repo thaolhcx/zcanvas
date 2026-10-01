@@ -41,11 +41,26 @@
           "nodeType": "video.generate",
           "typeVersion": 1,
           "prompt": "A girl in a red coat on a rainy street, cinematic",
+          "prompts": {
+            "prompt": "A girl in a red coat on a rainy street, cinematic"
+          },
           "model": "seedance-1.5",
           "settings": {
             "durationSec": 5
           },
-          "references": ["Hero portrait.png"]
+          "references": [
+            {
+              "name": "Hero portrait.png",
+              "id": "ast_5f0c2d1e-7a3b-4c8d-9e1f-2a3b4c5d6e7f",
+              "port": "image"
+            }
+          ],
+          "provider": {
+            "name": "seedance",
+            "model": "seedance-1.5-pro-250528",
+            "seed": 42817,
+            "requestId": "req_7f3a"
+          }
         },
         "updatedAt": "2026-10-01T08:10:00.000Z"
       },
