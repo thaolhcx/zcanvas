@@ -7,6 +7,7 @@ import type {
   XY,
 } from "../../contracts/index.ts";
 import type { Graph } from "../../graph/src/index.ts";
+import { GAP, nodeBoxes, overlaps, type Box } from "./media/place.ts";
 /** GET /templates entry: metadata only. */
 export interface TemplateEntry {
   id: string;
@@ -24,11 +25,15 @@ export interface TemplateEntry {
 // Graph.fromRecipe("insert") offsets pasted items by this much.
 const INSERT_OFFSET = 48;
 const NODE_HEIGHT = 300;
-/** Moves a template so its bounding box is centred on `center` once inserted. */
+/**
+ * Moves a template so its bounding box is centred on `center` once inserted,
+ * then moves it down until it overlaps none of the `existing` boxes.
+ */
 export function placeTemplate(
   recipe: Recipe,
   registry: Registry,
   center: XY,
+  existing: Box[] = [],
 ): Recipe {
   const copy = structuredClone(recipe);
   const boxes = [
@@ -44,8 +49,21 @@ export function placeTemplate(
     top = Math.min(...boxes.map((b) => b.y)),
     right = Math.max(...boxes.map((b) => b.x + b.w)),
     bottom = Math.max(...boxes.map((b) => b.y + b.h));
-  const dx = Math.round(center.x - (left + right) / 2 - INSERT_OFFSET),
-    dy = Math.round(center.y - (top + bottom) / 2 - INSERT_OFFSET);
+  const dx = Math.round(center.x - (left + right) / 2 - INSERT_OFFSET);
+  let dy = Math.round(center.y - (top + bottom) / 2 - INSERT_OFFSET);
+  // The block as it lands after the insert offset.
+  const block = () => ({
+    x: left + dx + INSERT_OFFSET,
+    y: top + dy + INSERT_OFFSET,
+    w: right - left,
+    h: bottom - top,
+  });
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const blocker = existing.find((box) => overlaps(block(), box));
+    if (!blocker) break;
+    // Jump just below the box in the way, then check again.
+    dy += Math.max(1, blocker.y + blocker.h + GAP - block().y);
+  }
   const move = (p: XY) => ({ x: p.x + dx, y: p.y + dy });
   for (const n of copy.nodes) n.position = move(n.position);
   for (const g of copy.groups) g.position = move(g.position);
@@ -58,7 +76,11 @@ export function placeTemplate(
  * the template's nodes by index.
  */
 export function insertTemplate(graph: Graph, recipe: Recipe, center: XY) {
-  const placed = placeTemplate(recipe, graph.registry, center);
+  const current = graph.toRecipe();
+  const placed = placeTemplate(recipe, graph.registry, center, [
+    ...nodeBoxes(current, graph.registry),
+    ...current.groups.map((g) => ({ ...g.position, ...g.size })),
+  ]);
   return graph.transaction("user", () => {
     const before = graph.toRecipe().nodes.length;
     graph.fromRecipe(placed, "insert");

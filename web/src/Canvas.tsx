@@ -993,6 +993,10 @@ function Workspace({
           if (!file) return;
           try {
             const recipe = JSON.parse(await file.text());
+            // The file may come from another canvas; keep this canvas's id.
+            const canvasId = new URLSearchParams(location.search).get("canvas");
+            if (canvasId && recipe?.meta && typeof recipe.meta === "object")
+              recipe.meta.id = canvasId;
             graph.fromRecipe(recipe, "replace");
             scheduleFit();
           } catch (error) {
