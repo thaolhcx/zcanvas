@@ -114,3 +114,21 @@ export function uploadAsset(
     xhr.send(data);
   });
 }
+const cache = new Map<string, Promise<Asset>>();
+/**
+ * Asset details shared by canvas nodes: many nodes often use one file, and
+ * each node shows it twice (preview and field). `revision` comes from the
+ * Media store and changes after a rename or delete.
+ */
+export function cachedAsset(id: string, revision = 0) {
+  const key = `${id}@${revision}`;
+  let pending = cache.get(key);
+  if (!pending) {
+    pending = getAsset(id);
+    cache.set(key, pending);
+    // Failures and stale revisions are not kept.
+    pending.catch(() => cache.delete(key));
+    cache.delete(`${id}@${revision - 1}`);
+  }
+  return pending;
+}

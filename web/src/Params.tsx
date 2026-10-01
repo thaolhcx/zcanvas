@@ -11,7 +11,7 @@ import { useGraph } from "./context.ts";
 import { useCanvas } from "./store.ts";
 import { acceptedMediaKinds } from "./connections.ts";
 import { media, useMedia } from "./media/store.ts";
-import { getAsset, uploadAsset } from "./media/api.ts";
+import { cachedAsset, uploadAsset } from "./media/api.ts";
 export function ParamField({
   node,
   name,
@@ -223,15 +223,16 @@ function AssetField({
   useEffect(() => {
     setAsset(undefined);
     if (!value) return;
-    const abort = new AbortController();
-    void getAsset(value, abort.signal)
-      .then(setAsset)
+    let live = true;
+    void cachedAsset(value, revision)
+      .then((a) => {
+        if (live) setAsset(a);
+      })
       .catch(() => {});
-    return () => abort.abort();
+    return () => {
+      live = false;
+    };
   }, [value, revision]);
-  const accept = kinds()
-    .map((k) => `${k}/*`)
-    .join(",");
   return (
     <span className="asset-field">
       <input
@@ -239,7 +240,7 @@ function AssetField({
         hidden
         aria-label={label}
         type="file"
-        accept={accept || "image/*,video/*,audio/*"}
+        accept="image/*,video/*,audio/*"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
@@ -264,6 +265,10 @@ function AssetField({
           disabled={progress !== undefined}
           onClick={(e) => {
             e.preventDefault();
+            // Computed on click: this field renders on every node during drags.
+            const accept = kinds().map((k) => `${k}/*`);
+            if (input.current && accept.length)
+              input.current.accept = accept.join(",");
             input.current?.click();
           }}
         >

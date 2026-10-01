@@ -27,7 +27,8 @@ import {
   useCanvas,
   useRun,
 } from "./store.ts";
-import { post, request, statusOf } from "./api.ts";
+import { post, statusOf } from "./api.ts";
+import { cachedAsset } from "./media/api.ts";
 import { media, useMedia } from "./media/store.ts";
 import { acceptedMediaKinds } from "./connections.ts";
 const icons = {
@@ -90,7 +91,7 @@ export function Preview({ id }: { id: string }) {
     setUploaded(undefined);
     setMissing(undefined);
     if (assetId)
-      void request<Asset>(`/assets/${assetId}`)
+      void cachedAsset(assetId, revision)
         .then((a) => {
           if (live) setUploaded(a);
         })
