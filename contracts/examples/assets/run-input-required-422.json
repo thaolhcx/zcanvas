@@ -1,0 +1,9 @@
+[
+  {
+    "code": "INPUT_REQUIRED",
+    "severity": "error",
+    "nodeId": "n_ref",
+    "paramKey": "asset",
+    "message": "This file was deleted or is not available in this space. Choose another file."
+  }
+]

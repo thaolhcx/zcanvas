@@ -4,22 +4,79 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { Graph, Y, emptyRecipe } from "../../graph/src/index.ts";
 import { validate, type Recipe, type Run } from "../../contracts/index.ts";
 import { db } from "./db.ts";
 import { registry } from "./registry.ts";
 import { config } from "./config.ts";
-import { getAsset, putAsset, s3 } from "./assets.ts";
+import { putAsset, unavailableAssets } from "./assets.ts";
 import { getRun, enqueue, emit } from "./runner.ts";
 import { templateRecipe, templateRoutes } from "./templates.ts";
+import {
+  ApiProblem,
+  type Access,
+  type Actor,
+  ensureActor,
+  personalSpaceId,
+  readableSpaceIds,
+  requireCanvas,
+  requireSpace,
+} from "./access.ts";
+import { registerAssetRoutes } from "./asset-routes.ts";
+import { StorageError } from "./storage.ts";
 const idParams = {
   type: "object",
   required: ["id"],
   properties: { id: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" } },
 };
-export async function createApp() {
+/** Asset IDs referenced by `asset` params, with the node and param that use them. */
+export function assetReferences(recipe: Recipe) {
+  const refs: { nodeId: string; paramKey: string; assetId: string }[] = [];
+  for (const node of recipe.nodes) {
+    const entry = registry.get(node.type);
+    for (const [paramKey, param] of Object.entries(entry?.params ?? {}))
+      if (param.type === "asset" && typeof node.params[paramKey] === "string")
+        refs.push({
+          nodeId: node.id,
+          paramKey,
+          assetId: node.params[paramKey] as string,
+        });
+  }
+  return refs;
+}
+/**
+ * `actorId` is server configuration (or a test fixture), never request data.
+ * The local POC has one configured identity; see docs/asset-platform.md.
+ */
+export async function createApp(options: { actorId?: string } = {}) {
+  const actor: Actor = { id: options.actorId ?? config.actorId };
+  await ensureActor(actor.id);
   const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024 });
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ApiProblem)
+      return reply.code(error.status).send(error.body());
+    if (error instanceof StorageError)
+      return reply
+        .code(503)
+        .send({ error: "Storage is unavailable", code: "STORAGE_UNAVAILABLE" });
+    const status = (error as { statusCode?: number }).statusCode ?? 500;
+    if (status < 500)
+      return reply.code(status).send({
+        error: (error as Error).message,
+        code: (error as { validation?: unknown }).validation
+          ? "VALIDATION"
+          : "BAD_REQUEST",
+      });
+    console.error(error);
+    return reply.code(500).send({ error: "Internal server error" });
+  });
+  const requireRun = async (id: string, access: Access) => {
+    const { rows } = await db.query("SELECT space_id FROM runs WHERE id=$1", [
+      id,
+    ]);
+    await requireSpace(actor, rows[0]?.space_id, access, "Run not found");
+    return rows[0].space_id as string;
+  };
   app.addHook("onRequest", async (request, reply) => {
     if (!isLocalOrigin(request.headers.origin))
       return reply
@@ -43,11 +100,19 @@ export async function createApp() {
     async () =>
       (
         await db.query(
-          "SELECT id, name, version, updated_at FROM canvases ORDER BY updated_at DESC",
+          'SELECT id, name, version, updated_at, space_id AS "spaceId", project_id AS "projectId" FROM canvases WHERE space_id = ANY($1) ORDER BY updated_at DESC',
+          [await readableSpaceIds(actor)],
         )
       ).rows,
   );
-  app.post<{ Body: { name?: string; templateId?: string } }>(
+  app.post<{
+    Body: {
+      name?: string;
+      templateId?: string;
+      spaceId?: string;
+      projectId?: string;
+    };
+  }>(
     "/canvases",
     {
       schema: {
@@ -56,12 +121,31 @@ export async function createApp() {
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
             templateId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
+            spaceId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
+            projectId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
           },
         },
       },
     },
     async (request, reply) => {
       const { name, templateId } = request.body ?? {};
+      const spaceId = request.body?.spaceId ?? personalSpaceId(actor.id);
+      await requireSpace(actor, spaceId, "write", "Space not found");
+      const projectId = request.body?.projectId ?? null;
+      if (
+        projectId &&
+        !(
+          await db.query("SELECT 1 FROM projects WHERE id=$1 AND space_id=$2", [
+            projectId,
+            spaceId,
+          ])
+        ).rowCount
+      )
+        throw new ApiProblem(
+          400,
+          "VALIDATION",
+          "The project is not in this space",
+        );
       let recipe = emptyRecipe(undefined, name);
       if (templateId) {
         const template = await templateRecipe(templateId);
@@ -83,16 +167,17 @@ export async function createApp() {
       graph.destroy();
       graph.doc.destroy();
       await db.query(
-        "INSERT INTO canvases(id,name,ydoc,snapshot) VALUES($1,$2,$3,$4)",
-        [recipe.meta.id, recipe.meta.name, bytes, recipe],
+        "INSERT INTO canvases(id,name,ydoc,snapshot,space_id,project_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [recipe.meta.id, recipe.meta.name, bytes, recipe, spaceId, projectId],
       );
-      return { canvasId: recipe.meta.id };
+      return { canvasId: recipe.meta.id, spaceId };
     },
   );
   app.get<{ Params: { id: string } }>(
     "/canvases/:id",
     { schema: { params: idParams } },
     async (request, reply) => {
+      await requireCanvas(actor, request.params.id, "read");
       const { rows } = await db.query(
         "SELECT snapshot FROM canvases WHERE id=$1",
         [request.params.id],
@@ -134,78 +219,7 @@ export async function createApp() {
     },
   );
   templateRoutes(app);
-  app.post("/assets", async (request, reply) => {
-    const file = await request.file();
-    if (!file) return reply.code(400).send({ error: "Choose a file" });
-    if (
-      !["image/", "video/", "audio/"].some((kind) =>
-        file.mimetype.startsWith(kind),
-      )
-    )
-      return reply.code(415).send({ error: "Choose an image, video or audio" });
-    try {
-      const buffer = await file.toBuffer();
-      return await putAsset(
-        new Blob([new Uint8Array(buffer)], { type: file.mimetype }),
-        {},
-      );
-    } catch (error) {
-      return reply.code(400).send({
-        error: error instanceof Error ? error.message : "Unreadable media",
-      });
-    }
-  });
-  app.get<{ Params: { id: string } }>(
-    "/assets/:id",
-    { schema: { params: idParams } },
-    async (request, reply) => {
-      try {
-        return await getAsset(request.params.id);
-      } catch {
-        return reply.code(404).send({ error: "Asset not found" });
-      }
-    },
-  );
-  app.get<{ Params: { id: string; kind: string } }>(
-    "/assets/:id/:kind",
-    async (request, reply) => {
-      if (!["file", "thumbnail"].includes(request.params.kind))
-        return reply.code(404).send();
-      let asset;
-      try {
-        asset = await getAsset(request.params.id);
-      } catch {
-        return reply.code(404).send();
-      }
-      const thumbnail = request.params.kind === "thumbnail";
-      if (thumbnail && !asset.thumbUrl) return reply.code(404).send();
-      const object = await s3.send(
-        new GetObjectCommand({
-          Bucket: config.s3Bucket,
-          Key: asset.id + (thumbnail ? "_thumb" : ""),
-        }),
-      );
-      const bytes = Buffer.from(await object.Body!.transformToByteArray());
-      reply
-        .type(thumbnail ? "image/jpeg" : asset.mime)
-        .header("Cache-Control", "public, max-age=31536000, immutable")
-        .header("Accept-Ranges", "bytes");
-      const range = request.headers.range?.match(/^bytes=(\d+)-(\d*)$/);
-      if (range) {
-        const start = Number(range[1]),
-          end = Math.min(
-            range[2] ? Number(range[2]) : bytes.length - 1,
-            bytes.length - 1,
-          );
-        if (start >= bytes.length || start > end) return reply.code(416).send();
-        return reply
-          .code(206)
-          .header("Content-Range", `bytes ${start}-${end}/${bytes.length}`)
-          .send(bytes.subarray(start, end + 1));
-      }
-      return reply.send(bytes);
-    },
-  );
+  registerAssetRoutes(app, actor);
   app.post<{
     Body: { recipe: Recipe; canvasId: string; graphVersion: number };
   }>("/runs", async (request, reply) => {
@@ -220,11 +234,29 @@ export async function createApp() {
           message: "graphVersion does not match the snapshot",
         },
       ]);
-    if (
-      !(await db.query("SELECT 1 FROM canvases WHERE id=$1", [canvasId]))
-        .rowCount
-    )
+    if (typeof canvasId !== "string")
       return reply.code(404).send({ error: "Canvas not found" });
+    const spaceId = await requireCanvas(actor, canvasId, "write");
+    // Assets must be ready and in the canvas space. Deleted, missing and
+    // other-space assets look the same: the input needs a new file.
+    const refs = assetReferences(recipe);
+    const missing = new Set(
+      await unavailableAssets(
+        [...new Set(refs.map((r) => r.assetId))],
+        spaceId,
+      ),
+    );
+    const inputIssues = refs
+      .filter((r) => missing.has(r.assetId))
+      .map((r) => ({
+        code: "INPUT_REQUIRED",
+        severity: "error",
+        nodeId: r.nodeId,
+        paramKey: r.paramKey,
+        message:
+          "This file was deleted or is not available in this space. Choose another file.",
+      }));
+    if (inputIssues.length) return reply.code(422).send(inputIssues);
     const run: Run = {
       runId: `run_${crypto.randomUUID()}`,
       canvasId,
@@ -235,24 +267,28 @@ export async function createApp() {
       jobs: [],
     };
     await db.query(
-      "INSERT INTO runs(id,canvas_id,recipe,data) VALUES($1,$2,$3,$4)",
-      [run.runId, canvasId, recipe, run],
+      "INSERT INTO runs(id,canvas_id,recipe,data,space_id,actor_id) VALUES($1,$2,$3,$4,$5,$6)",
+      [run.runId, canvasId, recipe, run, spaceId, actor.id],
     );
     await enqueue(run.runId);
     return reply.code(201).send(run);
   });
-  app.get<{ Querystring: { canvasId: string } }>("/runs", async (request) =>
-    (
+  app.get<{ Querystring: { canvasId: string } }>("/runs", async (request) => {
+    if (typeof request.query.canvasId !== "string")
+      throw new ApiProblem(400, "VALIDATION", "canvasId is required");
+    await requireCanvas(actor, request.query.canvasId, "read");
+    return (
       await db.query(
         "SELECT data FROM runs WHERE canvas_id=$1 ORDER BY created_at DESC LIMIT 30",
         [request.query.canvasId],
       )
-    ).rows.map((r) => r.data),
-  );
+    ).rows.map((r) => r.data);
+  });
   app.get<{ Params: { id: string } }>(
     "/runs/:id",
     { schema: { params: idParams } },
     async (request, reply) => {
+      await requireRun(request.params.id, "read");
       const run = await getRun(request.params.id);
       return run ?? reply.code(404).send({ error: "Run not found" });
     },
@@ -260,7 +296,13 @@ export async function createApp() {
   app.get<{ Params: { id: string }; Querystring: { after?: string } }>(
     "/runs/:id/events",
     { websocket: true },
-    (socket, request) => {
+    async (socket, request) => {
+      try {
+        await requireRun(request.params.id, "read");
+      } catch {
+        socket.close(1008, "Run not found");
+        return;
+      }
       let last = Number(request.query.after ?? 0),
         busy = false;
       const poll = async () => {
@@ -295,6 +337,7 @@ export async function createApp() {
     "/runs/:id/retry",
     { schema: { params: idParams } },
     async (request, reply) => {
+      await requireRun(request.params.id, "write");
       const run = await getRun(request.params.id);
       if (!run) return reply.code(404).send({ error: "Run not found" });
       if (run.status === "running")
@@ -358,6 +401,7 @@ export async function createApp() {
     "/runs/:id/cancel",
     { schema: { params: idParams } },
     async (request, reply) => {
+      await requireRun(request.params.id, "write");
       const run = await getRun(request.params.id);
       if (!run) return reply.code(404).send({ error: "Run not found" });
       if (run.status !== "running") return run;
@@ -404,13 +448,21 @@ export async function createApp() {
           ],
           { type: "image/png" },
         ),
-        { kind: "image" },
+        {
+          kind: "image",
+          name: "portrait.png",
+          spaceId: personalSpaceId(actor.id),
+          creatorId: actor.id,
+          source: { type: "upload" },
+          publish: "ready",
+        },
       ),
     );
   if (config.mock)
     app.post<{ Params: { id: string }; Body: { nodeId: string } }>(
       "/runs/:id/fail",
       async (request, reply) => {
+        await requireRun(request.params.id, "write");
         const run = await getRun(request.params.id);
         if (!run || run.status !== "running")
           return reply.code(409).send({ error: "Run must be running" });

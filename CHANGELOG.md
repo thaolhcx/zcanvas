@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Asset platform backend for [#11](https://github.com/thaolhcx/zcanvas/issues/11): catalog and spaces ([#16](https://github.com/thaolhcx/zcanvas/issues/16)), local/S3 storage with streaming delivery ([#17](https://github.com/thaolhcx/zcanvas/issues/17)) and semantic search ([#18](https://github.com/thaolhcx/zcanvas/issues/18)). See [docs/asset-platform.md](docs/asset-platform.md).
+
+- Personal and team spaces with server-resolved access on canvases, runs, assets, files, previews, usage and search. Projects group canvases inside a space.
+- Asset catalog with stable IDs, names, source, creator, lifecycle states, generation history and a rerunnable migration for POC data.
+- Paged list/filter, rename, delete with affected nodes and `INPUT_REQUIRED`, background previews and cleanup.
+- Local filesystem (default) and S3-compatible storage behind one interface. Each object records its storage profile.
+- Streaming range/HEAD delivery with validators and private caching, replacing whole-file buffering and the public immutable cache.
+- Hybrid name + semantic search on pgvector with background indexing, an in-process multilingual model and an explicit name-search fallback.
+
 - Template flows ([#10](https://github.com/thaolhcx/zcanvas/issues/10)): recipes may carry an optional `meta.template` (title, description, cover, tags, inputs). `GET /templates` lists metadata only, `GET /templates/:id` returns the recipe, `POST /templates` saves one with its inputs cleared, and `POST /canvases` accepts `templateId`.
 - A template browser in the Media browser layout inserts templates into the open canvas or starts a new canvas from the start screen. "Save as preset" becomes "Save as template". Unfilled inputs are outlined in yellow.
 - Built-in templates live in `contracts/examples/templates/` and are seeded on startup. The set is empty for now.

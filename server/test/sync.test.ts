@@ -4,6 +4,8 @@ import { Graph, Y, emptyRecipe, readRecipe } from "../../graph/src/index.ts";
 import { createSyncServer } from "../src/sync.ts";
 import { db, migrate } from "../src/db.ts";
 import { registry } from "../src/registry.ts";
+import { personalSpaceId } from "../src/access.ts";
+import { config } from "../src/config.ts";
 const until = async (fn: () => boolean | Promise<boolean>) => {
   const end = Date.now() + 8000;
   while (!(await fn())) {
@@ -15,11 +17,15 @@ it("two headless clients edit offline and converge with persisted server documen
   await migrate();
   const initial = emptyRecipe();
   const seed = new Graph(new Y.Doc(), registry, initial);
-  await db.query("INSERT INTO canvases(id,name,ydoc) VALUES($1,$2,$3)", [
-    initial.meta.id,
-    initial.meta.name,
-    Buffer.from(Y.encodeStateAsUpdate(seed.doc)),
-  ]);
+  await db.query(
+    "INSERT INTO canvases(id,name,ydoc,space_id) VALUES($1,$2,$3,$4)",
+    [
+      initial.meta.id,
+      initial.meta.name,
+      Buffer.from(Y.encodeStateAsUpdate(seed.doc)),
+      personalSpaceId(config.actorId),
+    ],
+  );
   const server = createSyncServer(0);
   await server.listen();
   const docs = [new Y.Doc(), new Y.Doc()];
@@ -64,6 +70,54 @@ it("two headless clients edit offline and converge with persisted server documen
     expect(a.toRecipe()).toEqual(b.toRecipe());
     a.destroy();
     b.destroy();
+  } finally {
+    providers.forEach((p) => p.destroy());
+    await server.destroy();
+    await db.query("DELETE FROM canvases WHERE id=$1", [initial.meta.id]);
+  }
+}, 20000);
+it("gives a space viewer a read-only sync connection", async () => {
+  await migrate();
+  const { teamSpace } = await import("./helpers.ts");
+  const space = await teamSpace({ [config.actorId]: "viewer" });
+  const initial = emptyRecipe();
+  const seed = new Graph(new Y.Doc(), registry, initial);
+  await db.query(
+    "INSERT INTO canvases(id,name,ydoc,space_id) VALUES($1,$2,$3,$4)",
+    [
+      initial.meta.id,
+      initial.meta.name,
+      Buffer.from(Y.encodeStateAsUpdate(seed.doc)),
+      space,
+    ],
+  );
+  const server = createSyncServer(0);
+  await server.listen();
+  const docs = [new Y.Doc(), new Y.Doc()];
+  const providers = docs.map(
+    (document) =>
+      new HocuspocusProvider({
+        url: server.webSocketURL,
+        name: initial.meta.id,
+        document,
+      }),
+  );
+  try {
+    await until(() => providers.every((p) => p.synced));
+    const viewer = new Graph(docs[0], registry);
+    const watcher = new Graph(docs[1], registry);
+    viewer.addNode("input.prompt", { params: { text: "Viewer edit" } });
+    // Give the server time to apply and store the edit if it accepted it.
+    await new Promise((r) => setTimeout(r, 800));
+    expect(watcher.toRecipe().nodes).toHaveLength(0);
+    const { rows } = await db.query("SELECT ydoc FROM canvases WHERE id=$1", [
+      initial.meta.id,
+    ]);
+    const stored = new Y.Doc();
+    Y.applyUpdate(stored, rows[0].ydoc);
+    expect(readRecipe(stored).nodes).toHaveLength(0);
+    viewer.destroy();
+    watcher.destroy();
   } finally {
     providers.forEach((p) => p.destroy());
     await server.destroy();

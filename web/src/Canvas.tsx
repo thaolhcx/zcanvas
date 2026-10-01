@@ -352,11 +352,17 @@ function Workspace({
   };
   /** Uploads dropped files and adds one Asset node per file in one transaction. */
   const dropFiles = async (files: File[], at: XYPosition) => {
+    // Uploads land in the canvas space; the server checks access.
+    const canvasId = new URLSearchParams(location.search).get("canvas");
+    const query = canvasId ? `?canvasId=${encodeURIComponent(canvasId)}` : "";
     const uploads = await Promise.allSettled(
       files.map((file) => {
         const data = new FormData();
         data.append("file", file);
-        return request<Asset>("/assets", { method: "POST", body: data });
+        return request<Asset>(`/assets${query}`, {
+          method: "POST",
+          body: data,
+        });
       }),
     );
     const assets = uploads.flatMap((u) =>

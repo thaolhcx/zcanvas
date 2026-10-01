@@ -4,6 +4,7 @@ import * as Y from "yjs";
 import { readRecipe } from "../../graph/src/index.ts";
 import { db } from "./db.ts";
 import { config } from "./config.ts";
+import { allows, canvasSpace, roleIn } from "./access.ts";
 export function createSyncServer(port = config.syncPort) {
   return new Server({
     port,
@@ -11,9 +12,16 @@ export function createSyncServer(port = config.syncPort) {
     quiet: true,
     debounce: 100,
     maxDebounce: 500,
-    async onConnect({ requestHeaders }) {
+    async onConnect({ requestHeaders, documentName, connectionConfig }) {
       if (!isLocalOrigin(requestHeaders.get("origin")))
         throw new Error("Only the local workspace may sync");
+      // The server's configured identity decides access, as for the HTTP API.
+      const role = await roleIn(
+        { id: config.actorId },
+        await canvasSpace(documentName),
+      );
+      if (!allows(role, "read")) throw new Error("Canvas does not exist");
+      if (!allows(role, "write")) connectionConfig.readOnly = true;
     },
     async onLoadDocument({ documentName, document }) {
       const { rows } = await db.query("SELECT ydoc FROM canvases WHERE id=$1", [

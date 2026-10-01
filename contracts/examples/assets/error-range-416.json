@@ -1,0 +1,7 @@
+{
+  "error": "Requested range is outside the file",
+  "code": "RANGE_NOT_SATISFIABLE",
+  "details": {
+    "size": 2116844
+  }
+}

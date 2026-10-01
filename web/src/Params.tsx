@@ -119,7 +119,14 @@ export function ParamField({
               const data = new FormData();
               data.append("file", file);
               try {
-                const asset = await request<Asset>("/assets", {
+                // Uploads land in the canvas space; the server checks access.
+                const canvasId = new URLSearchParams(location.search).get(
+                  "canvas",
+                );
+                const query = canvasId
+                  ? `?canvasId=${encodeURIComponent(canvasId)}`
+                  : "";
+                const asset = await request<Asset>(`/assets${query}`, {
                   method: "POST",
                   body: data,
                 });

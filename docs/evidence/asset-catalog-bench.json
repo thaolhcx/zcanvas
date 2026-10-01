@@ -1,0 +1,145 @@
+{
+ "generatedAt": "2026-10-01T06:38:59.284Z",
+ "rowsInSpace": 10000,
+ "rowsInOtherSpace": 10000,
+ "seededThisRun": 20000,
+ "environment": {
+  "cpus": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "memoryGb": 16,
+  "node": "v22.22.0",
+  "postgres": "PostgreSQL 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+  "pgvector": "0.6.0",
+  "note": "Cloud container, Postgres on the same host, default Postgres settings, warm cache."
+ },
+ "targets": {
+  "listPageP95Ms": 200,
+  "retrievalP95Ms": 500
+ },
+ "results": [
+  {
+   "label": "list first page (100, newest first)",
+   "runs": 60,
+   "p50Ms": 1.62,
+   "p95Ms": 2.25,
+   "maxMs": 2.49
+  },
+  {
+   "label": "list page 51 via cursor (100)",
+   "runs": 60,
+   "p50Ms": 1.85,
+   "p95Ms": 2.23,
+   "maxMs": 3.24
+  },
+  {
+   "label": "list kind=video (100)",
+   "runs": 60,
+   "p50Ms": 1.92,
+   "p95Ms": 2.18,
+   "maxMs": 2.26
+  },
+  {
+   "label": "list name_asc (100)",
+   "runs": 60,
+   "p50Ms": 1.96,
+   "p95Ms": 2.54,
+   "maxMs": 2.91
+  },
+  {
+   "label": "name search q=lantern (100)",
+   "runs": 60,
+   "p50Ms": 5.81,
+   "p95Ms": 10.71,
+   "maxMs": 11.46
+  },
+  {
+   "label": "name search q=00042 (100)",
+   "runs": 60,
+   "p50Ms": 1.2,
+   "p95Ms": 2,
+   "maxMs": 2.58
+  },
+  {
+   "label": "semantic retrieval top-20 (excl. embedding)",
+   "runs": 60,
+   "p50Ms": 20.82,
+   "p95Ms": 25.69,
+   "maxMs": 30.24
+  },
+  {
+   "label": "hybrid search API path, hash query embedding",
+   "runs": 60,
+   "p50Ms": 89.37,
+   "p95Ms": 116.79,
+   "maxMs": 131.35
+  }
+ ],
+ "endToEnd": {
+  "label": "query embedding (local:Xenova/paraphrase-multilingual-MiniLM-L12-v2) + retrieval",
+  "runs": 60,
+  "p50Ms": 32.55,
+  "p95Ms": 48.83,
+  "maxMs": 58.86
+ },
+ "plans": {
+  "listFirstPage": [
+   "Limit  (cost=0.41..21.84 rows=101 width=25) (actual time=0.081..0.115 rows=101 loops=1)",
+   "  Buffers: shared hit=8",
+   "  ->  Index Scan using assets_list_created on assets  (cost=0.41..2119.71 rows=9989 width=25) (actual time=0.080..0.109 rows=101 loops=1)",
+   "        Index Cond: (space_id = 'spc_bench'::text)",
+   "        Filter: (catalog_version = 1)",
+   "        Buffers: shared hit=8",
+   "Planning:",
+   "  Buffers: shared hit=1",
+   "Planning Time: 0.135 ms",
+   "Execution Time: 0.134 ms"
+  ],
+  "nameSearch": [
+   "Limit  (cost=565.38..565.38 rows=1 width=25) (actual time=3.780..3.790 rows=101 loops=1)",
+   "  Buffers: shared hit=708",
+   "  ->  Sort  (cost=565.38..565.38 rows=1 width=25) (actual time=3.779..3.784 rows=101 loops=1)",
+   "        Sort Key: created_at DESC, id DESC",
+   "        Sort Method: top-N heapsort  Memory: 39kB",
+   "        Buffers: shared hit=708",
+   "        ->  Bitmap Heap Scan on assets  (cost=557.67..565.37 rows=1 width=25) (actual time=1.260..3.556 rows=800 loops=1)",
+   "              Recheck Cond: ((lower(name) ~~ '%lantern%'::text) AND (status = 'ready'::text))",
+   "              Filter: ((space_id = 'spc_bench'::text) AND (catalog_version = 1))",
+   "              Rows Removed by Filter: 800",
+   "              Heap Blocks: exact=582",
+   "              Buffers: shared hit=708",
+   "              ->  Bitmap Index Scan on assets_name_trgm  (cost=0.00..557.67 rows=2 width=0) (actual time=1.189..1.190 rows=1600 loops=1)",
+   "                    Index Cond: (lower(name) ~~ '%lantern%'::text)",
+   "                    Buffers: shared hit=126",
+   "Planning:",
+   "  Buffers: shared hit=1",
+   "Planning Time: 0.120 ms",
+   "Execution Time: 3.813 ms"
+  ],
+  "semanticRetrieval": [
+   "Limit  (cost=6885.89..6885.94 rows=20 width=33) (actual time=24.881..24.887 rows=20 loops=1)",
+   "  Buffers: shared hit=5638",
+   "  ->  Sort  (cost=6885.89..6910.57 rows=9874 width=33) (actual time=24.880..24.884 rows=20 loops=1)",
+   "        Sort Key: ((s.embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.19611613,0,0,0,0,0,0.19611613,0,0,0,0,0,0,0,0,0,0.19611613,0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.19611613,-0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.19611613,0,0,0,0,0.39223227,0,0,0,0,0,0,-0.39223227,0,0,0,0,0,0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.19611613,0,0,0,0,0.19611613,0,0,0,0,0,0,0,0,0,0,-0.39223227,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.19611613,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]'::vector)), a.id",
+   "        Sort Method: top-N heapsort  Memory: 27kB",
+   "        Buffers: shared hit=5638",
+   "        ->  Hash Join  (cost=1095.34..6623.14 rows=9874 width=33) (actual time=5.728..23.339 rows=10000 loops=1)",
+   "              Hash Cond: ((s.asset_id = a.id) AND (s.revision = a.revision))",
+   "              Buffers: shared hit=5638",
+   "              ->  Seq Scan on asset_search_index s  (cost=0.00..5348.74 rows=19999 width=1560) (actual time=0.059..6.786 rows=20000 loops=1)",
+   "                    Filter: ((model = 'hash-v1-384'::text) AND (state = 'indexed'::text))",
+   "                    Rows Removed by Filter: 183",
+   "                    Buffers: shared hit=5046",
+   "              ->  Hash  (cost=945.50..945.50 rows=9989 width=21) (actual time=5.650..5.652 rows=10000 loops=1)",
+   "                    Buckets: 16384  Batches: 1  Memory Usage: 675kB",
+   "                    Buffers: shared hit=592",
+   "                    ->  Seq Scan on assets a  (cost=0.00..945.50 rows=9989 width=21) (actual time=0.021..4.024 rows=10000 loops=1)",
+   "                          Filter: ((space_id = 'spc_bench'::text) AND (status = 'ready'::text) AND (catalog_version = 1))",
+   "                          Rows Removed by Filter: 10200",
+   "                          Buffers: shared hit=592",
+   "Planning:",
+   "  Buffers: shared hit=15",
+   "Planning Time: 0.283 ms",
+   "Execution Time: 24.912 ms"
+  ]
+ }
+}

@@ -1,0 +1,4 @@
+{
+  "error": "limit must be an integer from 1 to 100",
+  "code": "VALIDATION"
+}

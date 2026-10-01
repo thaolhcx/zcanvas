@@ -1,7 +1,8 @@
 name: zcanvas
 services:
   postgres:
-    image: postgres:16-alpine
+    # Postgres 16 with pgvector for semantic asset search (pg_trgm is in contrib).
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: zcanvas
       POSTGRES_PASSWORD: zcanvas
@@ -13,6 +14,7 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+  # Optional: only needed with STORAGE_DRIVER=s3.
   minio:
     build:
       context: .
@@ -25,4 +27,5 @@ services:
     volumes: ["minio:/data"]
 volumes:
   postgres:
+  # Optional: only needed with STORAGE_DRIVER=s3.
   minio:

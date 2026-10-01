@@ -14,7 +14,11 @@
     "build": "pnpm --filter @zcanvas/web build",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "fixtures": "node scripts/fixtures.mjs"
+    "fixtures": "node scripts/fixtures.mjs",
+    "assets": "tsx scripts/assets.ts",
+    "search:eval": "tsx scripts/search-eval.ts",
+    "bench:catalog": "tsx scripts/bench-catalog.ts",
+    "bench:storage": "node --expose-gc --import tsx scripts/bench-storage.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

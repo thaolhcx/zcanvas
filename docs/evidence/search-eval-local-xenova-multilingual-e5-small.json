@@ -1,0 +1,1215 @@
+{
+ "generatedAt": "2026-10-01T06:37:49.897Z",
+ "provider": "local:Xenova/multilingual-e5-small",
+ "dims": 384,
+ "remote": false,
+ "machine": {
+  "cpus": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "memoryGb": 16,
+  "node": "v22.22.0"
+ },
+ "assets": 32,
+ "queries": 26,
+ "recallAt10": 0.769,
+ "recallAt10En": 0.929,
+ "recallAt10Vi": 0.583,
+ "mrr": 0.601,
+ "target": "relevant asset in top 10 for at least 80% of queries",
+ "passed": false,
+ "failures": [
+  {
+   "q": "ngọn hải đăng",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_01"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8378
+    },
+    {
+     "id": "ast_eval_14",
+     "name": "IMG_7781.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8237
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8235
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 15
+  },
+  {
+   "q": "ruộng bậc thang",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_06"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8379
+    },
+    {
+     "id": "ast_eval_27",
+     "name": "clip_0333.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8276
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8235
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 10
+  },
+  {
+   "q": "nhạc nền sôi động",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_08"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8332
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8278
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8273
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.8
+  },
+  {
+   "q": "đầu bếp thái rau",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_15"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_09",
+     "name": "IMG_3300.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8559
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8298
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.822
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.5
+  },
+  {
+   "q": "tiếng sấm và mưa",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_18"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8454
+    },
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8414
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8342
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.3
+  },
+  {
+   "q": "fireworks over the river on new year's eve",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_27"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_01",
+     "name": "IMG_2041.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8196
+    },
+    {
+     "id": "ast_eval_06",
+     "name": "clip_0008.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8163
+    },
+    {
+     "id": "ast_eval_21",
+     "name": "clip_0101.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.812
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.3
+  }
+ ],
+ "endToEndMs": {
+  "note": "query embedding + hybrid retrieval, in process",
+  "p50": 9.8,
+  "p95": 15.8
+ },
+ "indexMs": 2704,
+ "results": [
+  {
+   "q": "lighthouse by the sea",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_01"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_01",
+     "name": "IMG_2041.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8493
+    },
+    {
+     "id": "ast_eval_03",
+     "name": "DSC0193.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8013
+    },
+    {
+     "id": "ast_eval_13",
+     "name": "bg_plate_12.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8008
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 17.9
+  },
+  {
+   "q": "ngọn hải đăng",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_01"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8378
+    },
+    {
+     "id": "ast_eval_14",
+     "name": "IMG_7781.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8237
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8235
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 15
+  },
+  {
+   "q": "black cat",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_02"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_02",
+     "name": "IMG_2042.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7932
+    },
+    {
+     "id": "ast_eval_10",
+     "name": "IMG_3301.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7743
+    },
+    {
+     "id": "ast_eval_24",
+     "name": "IMG_4410.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7708
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9
+  },
+  {
+   "q": "con mèo ngủ",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_02"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_02",
+     "name": "IMG_2042.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.876
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8161
+    },
+    {
+     "id": "ast_eval_16",
+     "name": "tex_0042.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8111
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 15.8
+  },
+  {
+   "q": "old man portrait",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_03"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_03",
+     "name": "DSC0193.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8912
+    },
+    {
+     "id": "ast_eval_25",
+     "name": "scene_04.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.803
+    },
+    {
+     "id": "ast_eval_28",
+     "name": "IMG_6060.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7995
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 13
+  },
+  {
+   "q": "thành phố tương lai về đêm",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_04"
+   ],
+   "hit": true,
+   "rank": 3,
+   "top3": [
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8549
+    },
+    {
+     "id": "ast_eval_17",
+     "name": "IMG_5512.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8465
+    },
+    {
+     "id": "ast_eval_04",
+     "name": "render_final_v3.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8451
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 14
+  },
+  {
+   "q": "rainy night in Hoi An with lanterns",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_05"
+   ],
+   "hit": true,
+   "rank": 3,
+   "top3": [
+    {
+     "id": "ast_eval_04",
+     "name": "render_final_v3.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8337
+    },
+    {
+     "id": "ast_eval_13",
+     "name": "bg_plate_12.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8326
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.829
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 14.8
+  },
+  {
+   "q": "ruộng bậc thang",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_06"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8379
+    },
+    {
+     "id": "ast_eval_27",
+     "name": "clip_0333.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8276
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8235
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 10
+  },
+  {
+   "q": "ocean waves sound",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_07"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8339
+    },
+    {
+     "id": "ast_eval_18",
+     "name": "sfx_011.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8232
+    },
+    {
+     "id": "ast_eval_21",
+     "name": "clip_0101.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8026
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 11.1
+  },
+  {
+   "q": "nhạc nền sôi động",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_08"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8332
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8278
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8273
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.8
+  },
+  {
+   "q": "beef noodle soup",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_09"
+   ],
+   "hit": true,
+   "rank": 2,
+   "top3": [
+    {
+     "id": "ast_eval_15",
+     "name": "shot_A12.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8126
+    },
+    {
+     "id": "ast_eval_09",
+     "name": "IMG_3300.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7864
+    },
+    {
+     "id": "ast_eval_24",
+     "name": "IMG_4410.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7756
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.8
+  },
+  {
+   "q": "chó con chơi tuyết",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_10"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_10",
+     "name": "IMG_3301.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8654
+    },
+    {
+     "id": "ast_eval_02",
+     "name": "IMG_2042.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8269
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8197
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 8.4
+  },
+  {
+   "q": "woman in red coat in the rain",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_11"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_11",
+     "name": "export_final.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8792
+    },
+    {
+     "id": "ast_eval_18",
+     "name": "sfx_011.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7894
+    },
+    {
+     "id": "ast_eval_06",
+     "name": "clip_0008.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7822
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 10.1
+  },
+  {
+   "q": "female voice welcome message",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_12"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_12",
+     "name": "vo_line_04.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8323
+    },
+    {
+     "id": "ast_eval_29",
+     "name": "voice_ad_02.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8037
+    },
+    {
+     "id": "ast_eval_31",
+     "name": "ref_pose_03.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7856
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.6
+  },
+  {
+   "q": "bầu trời đầy sao trên sa mạc",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_13"
+   ],
+   "hit": true,
+   "rank": 4,
+   "top3": [
+    {
+     "id": "ast_eval_14",
+     "name": "IMG_7781.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8237
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8228
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8173
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 10.1
+  },
+  {
+   "q": "lotus flower",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_14"
+   ],
+   "hit": true,
+   "rank": 9,
+   "top3": [
+    {
+     "id": "ast_eval_24",
+     "name": "IMG_4410.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7775
+    },
+    {
+     "id": "ast_eval_16",
+     "name": "tex_0042.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.777
+    },
+    {
+     "id": "ast_eval_13",
+     "name": "bg_plate_12.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7667
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 10.2
+  },
+  {
+   "q": "đầu bếp thái rau",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_15"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_09",
+     "name": "IMG_3300.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8559
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8298
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.822
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.5
+  },
+  {
+   "q": "wood texture",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_16"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_16",
+     "name": "tex_0042.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8848
+    },
+    {
+     "id": "ast_eval_24",
+     "name": "IMG_4410.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8163
+    },
+    {
+     "id": "ast_eval_25",
+     "name": "scene_04.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8068
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.9
+  },
+  {
+   "q": "old motorbike in front of a Saigon cafe",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_17"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_17",
+     "name": "IMG_5512.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8554
+    },
+    {
+     "id": "ast_eval_24",
+     "name": "IMG_4410.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8227
+    },
+    {
+     "id": "ast_eval_13",
+     "name": "bg_plate_12.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8144
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.2
+  },
+  {
+   "q": "tiếng sấm và mưa",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_18"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8454
+    },
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8414
+    },
+    {
+     "id": "ast_eval_05",
+     "name": "clip_0007.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8342
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.3
+  },
+  {
+   "q": "silver haired warrior girl",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_19",
+    "ast_eval_31"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_19",
+     "name": "char_ref_01.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.9004
+    },
+    {
+     "id": "ast_eval_31",
+     "name": "ref_pose_03.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8577
+    },
+    {
+     "id": "ast_eval_03",
+     "name": "DSC0193.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7884
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.2
+  },
+  {
+   "q": "bãi biển có hàng dừa",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_20"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.9129
+    },
+    {
+     "id": "ast_eval_07",
+     "name": "audio_take2.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8286
+    },
+    {
+     "id": "ast_eval_09",
+     "name": "IMG_3300.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8126
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 8.9
+  },
+  {
+   "q": "fireworks over the river on new year's eve",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_27"
+   ],
+   "hit": false,
+   "rank": null,
+   "top3": [
+    {
+     "id": "ast_eval_01",
+     "name": "IMG_2041.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8196
+    },
+    {
+     "id": "ast_eval_06",
+     "name": "clip_0008.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8163
+    },
+    {
+     "id": "ast_eval_21",
+     "name": "clip_0101.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.812
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 9.3
+  },
+  {
+   "q": "phi hành gia ngoài không gian",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_28"
+   ],
+   "hit": true,
+   "rank": 9,
+   "top3": [
+    {
+     "id": "ast_eval_30",
+     "name": "IMG_1212.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8104
+    },
+    {
+     "id": "ast_eval_17",
+     "name": "IMG_5512.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8081
+    },
+    {
+     "id": "ast_eval_20",
+     "name": "IMG_9001.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8061
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 8.2
+  },
+  {
+   "q": "birthday candles kid",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_26"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_26",
+     "name": "IMG_8820.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.773
+    },
+    {
+     "id": "ast_eval_31",
+     "name": "ref_pose_03.png",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7704
+    },
+    {
+     "id": "ast_eval_10",
+     "name": "IMG_3301.jpg",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.7652
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 8.9
+  },
+  {
+   "q": "giọng nam trầm lồng tiếng trailer",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_29"
+   ],
+   "hit": true,
+   "rank": 1,
+   "top3": [
+    {
+     "id": "ast_eval_29",
+     "name": "voice_ad_02.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8526
+    },
+    {
+     "id": "ast_eval_23",
+     "name": "audio_0200.wav",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8292
+    },
+    {
+     "id": "ast_eval_27",
+     "name": "clip_0333.mp4",
+     "by": [
+      "semantic"
+     ],
+     "similarity": 0.8189
+    }
+   ],
+   "semanticState": "ok",
+   "endToEndMs": 8.7
+  }
+ ]
+}
