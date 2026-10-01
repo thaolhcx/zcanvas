@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Graph, Y, emptyRecipe } from "../../graph/src/index.ts";
+import { nodeBoxes, overlaps } from "../src/media/place.ts";
 import { loadRegistry } from "../../contracts/node.mjs";
 import pilot from "../../contracts/examples/pilot.recipe.json" with { type: "json" };
 import type { Recipe } from "../../contracts/index.ts";
@@ -38,6 +39,30 @@ describe("template insertion", () => {
       cy = (Math.min(...ys) + Math.max(...ys)) / 2 + 48;
     expect(Math.abs(cx - 5000)).toBeLessThanOrEqual(1);
     expect(Math.abs(cy + 2000)).toBeLessThanOrEqual(1);
+  });
+  it("moves the template below existing nodes instead of overlapping them", () => {
+    const graph = graphWith(emptyRecipe());
+    const existing = [0, 340, 680].map((x) =>
+      graph.addNode("input.prompt", { position: { x, y: -150 } }),
+    );
+    const result = insertTemplate(graph, template(), { x: 400, y: 0 });
+    const after = graph.toRecipe();
+    const boxes = nodeBoxes(after, registry);
+    const box = (id: string) =>
+      boxes[after.nodes.findIndex((n) => n.id === id)];
+    for (const a of result.nodeIds)
+      for (const b of existing) expect(overlaps(box(a), box(b))).toBe(false);
+    // Nothing to avoid: still centred, same as before.
+    const empty = graphWith(emptyRecipe());
+    const alone = insertTemplate(empty, template(), { x: 400, y: 0 });
+    const ys = (g: Graph, ids: string[]) =>
+      Math.min(
+        ...g
+          .toRecipe()
+          .nodes.filter((n) => ids.includes(n.id))
+          .map((n) => n.position.y),
+      );
+    expect(ys(graph, result.nodeIds)).toBeGreaterThan(ys(empty, alone.nodeIds));
   });
   it("inserts in one undo step, keeps existing nodes and maps inputs to new ids", () => {
     const graph = graphWith(emptyRecipe());

@@ -6,10 +6,10 @@ export interface Box {
   w: number;
   h: number;
 }
-const GAP = 40;
+export const GAP = 40;
 /** A conservative height for an Asset node with its preview and field. */
 export const ASSET_NODE_HEIGHT = 320;
-const overlaps = (a: Box, b: Box) =>
+export const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w + GAP &&
   b.x < a.x + a.w + GAP &&
   a.y < b.y + b.h + GAP &&
