@@ -73,17 +73,28 @@ export async function migrate() {
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(generation->'references') r WHERE jsonb_typeof(r) = 'string');
     SELECT pg_advisory_unlock(hashtext('zcanvas.migrate'));
   `);
+  // Under the same lock: two processes starting together would otherwise race
+  // on CREATE EXTENSION, and the loser would wrongly turn semantic search off.
+  const client = await db.connect();
   try {
-    await db.query(`CREATE EXTENSION IF NOT EXISTS vector`);
-    capabilities.vector = true;
-  } catch {
-    capabilities.vector = false;
-  }
-  if (capabilities.vector)
-    await db.query(`
+    await client.query("SELECT pg_advisory_lock(hashtext('zcanvas.migrate'))");
+    try {
+      await client.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+      capabilities.vector = true;
+    } catch {
+      capabilities.vector = false;
+    }
+    if (capabilities.vector)
+      await client.query(`
       CREATE TABLE IF NOT EXISTS asset_search_index (asset_id text NOT NULL REFERENCES assets(id) ON DELETE CASCADE, model text NOT NULL, revision integer NOT NULL, state text NOT NULL CHECK (state IN ('indexed','failed')), embedding vector, content_hash text, error text, attempts integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (asset_id, model));
       CREATE INDEX IF NOT EXISTS asset_search_model ON asset_search_index(model, asset_id) WHERE state = 'indexed';
     `);
+  } finally {
+    await client
+      .query("SELECT pg_advisory_unlock(hashtext('zcanvas.migrate'))")
+      .catch(() => {});
+    client.release();
+  }
   const { ensureActor } = await import("./access.ts");
   await ensureActor(config.actorId, "Local user");
   const { migrateLegacyCatalog } = await import("./catalog-migration.ts");

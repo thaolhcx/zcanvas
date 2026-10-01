@@ -217,12 +217,26 @@ export async function startSearchWorkers() {
 }
 // ---------------------------------------------------------------- query
 const queryCache = new Map<string, number[]>();
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal) {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    if (signal.aborted) abort();
+    signal.addEventListener("abort", abort, { once: true });
+    work
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener("abort", abort));
+  });
+}
 /** Caches query vectors only. Results are always fetched with current scope and state. */
 async function embedQuery(q: string, signal: AbortSignal) {
   const key = `${provider!.id}\n${q}`;
   const cached = queryCache.get(key);
   if (cached) return cached;
-  const [vector] = await provider!.embed([q], "query", signal);
+  // In-process models cannot be interrupted, so stop waiting at the deadline.
+  const [vector] = await untilAborted(
+    provider!.embed([q], "query", signal),
+    signal,
+  );
   queryCache.set(key, vector);
   if (queryCache.size > 500) queryCache.delete(queryCache.keys().next().value!);
   return vector;

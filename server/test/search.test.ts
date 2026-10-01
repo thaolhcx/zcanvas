@@ -86,6 +86,50 @@ afterAll(async () => {
   await other?.close();
   await boss.stop({ graceful: false });
 });
+describe("revoked access", () => {
+  it("hides a space from a removed member everywhere, even with a cached query", async () => {
+    const shared = await teamSpace({ usr_local: "owner", [otherId]: "viewer" });
+    const asset = await make(shared, "IMG_7001.png", {
+      prompt: "harbour lights reflected in the rain",
+    });
+    const canvasId = `rcp_${crypto.randomUUID()}`;
+    await db.query(
+      "INSERT INTO canvases(id,name,space_id) VALUES($1,'Shared',$2)",
+      [canvasId, shared],
+    );
+    const before = await search(other, `spaceId=${shared}&q=harbour`);
+    expect(ids(before)).toContain(asset.id);
+    expect(
+      (await other.inject(`/assets/${asset.id}/thumbnail`)).statusCode,
+    ).toBe(200);
+    await db.query(
+      "DELETE FROM space_members WHERE space_id=$1 AND user_id=$2",
+      [shared, otherId],
+    );
+    // Same query again: its vector is cached, but results never are.
+    for (const path of [
+      `/assets/search?spaceId=${shared}&q=harbour`,
+      `/assets?spaceId=${shared}`,
+      `/assets/${asset.id}`,
+      `/assets/${asset.id}/file`,
+      `/assets/${asset.id}/thumbnail`,
+      `/assets/${asset.id}/usage?canvasId=${canvasId}`,
+      `/canvases/${canvasId}`,
+    ]) {
+      const response = await other.inject(path);
+      expect(response.statusCode, path).toBe(404);
+      expect(response.body, path).not.toContain("harbour");
+      expect(response.body, path).not.toContain("IMG_7001");
+    }
+    await expect(
+      searchAssets({ id: otherId }, { q: "harbour", spaceId: shared }),
+    ).rejects.toMatchObject({ status: 404 });
+    // The owner still sees it.
+    expect(ids(await search(app, `spaceId=${shared}&q=harbour`))).toContain(
+      asset.id,
+    );
+  });
+});
 describe("semantic search", () => {
   let lighthouse: Asset, cat: Asset, exact: Asset, sound: Asset;
   beforeAll(async () => {
@@ -251,6 +295,15 @@ describe("semantic search", () => {
       const timed = await search(app, `spaceId=${space}&q=sunrise`);
       expect(timed.semantic.state).toBe("timeout");
       expect(ids(timed)[0]).toBe(exact.id);
+      // An in-process model cannot be interrupted; the query still stops waiting.
+      setEmbeddingProvider({
+        ...base,
+        embed: () => new Promise((resolve) => setTimeout(resolve, 2000)),
+      });
+      const started = Date.now();
+      const stuck = await search(app, `spaceId=${space}&q=sunset glow`);
+      expect(stuck.semantic.state).toBe("timeout");
+      expect(Date.now() - started).toBeLessThan(1500);
     } finally {
       config.search.queryTimeoutMs = timeout;
     }

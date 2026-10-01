@@ -6,11 +6,17 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { createApp } from "../src/app.ts";
 import { migrate, db } from "../src/db.ts";
-import { checkStorage, LocalStore, registerStore } from "../src/storage.ts";
+import {
+  checkStorage,
+  LocalStore,
+  registerStore,
+  storeFor,
+} from "../src/storage.ts";
 import { generationInfo, startRunner } from "../src/runner.ts";
 import { personalSpaceId } from "../src/access.ts";
 import {
   cleanupAsset,
+  deriveAsset,
   failJobAssets,
   publishJobAssets,
   putAsset,
@@ -934,6 +940,84 @@ describe("deletion", () => {
       [asset.id],
     );
     expect(objects.rows.every((o) => o.state === "deleted")).toBe(true);
+  });
+  it("keeps a failed cleanup recoverable and finishes it on retry", async () => {
+    const asset = (await upload(app, await png())).json<Asset>();
+    await app.inject({ method: "DELETE", url: `/assets/${asset.id}` });
+    await new Promise((r) => setTimeout(r, 1100));
+    const { rows } = await db.query(
+      "SELECT profile FROM asset_objects WHERE asset_id=$1 AND role='original'",
+      [asset.id],
+    );
+    const real = storeFor(rows[0].profile);
+    let failures = 1;
+    const flaky = Object.create(real);
+    flaky.delete = async (key: string) => {
+      if (failures-- > 0) throw new Error("object store unavailable");
+      return real.delete(key);
+    };
+    registerStore(flaky);
+    try {
+      // The job throws, so pg-boss retries it; nothing is marked purged yet.
+      await expect(cleanupAsset(asset.id)).rejects.toThrow("unavailable");
+      const before = await db.query(
+        "SELECT purged_at FROM assets WHERE id=$1",
+        [asset.id],
+      );
+      expect(before.rows[0].purged_at).toBeNull();
+      expect((await app.inject(`/assets/${asset.id}`)).statusCode).toBe(410);
+      expect(await cleanupAsset(asset.id)).toBe("purged");
+    } finally {
+      registerStore(real);
+    }
+    const objects = await db.query(
+      "SELECT state FROM asset_objects WHERE asset_id=$1",
+      [asset.id],
+    );
+    expect(objects.rows.every((o) => o.state === "deleted")).toBe(true);
+  });
+  it("marks a video poster failed only after the last retry, without blocking the file", async () => {
+    const video = (
+      await upload(app, {
+        name: "broken-poster.mp4",
+        type: "video/mp4",
+        data: await fixture("clip.mp4"),
+      })
+    ).json<Asset>();
+    await until(
+      async () =>
+        (await app.inject(`/assets/${video.id}`)).json<Asset>()
+          .previewStatus !== "pending",
+    );
+    await db.query("UPDATE assets SET preview_status='pending' WHERE id=$1", [
+      video.id,
+    ]);
+    const dir = await mkdtemp(join(tmpdir(), "zcanvas-poster-"));
+    const broken = join(dir, "source");
+    await writeFile(broken, "not a video");
+    try {
+      await expect(
+        deriveAsset(video.id, { sourcePath: broken, finalAttempt: false }),
+      ).rejects.toBeTruthy();
+      expect(
+        (await app.inject(`/assets/${video.id}`)).json<Asset>().previewStatus,
+      ).toBe("pending");
+      expect(
+        (await app.inject(`/assets/${video.id}/thumbnail`)).json().code,
+      ).toBe("PREVIEW_PENDING");
+      await expect(
+        deriveAsset(video.id, { sourcePath: broken, finalAttempt: true }),
+      ).rejects.toBeTruthy();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+    expect(
+      (await app.inject(`/assets/${video.id}`)).json<Asset>().previewStatus,
+    ).toBe("failed");
+    const thumb = await app.inject(`/assets/${video.id}/thumbnail`);
+    expect(thumb.statusCode).toBe(404);
+    expect(thumb.json().code).toBe("PREVIEW_FAILED");
+    expect((await app.inject(`/assets/${video.id}/file`)).statusCode).toBe(200);
   });
 });
 describe("interrupted writes", () => {

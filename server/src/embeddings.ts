@@ -76,7 +76,8 @@ export function localProvider(
   const prefix = (purpose: "query" | "document") =>
     /e5/i.test(model) ? (purpose === "query" ? "query: " : "passage: ") : "";
   return {
-    id: `local:${model}`,
+    // Dimensions are part of the ID so vectors of different sizes never mix.
+    id: `local:${model}:${dims}`,
     dims,
     remote: false,
     async embed(texts, purpose, signal) {

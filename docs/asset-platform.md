@@ -10,7 +10,7 @@ Shared types are in [`contracts/assets.ts`](../contracts/assets.ts). Example res
 | --- | --- | --- |
 | 1. Contracts | Space, asset, list/search/delete/usage types, error shape | Done |
 | 2. Schema and migration | Spaces, members, projects, catalog columns, objects, indexes, rerunnable legacy migration | Done |
-| 3. Access | Server-resolved actor, space roles on every route and on the graph/run path | Done |
+| 3. Access | Server-resolved actor, space roles on every space-owned route and on the graph/run path (presets are global, see below) | Done |
 | 4. Storage | `ObjectStore` with local and S3 adapters, opaque keys, a storage profile per object | Done |
 | 5. Ingest and lifecycle | Streamed uploads, upload/processing/ready/failed/deleted states, previews (video in the background), cleanup, sweeper | Done |
 | 6. Delivery | Streaming range/HEAD/validators, private caching, safe names, disconnect handling | Done |
@@ -34,6 +34,8 @@ Rules, enforced on the server in `server/src/access.ts`:
 3. A non-member gets `404` for everything in the space, so a space's existence is not revealed. Unmapped records (no space) are visible to nobody.
 4. A canvas may use an asset only from its own space. `POST /runs` rejects other-space, deleted and missing assets with `INPUT_REQUIRED`, and the runner checks again at execution time. The output cache key includes the space, so cached outputs cannot cross spaces.
 5. Search uses the same space check, and its filters run inside candidate retrieval.
+
+Presets (`/presets`) are global recipe templates in the POC, not owned by a space, so they are outside these rules. A preset holds no access of its own: an asset ID inside it still has to pass rule 4 when a canvas runs it. Presets must become space-owned before a second real user is added.
 
 Not built (extension points only): login, invitations, team admin UI, cross-space sharing, public links, ownership transfer, folders, collections and film roles. Future collections should reference asset IDs (for example a `collection_items(collection_id, asset_id)` table) and never file paths.
 
@@ -113,7 +115,7 @@ The agent/MCP surface can call the same routes, or the service functions directl
 - **Providers** (`server/src/embeddings.ts`): `local` runs `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions, English and Vietnamese) in-process with transformers.js. It is an optional dependency, the model is downloaded once, and no text leaves the server. `openai` calls any OpenAI-compatible `/embeddings` endpoint; with it, the search text above (names, descriptions, tags, prompts, reference names) is sent to that provider. `hash` gives deterministic test vectors that match words, not meaning, and is used only in automated tests. `none` turns semantic search off.
 - **Index**: Postgres with pgvector. The `asset_search_index` table holds `(asset_id, model)`, the asset `revision`, state, vector and content hash. pgvector keeps vectors next to the catalog rows and access columns, so scope filters and retrieval run in one SQL statement and no extra service is needed. Retrieval is an exact scan inside the allowed space: 10k vectors take about 26 ms at p95 (below). That makes filtering exact, with no global top-k followed by a filter. HNSW is the next step once one space holds hundreds of thousands of assets; it needs pgvector ≥ 0.8 iterative scans to stay exact under filters.
 - **Jobs**: `asset-index` (pg-boss) runs after upload, publish, rename or metadata edit. Jobs are idempotent: unchanged text only moves the revision forward. A write lands only if the asset still has the revision the text came from, and it never replaces a newer revision, so late or duplicate jobs cannot overwrite newer data. Failures are recorded (`state=failed`, error, attempts) and retried. `pnpm assets reindex` backfills; `--all` re-embeds everything and `--prune` drops other models' vectors.
-- **Model changes**: queries use only vectors whose `model` matches the active provider. After a switch, unindexed assets show up as `semantic.state = "indexing"` with a `pending` count until reindexing finishes. Vectors from different models are never compared.
+- **Model changes**: the provider ID includes the model and the dimensions (`local:<model>:<dims>`, `openai:<model>:<dims>`). Queries use only vectors whose `model` matches the active provider ID. After a switch, unindexed assets show up as `semantic.state = "indexing"` with a `pending` count until reindexing finishes. Vectors from different models are never compared.
 - **Query**: name matches (exact name or stem first, then substring, then trigram similarity) are fused with semantic matches by reciprocal rank. An exact file name always ranks first. Both queries filter by space, `status='ready'`, kind and source in SQL. A final hydration step checks scope and state again at response time. Bounds: `q` ≤ 200 characters, `limit` ≤ 50, an embedding plus SQL timeout (`SEARCH_TIMEOUT_MS`, default 2500 ms).
 - **Fallback**: when the provider is off, fails or times out, or pgvector is missing, the response still returns name results with `mode: "name"` and `semantic.state` set to `disabled`, `unavailable` or `timeout`. Browse and upload never depend on search.
 - **Caches**: only query vectors are cached, keyed by model and query text. Results are always read fresh with the actor's scope, so a deleted or revoked asset cannot come back from a cache.
@@ -167,9 +169,10 @@ The only miss for the default model is "ruộng bậc thang" (rice terraces): th
 **Automated tests** (`pnpm test`):
 
 - `storage.test.ts`: adapter contract (write, stat, read, range, delete, short/long/failed writes, key validation) against a temporary directory and, with `S3_TEST_ENDPOINT`, MinIO; symlink escape, range parsing, download names.
-- `assets.test.ts`: upload, preview fallback, pagination with identical timestamps, filters and validation, rename, generated metadata and history, publish-on-success, cancelled runs, access on every route and on the run path, team viewer roles, delivery (range, suffix, 416, HEAD, 304, disconnect), delete, `INPUT_REQUIRED` and retry, cache safety, purge, interrupted upload, size limit, legacy migration and rerun.
-- `search.test.ts`: description and prompt matches, exact-name priority, filters, cross-space isolation, immediate removal on delete even with a cached query, revision ordering, model change and reindex, failure, timeout and disabled fallbacks, recorded index failures, bounds.
+- `assets.test.ts`: upload, preview fallback, pagination with identical timestamps, filters and validation, rename, generated metadata and history, publish-on-success, cancelled runs, access on every route and on the run path, team viewer roles, delivery (range, suffix, 416, HEAD, 304, disconnect), delete, `INPUT_REQUIRED` and retry, cache safety, purge, cleanup that fails and finishes on retry, a video poster that fails only after the last retry, interrupted upload, size limit, legacy migration and rerun.
+- `search.test.ts`: description and prompt matches, exact-name priority, filters, cross-space isolation, immediate removal on delete even with a cached query, revision ordering, model change and reindex, failure, timeout (including a provider that ignores the abort signal) and disabled fallbacks, recorded index failures, bounds, and a removed member losing search, list, detail, file, thumbnail, usage and canvas access at once.
 - `fixtures.test.ts`: example responses match the live API.
+- `sync.test.ts`: offline edits converge; a viewer's edits are neither stored nor sent to other clients.
 
 ## Limits
 
