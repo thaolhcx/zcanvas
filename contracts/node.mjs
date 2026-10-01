@@ -16,3 +16,25 @@ export function loadRegistry(dir) {
   }
   return registry;
 }
+/** Built-in templates: `<slug>.recipe.json` plus an optional `<slug>.cover.png`. */
+export function loadTemplates(dir) {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".recipe.json"))
+    .sort()
+    .map((file) => {
+      const slug = file.slice(0, -".recipe.json".length);
+      if (!/^[a-z0-9-]{1,40}$/.test(slug))
+        throw new Error(
+          `template ${file}: slug must be lowercase letters, digits or -`,
+        );
+      const cover = join(dir, `${slug}.cover.png`);
+      return {
+        id: `tpl_builtin_${slug.replaceAll("-", "_")}`,
+        slug,
+        recipe: JSON.parse(readFileSync(join(dir, file), "utf8")),
+        cover: readdirSync(dir).includes(`${slug}.cover.png`)
+          ? cover
+          : undefined,
+      };
+    });
+}

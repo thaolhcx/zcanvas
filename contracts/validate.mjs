@@ -132,6 +132,30 @@ export function validate(recipe, registry) {
   return issues;
 }
 
+/**
+ * Template rules for a recipe that carries meta.template (call after validate passes the schema).
+ * Kept apart from validate so a canvas created from a template can still delete or change
+ * the nodes its template once named. Returns Issue[] with code SCHEMA.
+ */
+export function validateTemplate(recipe, registry) {
+  const issues = [];
+  const template = recipe?.meta?.template;
+  if (!template) return issues;
+  const nodes = new Map(recipe.nodes.map(n => [n.id, n]));
+  const seen = new Set();
+  template.inputs.forEach((input, i) => {
+    const where = { nodeId: input.nodeId, paramKey: input.paramKey };
+    const node = nodes.get(input.nodeId);
+    const type = node && registry.get(node.type);
+    if (!node) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i} names missing node ${input.nodeId}`, ...where });
+    else if (type && !type.params[input.paramKey]) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i}: ${node.type} has no param ${input.paramKey}`, ...where });
+    const key = `${input.nodeId}.${input.paramKey}`;
+    if (seen.has(key)) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i} repeats ${key}`, ...where });
+    seen.add(key);
+  });
+  return issues;
+}
+
 export function checkRegistryEntry(entry) {
   return registrySchema(entry) ? [] : registrySchema.errors.map(e => `${e.instancePath} ${e.message}`);
 }

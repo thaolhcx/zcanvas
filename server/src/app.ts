@@ -12,6 +12,7 @@ import { registry } from "./registry.ts";
 import { config } from "./config.ts";
 import { getAsset, putAsset, s3 } from "./assets.ts";
 import { getRun, enqueue, emit } from "./runner.ts";
+import { templateRecipe, templateRoutes } from "./templates.ts";
 const idParams = {
   type: "object",
   required: ["id"],
@@ -46,21 +47,37 @@ export async function createApp() {
         )
       ).rows,
   );
-  app.post<{ Body: { name: string } }>(
+  app.post<{ Body: { name?: string; templateId?: string } }>(
     "/canvases",
     {
       schema: {
         body: {
           type: "object",
-          required: ["name"],
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
+            templateId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
           },
         },
       },
     },
-    async (request) => {
-      const recipe = emptyRecipe(undefined, request.body.name);
+    async (request, reply) => {
+      const { name, templateId } = request.body ?? {};
+      let recipe = emptyRecipe(undefined, name);
+      if (templateId) {
+        const template = await templateRecipe(templateId);
+        if ("error" in template)
+          return reply
+            .code(template.code === "NOT_FOUND" ? 404 : 422)
+            .send(template);
+        recipe = {
+          ...structuredClone(template.recipe),
+          meta: {
+            ...structuredClone(template.recipe.meta),
+            id: recipe.meta.id,
+            ...(name ? { name } : {}),
+          },
+        };
+      }
       const graph = new Graph(new Y.Doc(), registry, recipe);
       const bytes = Buffer.from(Y.encodeStateAsUpdate(graph.doc));
       graph.destroy();
@@ -116,6 +133,7 @@ export async function createApp() {
       return { id };
     },
   );
+  templateRoutes(app);
   app.post("/assets", async (request, reply) => {
     const file = await request.file();
     if (!file) return reply.code(400).send({ error: "Choose a file" });

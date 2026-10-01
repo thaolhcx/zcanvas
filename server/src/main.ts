@@ -3,8 +3,10 @@ import { createApp } from "./app.ts";
 import { createSyncServer } from "./sync.ts";
 import { config } from "./config.ts";
 import { ensureBucket } from "./assets.ts";
+import { seedTemplates } from "./templates.ts";
 import { startQueue, boss } from "./runner.ts";
 await migrate();
+await seedTemplates();
 await ensureBucket();
 await startQueue();
 const app = await createApp(),
