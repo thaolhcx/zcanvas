@@ -154,7 +154,7 @@ The only miss for the default model is "ruộng bậc thang" (rice terraces): th
 
 ## Limits
 
-- **MinIO was not run in this environment.** The S3 adapter shares the contract suite with the local adapter, but the suite was not run against MinIO here because building MinIO from source was not permitted. Run `S3_TEST_ENDPOINT=http://127.0.0.1:59000 pnpm vitest run server/test/storage.test.ts` and `STORAGE_DRIVER=s3 S3_AUTO_CREATE_BUCKET=1 pnpm bench:storage` with `docker compose up` to complete that check. Only the S3 operations the app uses are covered, and no vendor is claimed as certified.
+- **MinIO was not run in this environment.** The S3 adapter shares the contract suite with the local adapter, but the suite was not run against MinIO here because building MinIO from source was not permitted. In a cloud session, [`scripts/cloud-setup.sh`](../scripts/cloud-setup.sh) installs Postgres + pgvector and builds and starts MinIO; add it to the environment's setup script. Then run `S3_TEST_ENDPOINT=http://127.0.0.1:59000 pnpm vitest run server/test/storage.test.ts` and `STORAGE_DRIVER=s3 S3_AUTO_CREATE_BUCKET=1 pnpm bench:storage` with `docker compose up` to complete that check. Only the S3 operations the app uses are covered, and no vendor is claimed as certified.
 - The `openai` provider is implemented but was not called here (no key). Quality evidence uses the in-process model.
 - The 100 MB benchmark ran on the local adapter only.
 - The frontend media browser is issue #19. The only frontend change here is that uploads now go to the canvas space.
