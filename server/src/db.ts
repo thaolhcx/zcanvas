@@ -7,6 +7,7 @@ export async function migrate() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS canvases (id text PRIMARY KEY, name text NOT NULL, ydoc bytea, snapshot jsonb, version integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE IF NOT EXISTS presets (id text PRIMARY KEY, name text NOT NULL, recipe jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+    ALTER TABLE presets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
     CREATE TABLE IF NOT EXISTS assets (id text PRIMARY KEY, data jsonb NOT NULL);
     CREATE TABLE IF NOT EXISTS runs (id text PRIMARY KEY, canvas_id text NOT NULL, recipe jsonb NOT NULL, data jsonb NOT NULL, generation integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now());
     CREATE INDEX IF NOT EXISTS runs_canvas ON runs(canvas_id, created_at DESC);

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { Asset, Param, RecipeNode } from "../../contracts/index.ts";
+import {
+  isUnfilled,
+  type Asset,
+  type Param,
+  type RecipeNode,
+} from "../../contracts/index.ts";
 import { useGraph } from "./context.ts";
 import { request } from "./api.ts";
 import { useCanvas } from "./store.ts";
@@ -7,10 +12,12 @@ export function ParamField({
   node,
   name,
   param,
+  hint = true,
 }: {
   node: RecipeNode;
   name: string;
   param: Param;
+  hint?: boolean;
 }) {
   const graph = useGraph(),
     key = `${node.id}.${name}`;
@@ -22,6 +29,10 @@ export function ParamField({
   const [draft, setDraft] = useState(format(value)),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const error = useCanvas((s) => s.fieldErrors[key]);
+  const templateInput = useCanvas((s) =>
+    s.templateInputs.find((i) => i.nodeId === node.id && i.paramKey === name),
+  );
+  const marked = templateInput && isUnfilled(node.params[name]);
   useEffect(() => {
     setDraft(format(value));
   }, [value]);
@@ -66,7 +77,10 @@ export function ParamField({
     onBlur: () => commit(draft),
   };
   return (
-    <label className="param nodrag nowheel" data-param={name}>
+    <label
+      className={`param nodrag nowheel ${marked ? "template-input" : ""}`}
+      data-param={name}
+    >
       <span>
         {label}
         {param.required && <i> ·</i>}
@@ -149,6 +163,13 @@ export function ParamField({
           placeholder={"placeholder" in param ? param.placeholder : undefined}
         />
       )}
+      {marked && hint && (
+        <small className="template-hint">
+          {templateInput.help ??
+            templateInput.label ??
+            "Fill this template input"}
+        </small>
+      )}
       {error && (
         <small className="field-error" role="alert">
           {error}
@@ -175,7 +196,13 @@ export function ParamForm({
     <>
       <div className="params">
         {(inline ? params.slice(0, 2) : params).map(([key, param]) => (
-          <ParamField key={key} node={node} name={key} param={param} />
+          <ParamField
+            key={key}
+            node={node}
+            name={key}
+            param={param}
+            hint={!inline}
+          />
         ))}
       </div>
       {!inline &&

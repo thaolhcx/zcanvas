@@ -36,9 +36,18 @@ import {
   Type,
   GitBranch,
   ArrowUpRight,
+  LayoutTemplate,
+  Check,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { type Recipe, type Run, type NodeType } from "../../contracts/index.ts";
+import {
+  unfilledInputs,
+  type Asset,
+  type Recipe,
+  type Run,
+  type NodeType,
+  type TemplateInput,
+} from "../../contracts/index.ts";
 import { estimateCredits } from "../../contracts/estimate.ts";
 import { BaseNode } from "./BaseNode.tsx";
 import { ParamForm } from "./Params.tsx";
@@ -56,6 +65,9 @@ import {
 import { action, useCanvas, useRun, updateRun, EMPTY_ISSUES } from "./store.ts";
 import { post, followRun, request } from "./api.ts";
 import { Debug } from "./Debug.tsx";
+import { TemplateBrowser } from "./TemplateBrowser.tsx";
+import { SaveTemplateDialog } from "./SaveTemplateDialog.tsx";
+import { insertTemplate } from "./templates.ts";
 const nodeTypes = {
   base: BaseNode,
   group: ({ data }: { data: Record<string, unknown> }) => (
@@ -121,7 +133,11 @@ function Workspace({
     [menu, setMenu] = useState(false),
     [name, setName] = useState(graph.toRecipe().meta.name),
     [inspector, setInspector] = useState<string>(),
-    [viewportFitting, setViewportFitting] = useState(false);
+    [viewportFitting, setViewportFitting] = useState(false),
+    [templates, setTemplates] = useState(false),
+    [saving, setSaving] = useState(false),
+    [dropping, setDropping] = useState(false),
+    [notice, setNotice] = useState("");
   const clipboard = useRef<Recipe | undefined>(undefined),
     helperLines = useRef<HelperLinesHandle>(null),
     connectionOrigin = useRef<(Endpoint & { point: XYPosition }) | undefined>(
@@ -295,6 +311,89 @@ function Workspace({
   const fit = () => fitTo({ padding: 0.15, duration: motionDuration(200) });
   const scheduleFit = () =>
     fitTo({ padding: 0.15, duration: motionDuration(200) }, 50);
+  /** Marks template inputs and moves the camera to the first unfilled one. */
+  const focusInputs = (inputs: TemplateInput[], fallback: string[] = []) => {
+    const recipe = graph.toRecipe(),
+      ids = new Set(recipe.nodes.map((n) => n.id)),
+      key = (i: TemplateInput) => `${i.nodeId}.${i.paramKey}`;
+    const merged = new Map(
+      [...useCanvas.getState().templateInputs, ...inputs]
+        .filter((i) => ids.has(i.nodeId))
+        .map((i) => [key(i), i]),
+    );
+    useCanvas.setState({ templateInputs: [...merged.values()] });
+    const first = unfilledInputs(recipe, inputs)[0];
+    const target = first ? [first.nodeId] : fallback;
+    if (first) setInspector(first.nodeId);
+    if (target.length)
+      fitTo(
+        {
+          nodes: target.map((id) => ({ id })),
+          maxZoom: 1,
+          padding: 0.2,
+          duration: motionDuration(250),
+        },
+        150,
+      );
+  };
+  useEffect(() => {
+    const template = graph.toRecipe().meta.template;
+    if (template?.inputs.length) focusInputs(template.inputs);
+  }, [graph]);
+  const insert = async ({ recipe }: { recipe: Recipe }) => {
+    const center = flow.screenToFlowPosition({
+      x: innerWidth / 2,
+      y: innerHeight / 2,
+    });
+    const result = insertTemplate(graph, recipe, center);
+    useCanvas.setState({ error: "" });
+    setTemplates(false);
+    focusInputs(result.inputs, result.nodeIds);
+  };
+  /** Uploads dropped files and adds one Asset node per file in one transaction. */
+  const dropFiles = async (files: File[], at: XYPosition) => {
+    // Uploads land in the canvas space; the server checks access.
+    const canvasId = new URLSearchParams(location.search).get("canvas");
+    const query = canvasId ? `?canvasId=${encodeURIComponent(canvasId)}` : "";
+    const uploads = await Promise.allSettled(
+      files.map((file) => {
+        const data = new FormData();
+        data.append("file", file);
+        return request<Asset>(`/assets${query}`, {
+          method: "POST",
+          body: data,
+        });
+      }),
+    );
+    const assets = uploads.flatMap((u) =>
+      u.status === "fulfilled" ? [u.value] : [],
+    );
+    const failed = uploads.find(
+      (u): u is PromiseRejectedResult => u.status === "rejected",
+    );
+    const width = graph.registry.get("input.asset")?.ui?.width ?? 280;
+    if (assets.length)
+      action(() =>
+        graph.transaction("user", () => {
+          assets.forEach((asset, i) =>
+            graph.addNode("input.asset", {
+              position: {
+                x: Math.round(at.x + i * (width + 40)),
+                y: Math.round(at.y),
+              },
+              params: { asset: asset.id },
+            }),
+          );
+        }),
+      );
+    if (failed)
+      useCanvas.setState({
+        error:
+          failed.reason instanceof Error
+            ? failed.reason.message
+            : String(failed.reason),
+      });
+  };
   const remove = () =>
     action(() =>
       graph.transaction("user", () => {
@@ -381,6 +480,7 @@ function Workspace({
   };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
+      if (templates || saving) return;
       if (
         (event.target as HTMLElement).closest(
           "input,textarea,select,[contenteditable]",
@@ -496,7 +596,7 @@ function Workspace({
     URL.revokeObjectURL(a.href);
   };
   return (
-    <main className="workspace">
+    <main className={`workspace ${dropping ? "dropping" : ""}`}>
       <PortPaletteContext.Provider value={openPortPalette}>
         <ReactFlow
           {...magnet}
@@ -579,6 +679,33 @@ function Workspace({
                   y: event.clientY,
                 }),
               );
+          }}
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes("Files")) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            if (!dropping) setDropping(true);
+          }}
+          onDragLeave={(event) => {
+            if (
+              !event.currentTarget.contains(
+                event.relatedTarget as globalThis.Node | null,
+              )
+            )
+              setDropping(false);
+          }}
+          onDrop={(event) => {
+            setDropping(false);
+            const files = [...event.dataTransfer.files];
+            if (!files.length) return;
+            event.preventDefault();
+            void dropFiles(
+              files,
+              flow.screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+              }),
+            );
           }}
           onMove={(_, view) => {
             setZoom(view.zoom);
@@ -718,17 +845,13 @@ function Workspace({
       {menu && (
         <div className="canvas-menu">
           <button
-            onClick={async () => {
-              try {
-                await post("/presets", { name, recipe: graph.toRecipe() });
-                setMenu(false);
-              } catch (e) {
-                useCanvas.setState({ error: String(e) });
-              }
+            onClick={() => {
+              setMenu(false);
+              setSaving(true);
             }}
           >
             <Save size={15} />
-            Save as preset
+            Save as template
           </button>
           <button onClick={exportRecipe}>
             <Download size={15} />
@@ -770,6 +893,17 @@ function Workspace({
           {palette ? <X size={21} /> : <Plus size={21} />}
         </button>
         <span />
+        <button
+          aria-label="Templates"
+          title="Templates"
+          aria-expanded={templates}
+          onClick={() => {
+            setPalette(undefined);
+            setTemplates(true);
+          }}
+        >
+          <LayoutTemplate size={19} />
+        </button>
         <button aria-label="Auto layout" title="Auto layout" onClick={layout}>
           <Workflow size={19} />
         </button>
@@ -982,6 +1116,32 @@ function Workspace({
             <X size={14} />
           </button>
         </div>
+      )}
+      {notice && (
+        <div className="action-notice" role="status">
+          <Check size={14} />
+          {notice}
+          <button aria-label="Dismiss" onClick={() => setNotice("")}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {templates && (
+        <TemplateBrowser
+          variant="overlay"
+          primaryLabel="Insert into canvas"
+          onPick={insert}
+          onClose={() => setTemplates(false)}
+        />
+      )}
+      {saving && (
+        <SaveTemplateDialog
+          onClose={() => setSaving(false)}
+          onSaved={(template) => {
+            setSaving(false);
+            setNotice(`Saved template “${template.title}”`);
+          }}
+        />
       )}
       {debug && <Debug />}
       <div className="workspace-caption">

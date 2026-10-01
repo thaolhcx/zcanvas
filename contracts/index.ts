@@ -1,3 +1,4 @@
 export * from "./types.ts";
-export { validate, checkRegistryEntry } from "./validate.mjs";
+export { validate, validateTemplate, checkRegistryEntry } from "./validate.mjs";
+export * from "./template.ts";
 export * from "./assets.ts";

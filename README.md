@@ -21,13 +21,13 @@ Open **http://127.0.0.1:5173**. Choose **Open pilot flow** to inspect the suppli
 
 The first Docker build compiles MinIO from a pinned official source revision because the old official image is no longer available. Subsequent starts use the cached image. The database and object store use named volumes; `docker compose down` preserves them.
 
-| Service | Address |
-| --- | --- |
-| Canvas (dev) | http://127.0.0.1:5173 |
-| Canvas (production preview) | http://127.0.0.1:4173 |
-| HTTP API + run events | http://127.0.0.1:4310 |
-| Hocuspocus graph sync | ws://127.0.0.1:4311 |
-| Postgres 16 + pgvector | localhost:55432 |
+| Service                                 | Address                           |
+| --------------------------------------- | --------------------------------- |
+| Canvas (dev)                            | http://127.0.0.1:5173             |
+| Canvas (production preview)             | http://127.0.0.1:4173             |
+| HTTP API + run events                   | http://127.0.0.1:4310             |
+| Hocuspocus graph sync                   | ws://127.0.0.1:4311               |
+| Postgres 16 + pgvector                  | localhost:55432                   |
 | MinIO API / console (optional, S3 mode) | localhost:59000 / localhost:59001 |
 
 All services bind to loopback. This is a single-user local POC, with no login or deployment setup. The example credentials are for these local containers only.
@@ -43,7 +43,7 @@ pnpm exec playwright install chromium
 pnpm e2e
 ```
 
-`pnpm test` reproduces the supplied 20 contract tests, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres (with pgvector), pg-boss, the local storage adapter and ffmpeg. Set `S3_TEST_ENDPOINT` to also run the storage contract against MinIO. `pnpm bench:catalog`, `pnpm bench:storage` and `EMBEDDING_PROVIDER=local pnpm search:eval` record the asset evidence in `docs/evidence/`. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
+`pnpm test` reproduces the supplied 20 contract tests, checks the template contract and every built-in template, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres (with pgvector), pg-boss, the local storage adapter and ffmpeg. Set `S3_TEST_ENDPOINT` to also run the storage contract against MinIO. `pnpm bench:catalog`, `pnpm bench:storage` and `EMBEDDING_PROVIDER=local pnpm search:eval` record the asset evidence in `docs/evidence/`. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
 
 For a persistent production preview:
 
@@ -62,23 +62,25 @@ Append `?debug=1` (or `&debug=1`) to show an FPS meter, frame-duration measureme
 - Drag nodes near an edge or center to align them: guides appear during dragging and snap within 5 screen pixels at every zoom. Multi-node selections and groups move together.
 - Hover near the + icons to reveal their magnetic controls. Selected nodes signal along attached connections; reduced-motion preferences disable animation.
 - `Cmd/Ctrl+Z`, `Shift+Cmd/Ctrl+Z`: undo/redo. `Cmd/Ctrl+C/V/D`: copy/paste/duplicate. `Cmd/Ctrl+G`: group. `Cmd/Ctrl+Enter`: run. `F`: fit view. Space-drag pans.
-- The canvas-name menu exports/imports recipe JSON and saves presets. Opening a preset creates a new canvas.
+- The canvas-name menu exports/imports recipe JSON and saves the canvas as a template: title, description, tags, an optional cover from run outputs or uploads, and the params a user must fill. Ticked params are left empty in the saved template.
+- **Templates** in the tool rail inserts a template into the open canvas, centred on the view; one Undo removes it. On the start screen, the Templates tab starts a new canvas from a template. Unfilled template inputs are outlined in yellow and the view moves to the first one.
+- Drop image, video or audio files on the canvas to add one Asset node per file; one Undo removes the batch.
 - A run uses an immutable graph snapshot. Editing the graph does not change a running job. Use a fresh Run after changing params; cache reuse makes unchanged work free. Retry uses the previous run snapshot and reruns the selected node plus its descendants.
 - Select older runs in the header. On reconnect, the client reloads their current state and resumes events from its last event ID.
 - Edits persist in IndexedDB and sync through Hocuspocus. The production build caches its app shell for offline reload after the first successful visit; dev mode needs the Vite server to reload.
 
 ## Repository
 
-| Directory | Responsibility |
-| --- | --- |
-| `contracts/` | Schemas, eight node definitions, shared TypeScript contracts, browser-safe validator |
-| `graph/` | Yjs Graph API, atomic draft validation, import/export, grouping/layout, undo |
-| `server/` | HTTP API, Hocuspocus persistence, pg-boss run processing, asset catalog/storage/search, models boundary |
-| `workers/` | Small worker functions using only `RunContext` |
-| `web/` | React Flow canvas, registry-driven BaseNode, Zustand UI/run stores, IndexedDB |
-| `fixtures/` | Original generated test media: portrait PNG, 12-second MP4, 12-second WAV |
-| `e2e/` | Playwright production-build scenarios |
-| `docs/` | Original source documents, implementation interpretations and verification evidence |
+| Directory    | Responsibility                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `contracts/` | Schemas, eight node definitions, shared TypeScript contracts, browser-safe validator                    |
+| `graph/`     | Yjs Graph API, atomic draft validation, import/export, grouping/layout, undo                            |
+| `server/`    | HTTP API, Hocuspocus persistence, pg-boss run processing, asset catalog/storage/search, models boundary |
+| `workers/`   | Small worker functions using only `RunContext`                                                          |
+| `web/`       | React Flow canvas, registry-driven BaseNode, Zustand UI/run stores, IndexedDB                           |
+| `fixtures/`  | Original generated test media: portrait PNG, 12-second MP4, 12-second WAV                               |
+| `e2e/`       | Playwright production-build scenarios                                                                   |
+| `docs/`      | Original source documents, implementation interpretations and verification evidence                     |
 
 The graph contains only recipe data. Run state, outputs and validation issues never enter Yjs. All edits use the Graph API; node positions commit on drag stop. Per-key Yjs changes preserve references for unaffected nodes. Images use 300-pixel thumbnails; full media is fetched only for export/opening.
 

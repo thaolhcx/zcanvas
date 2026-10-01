@@ -11,6 +11,7 @@ import { registry } from "./registry.ts";
 import { config } from "./config.ts";
 import { putAsset, unavailableAssets } from "./assets.ts";
 import { getRun, enqueue, emit } from "./runner.ts";
+import { templateRecipe, templateRoutes } from "./templates.ts";
 import {
   ApiProblem,
   type Access,
@@ -104,25 +105,33 @@ export async function createApp(options: { actorId?: string } = {}) {
         )
       ).rows,
   );
-  app.post<{ Body: { name: string; spaceId?: string; projectId?: string } }>(
+  app.post<{
+    Body: {
+      name?: string;
+      templateId?: string;
+      spaceId?: string;
+      projectId?: string;
+    };
+  }>(
     "/canvases",
     {
       schema: {
         body: {
           type: "object",
-          required: ["name"],
           properties: {
             name: { type: "string", minLength: 1, maxLength: 120 },
+            templateId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
             spaceId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
             projectId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,100}$" },
           },
         },
       },
     },
-    async (request) => {
-      const spaceId = request.body.spaceId ?? personalSpaceId(actor.id);
+    async (request, reply) => {
+      const { name, templateId } = request.body ?? {};
+      const spaceId = request.body?.spaceId ?? personalSpaceId(actor.id);
       await requireSpace(actor, spaceId, "write", "Space not found");
-      const projectId = request.body.projectId ?? null;
+      const projectId = request.body?.projectId ?? null;
       if (
         projectId &&
         !(
@@ -137,7 +146,22 @@ export async function createApp(options: { actorId?: string } = {}) {
           "VALIDATION",
           "The project is not in this space",
         );
-      const recipe = emptyRecipe(undefined, request.body.name);
+      let recipe = emptyRecipe(undefined, name);
+      if (templateId) {
+        const template = await templateRecipe(templateId);
+        if ("error" in template)
+          return reply
+            .code(template.code === "NOT_FOUND" ? 404 : 422)
+            .send(template);
+        recipe = {
+          ...structuredClone(template.recipe),
+          meta: {
+            ...structuredClone(template.recipe.meta),
+            id: recipe.meta.id,
+            ...(name ? { name } : {}),
+          },
+        };
+      }
       const graph = new Graph(new Y.Doc(), registry, recipe);
       const bytes = Buffer.from(Y.encodeStateAsUpdate(graph.doc));
       graph.destroy();
@@ -194,6 +218,7 @@ export async function createApp(options: { actorId?: string } = {}) {
       return { id };
     },
   );
+  templateRoutes(app);
   registerAssetRoutes(app, actor);
   app.post<{
     Body: { recipe: Recipe; canvasId: string; graphVersion: number };

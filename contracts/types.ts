@@ -102,6 +102,23 @@ export interface RecipeGroup {
   position: XY;
   size: WH;
 }
+/** One param a template user must fill. */
+export interface TemplateInput {
+  nodeId: NodeId;
+  paramKey: string;
+  label?: string;
+  help?: string;
+}
+/** `recipe.meta.template`: present when a recipe is a reusable template flow. */
+export interface TemplateMeta {
+  title: string;
+  description?: string;
+  /** Asset id (ast_…) of the cover image. */
+  cover?: string;
+  tags?: string[];
+  /** Ordered; the first unfilled one is where the camera goes. */
+  inputs: TemplateInput[];
+}
 export interface Recipe {
   schema: "recipe/v1";
   meta: {
@@ -110,6 +127,7 @@ export interface Recipe {
     version: number;
     registryVersion: string;
     updatedAt?: string;
+    template?: TemplateMeta;
   };
   nodes: RecipeNode[];
   edges: RecipeEdge[];

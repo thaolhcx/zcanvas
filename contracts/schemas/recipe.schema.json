@@ -16,7 +16,8 @@
         "name": { "type": "string", "minLength": 1, "maxLength": 120 },
         "version": { "type": "integer", "minimum": 0, "description": "Graph version; +1 per Graph API transaction" },
         "registryVersion": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "template": { "$ref": "#/$defs/template" }
       }
     },
     "nodes": {
@@ -70,6 +71,35 @@
     }
   },
   "$defs": {
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "inputs"],
+      "description": "Optional. Present when this recipe is a reusable template flow.",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "cover": { "type": "string", "pattern": "^ast_[a-zA-Z0-9_-]{1,96}$" },
+        "tags": {
+          "type": "array", "maxItems": 10, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+        },
+        "inputs": {
+          "type": "array", "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nodeId", "paramKey"],
+            "properties": {
+              "nodeId": { "$ref": "#/$defs/id" },
+              "paramKey": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "label": { "type": "string", "maxLength": 60 },
+              "help": { "type": "string", "maxLength": 200 }
+            }
+          }
+        }
+      }
+    },
     "id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$" },
     "xy": {
       "type": "object", "additionalProperties": false, "required": ["x", "y"],
