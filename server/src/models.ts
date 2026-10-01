@@ -1,4 +1,4 @@
-import { readFile, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import sharp from "sharp";
 import type { Asset, ModelsClient, RunContext } from "../../contracts/index.ts";
 import { config } from "./config.ts";
 import { db } from "./db.ts";
-import { assetBytes } from "./assets.ts";
+import { copyAssetToFile } from "./assets.ts";
 const exec = promisify(execFile);
 export function createModels(ctx: {
   runId: string;
@@ -68,7 +68,7 @@ export async function exportMedia(ctx: RunContext) {
   const audio = ctx.inputs.audio as Asset | undefined;
   const dir = await mkdtemp(join(tmpdir(), "zcanvas-export-"));
   try {
-    await writeFile(join(dir, "video.mp4"), await assetBytes(video.id));
+    await copyAssetToFile(video.id, join(dir, "video.mp4"));
     const args = [
       "-loglevel",
       "error",
@@ -78,7 +78,7 @@ export async function exportMedia(ctx: RunContext) {
       join(dir, "video.mp4"),
     ];
     if (audio) {
-      await writeFile(join(dir, "audio.wav"), await assetBytes(audio.id));
+      await copyAssetToFile(audio.id, join(dir, "audio.wav"));
       args.push(
         "-protocol_whitelist",
         "file,pipe",

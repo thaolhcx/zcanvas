@@ -187,8 +187,22 @@ export interface Asset {
     height?: number;
     [key: string]: unknown;
   };
+  /** Source run/node of a generated asset. Kept for older clients; see `source`. */
   createdBy?: { runId: string; nodeId: string };
   createdAt: string;
+  // Catalog fields. Optional so assets saved before the catalog stay valid.
+  name?: string;
+  spaceId?: string;
+  /** User who uploaded the file or started the run. Not the owner: the space owns it. */
+  creatorId?: string;
+  source?: import("./assets.ts").AssetSource;
+  status?: import("./assets.ts").AssetStatus;
+  previewStatus?: import("./assets.ts").PreviewStatus;
+  description?: string;
+  tags?: string[];
+  generation?: import("./assets.ts").GenerationInfo;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 export type Output = Asset | { value: string | object };
 export type Outputs = Record<PortKey, Output | Output[]>;

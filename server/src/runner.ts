@@ -1,9 +1,10 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { checkValues } from "./values.ts";
 import { sfxWorker } from "../../workers/src/sfx-example.ts";
-import PgBoss from "pg-boss";
 import { createHash } from "node:crypto";
 import type {
+  Asset,
+  GenerationInfo,
   Job,
   Output,
   Outputs,
@@ -17,7 +18,19 @@ import { workers, exportWorker } from "../../workers/src/index.ts";
 import { db } from "./db.ts";
 import { config } from "./config.ts";
 import { registry } from "./registry.ts";
-import { getAsset, putAsset } from "./assets.ts";
+import {
+  AssetUnavailable,
+  getAssetInSpace,
+  putAsset,
+  publishJobAssets,
+  failJobAssets,
+  unavailableAssets,
+  startAssetWorkers,
+  sweepStaleWrites,
+} from "./assets.ts";
+import { startSearchWorkers } from "./search.ts";
+import { boss, startQueue } from "./queue.ts";
+export { boss, startQueue };
 import { createModels, exportMedia } from "./models.ts";
 if (process.env.ENABLE_SFX_EXAMPLE === "1") workers.push(sfxWorker);
 const activeWorkers = new Map<string, number>();
@@ -37,17 +50,6 @@ async function withWorkerSlot<T>(
     activeWorkers.set(type, (activeWorkers.get(type) ?? 1) - 1);
   }
 }
-export const boss = new PgBoss(config.databaseUrl);
-boss.on("error", (error) => console.error("Queue:", error));
-export async function startQueue() {
-  await boss.start();
-  await boss.createQueue("canvas-run", {
-    name: "canvas-run",
-    retryLimit: 2,
-    retryDelay: 1,
-    expireInSeconds: 60,
-  });
-}
 export const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, v) =>
     v && typeof v === "object" && !Array.isArray(v)
@@ -56,12 +58,14 @@ export const canonical = (value: unknown): string =>
         )
       : v,
   );
-export function cacheKey(node: RecipeNode, inputs: Outputs) {
+/** `scope` (the run's space) keeps cached outputs from crossing spaces. */
+export function cacheKey(node: RecipeNode, inputs: Outputs, scope?: string) {
   const identity = (value: Output): unknown =>
     "id" in value ? { assetId: value.id } : value;
   return createHash("sha256")
     .update(
       canonical({
+        ...(scope ? { scope } : {}),
         type: node.type,
         typeVersion: node.typeVersion,
         params: node.params,
@@ -134,6 +138,47 @@ function condition(value: Output, params: Record<string, unknown>) {
       return String(actual) === compare;
   }
 }
+const isAsset = (value: unknown): value is Asset =>
+  Boolean(value && typeof value === "object" && "id" in value && "mime" in value);
+export function outputAssetIds(outputs: Outputs | undefined) {
+  return Object.values(outputs ?? {})
+    .flatMap((v) => (Array.isArray(v) ? v : [v]))
+    .filter(isAsset)
+    .map((a) => a.id);
+}
+const extension = (mime: string) =>
+  ({ "image/png": "png", "image/jpeg": "jpg", "video/mp4": "mp4", "video/webm": "webm", "audio/wav": "wav" })[mime] ??
+  mime.split("/")[1] ??
+  "bin";
+/** Plain-text history saved on generated assets. Later edits never rewrite it. */
+export function generationInfo(
+  node: RecipeNode,
+  params: Record<string, unknown>,
+  inputs: Outputs,
+): GenerationInfo {
+  const texts = Object.values(inputs)
+    .flatMap((v) => (Array.isArray(v) ? v : [v]))
+    .filter((v): v is { value: string } => !isAsset(v) && typeof (v as { value?: unknown }).value === "string")
+    .map((v) => v.value);
+  const prompt = (texts.length ? texts.join("\n") : typeof params.prompt === "string" ? params.prompt : "").slice(0, 4000);
+  const references = Object.values(inputs)
+    .flatMap((v) => (Array.isArray(v) ? v : [v]))
+    .filter(isAsset)
+    .map((a) => a.name ?? a.id);
+  const settings = Object.fromEntries(
+    Object.entries(params).filter(
+      ([key, value]) => key !== "prompt" && (value === null || ["string", "number", "boolean"].includes(typeof value)),
+    ),
+  );
+  return {
+    nodeType: node.type,
+    typeVersion: node.typeVersion,
+    ...(prompt ? { prompt } : {}),
+    ...(typeof params.model === "string" ? { model: params.model } : config.mock ? { model: `mock:${node.type}` } : {}),
+    ...(Object.keys(settings).length ? { settings } : {}),
+    ...(references.length ? { references } : {}),
+  };
+}
 // Values preserve list slots, including skipped branches, so later fan-outs stay aligned.
 type Values = Record<string, (Output | undefined)[]>;
 async function executeRun(runId: string) {
@@ -148,13 +193,15 @@ async function executeRun(runId: string) {
   }
   try {
     const { rows } = await db.query(
-      "SELECT recipe, generation FROM runs WHERE id=$1",
+      "SELECT r.recipe, r.generation, r.actor_id, COALESCE(r.space_id, c.space_id) AS space_id FROM runs r LEFT JOIN canvases c ON c.id=r.canvas_id WHERE r.id=$1",
       [runId],
     );
     const run = await getRun(runId);
     if (!run || run.status !== "running") return;
     const recipe: Recipe = rows[0].recipe;
     const generation = rows[0].generation;
+    const spaceId: string = rows[0].space_id;
+    const actorId: string | null = rows[0].actor_id;
     const results = new Map<string, Values>();
     const lists = new Map<string, boolean>();
     const current = async () => {
@@ -214,7 +261,13 @@ async function executeRun(runId: string) {
       const concurrency =
         entry.runner.kind === "job" ? (entry.runner.concurrency ?? 2) : 1;
       const processItem = async (index: number) => {
-        const previous = existing.find((j) => (j.itemIndex ?? 0) === index);
+        let previous = existing.find((j) => (j.itemIndex ?? 0) === index);
+        // A finished job whose output asset was deleted is rerun, never reused.
+        if (
+          previous?.status === "done" &&
+          (await unavailableAssets(outputAssetIds(previous.outputs), spaceId)).length
+        )
+          previous = { ...previous, status: "queued", outputs: undefined };
         const job: Job =
           previous?.status === "done" || previous?.status === "skipped"
             ? previous
@@ -306,10 +359,10 @@ async function executeRun(runId: string) {
           if (lengthMismatch)
             throw new Error("Fan-out input lists must have equal lengths");
           checkValues(entry.inputs, inputs);
-          const key = cacheKey(node, inputs);
+          const key = cacheKey(node, inputs, spaceId);
           const cacheable =
             entry.runner.kind === "job" && entry.runner.cacheable !== false;
-          const cached = cacheable
+          let cached = cacheable
             ? (
                 await db.query(
                   "SELECT outputs FROM output_cache WHERE key=$1",
@@ -317,6 +370,14 @@ async function executeRun(runId: string) {
                 )
               ).rows[0]
             : undefined;
+          // Never resurrect a deleted or failed asset from the cache.
+          if (
+            cached &&
+            (await unavailableAssets(outputAssetIds(cached.outputs), spaceId)).length
+          ) {
+            await db.query("DELETE FROM output_cache WHERE key=$1", [key]);
+            cached = undefined;
+          }
           job.status = "running";
           job.progress = 0;
           await save(job);
@@ -324,7 +385,9 @@ async function executeRun(runId: string) {
           else if (node.type === "input.prompt")
             job.outputs = { text: { value: String(node.params.text) } };
           else if (node.type === "input.asset")
-            job.outputs = { asset: await getAsset(String(node.params.asset)) };
+            job.outputs = {
+              asset: await getAssetInSpace(String(node.params.asset), spaceId),
+            };
           else if (node.type === "flow.if") {
             const value = inputs.value as Output;
             job.outputs = {
@@ -366,11 +429,32 @@ async function executeRun(runId: string) {
                   }),
                 );
               },
-              putAsset: (file, meta) =>
-                putAsset(file, {
-                  ...meta,
-                  createdBy: { runId, nodeId: node.id },
-                }),
+              putAsset: (file, meta) => {
+                const mime =
+                  meta.mime ?? (file instanceof Blob ? file.type : "application/octet-stream");
+                const label =
+                  typeof meta.meta?.name === "string" && meta.meta.name.trim()
+                    ? meta.meta.name.trim()
+                    : `${node.label ?? entry.title}${fan ? ` ${index + 1}` : ""}`;
+                return putAsset(file, {
+                  spaceId,
+                  creatorId: actorId,
+                  name: `${label}.${extension(mime)}`,
+                  mime,
+                  kind: meta.kind,
+                  meta: meta.meta,
+                  source: {
+                    type: "generated",
+                    canvasId: run.canvasId,
+                    runId,
+                    nodeId: node.id,
+                    jobId: job.jobId,
+                  },
+                  generation: generationInfo(node, ctx.params, inputs),
+                  // Visible only after the job finishes on the current run.
+                  publish: "processing",
+                });
+              },
               models: createModels({
                 runId,
                 jobId: job.jobId,
@@ -412,9 +496,11 @@ async function executeRun(runId: string) {
           job.error = {
             code: interrupted
               ? "MOCK_FAILURE"
-              : controller.signal.aborted
-                ? "MODEL_TIMEOUT"
-                : "WORKER_ERROR",
+              : error instanceof AssetUnavailable
+                ? "INPUT_REQUIRED"
+                : controller.signal.aborted
+                  ? "MODEL_TIMEOUT"
+                  : "WORKER_ERROR",
             message: interrupted
               ? "Mock job interrupted. Retry this node."
               : error instanceof Error
@@ -427,6 +513,14 @@ async function executeRun(runId: string) {
           clearTimeout(timeout);
         }
         await save(job);
+        // Outputs become ready only for a finished job on the current run.
+        if (job.status === "done" && (await current()))
+          await publishJobAssets(job.jobId);
+        else
+          await failJobAssets(
+            job.jobId,
+            job.status === "done" ? "Run was cancelled or retried" : `Job ${job.status}`,
+          );
         collect();
       };
       for (let start = 0; start < count; start += concurrency)
@@ -473,6 +567,8 @@ async function executeRun(runId: string) {
 }
 export async function startRunner() {
   await startQueue();
+  await startAssetWorkers();
+  await startSearchWorkers();
   await boss.work<{ runId: string }>(
     "canvas-run",
     { batchSize: 4, pollingIntervalSeconds: 0.5 },
@@ -490,8 +586,12 @@ export async function startRunner() {
   const timer = setInterval(() => {
     void recover().catch(console.error);
   }, 5000);
+  const sweeper = setInterval(() => {
+    void sweepStaleWrites().catch(console.error);
+  }, 60000);
   return async () => {
     clearInterval(timer);
+    clearInterval(sweeper);
     await boss.stop({ graceful: true });
   };
 }

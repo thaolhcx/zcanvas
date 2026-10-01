@@ -2,7 +2,7 @@ import { beforeAll, afterAll, it, expect } from "vitest";
 import WebSocket from "ws";
 import { createApp } from "../src/app.ts";
 import { migrate, db } from "../src/db.ts";
-import { ensureBucket } from "../src/assets.ts";
+import { checkStorage } from "../src/storage.ts";
 import { startRunner, cacheKey } from "../src/runner.ts";
 import pilot from "../../contracts/examples/pilot.recipe.json" with { type: "json" };
 import type { Recipe, Run } from "../../contracts/index.ts";
@@ -35,7 +35,7 @@ const wait = async (id: string) => {
 };
 beforeAll(async () => {
   await migrate();
-  await ensureBucket();
+  await checkStorage();
   stop = await startRunner();
   app = await createApp();
   url = await app.listen({ host: "127.0.0.1", port: 0 });

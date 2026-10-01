@@ -4,6 +4,8 @@ import { Graph, Y, emptyRecipe, readRecipe } from "../../graph/src/index.ts";
 import { createSyncServer } from "../src/sync.ts";
 import { db, migrate } from "../src/db.ts";
 import { registry } from "../src/registry.ts";
+import { personalSpaceId } from "../src/access.ts";
+import { config } from "../src/config.ts";
 const until = async (fn: () => boolean | Promise<boolean>) => {
   const end = Date.now() + 8000;
   while (!(await fn())) {
@@ -15,11 +17,15 @@ it("two headless clients edit offline and converge with persisted server documen
   await migrate();
   const initial = emptyRecipe();
   const seed = new Graph(new Y.Doc(), registry, initial);
-  await db.query("INSERT INTO canvases(id,name,ydoc) VALUES($1,$2,$3)", [
-    initial.meta.id,
-    initial.meta.name,
-    Buffer.from(Y.encodeStateAsUpdate(seed.doc)),
-  ]);
+  await db.query(
+    "INSERT INTO canvases(id,name,ydoc,space_id) VALUES($1,$2,$3,$4)",
+    [
+      initial.meta.id,
+      initial.meta.name,
+      Buffer.from(Y.encodeStateAsUpdate(seed.doc)),
+      personalSpaceId(config.actorId),
+    ],
+  );
   const server = createSyncServer(0);
   await server.listen();
   const docs = [new Y.Doc(), new Y.Doc()];
