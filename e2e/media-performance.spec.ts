@@ -122,7 +122,10 @@ test("scrolls 500 assets smoothly with a bounded number of cards and no players"
   const elapsed = Date.now() - started;
   const metrics = await sample();
   const scrolled = await scroller.evaluate((el) => el.scrollTop);
-  const loaded = await browser.locator(".browser-meta").textContent();
+  const loaded = await browser
+    .locator(".browser-meta > span")
+    .first()
+    .textContent();
   const memory = await page.evaluate(
     () =>
       (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory

@@ -168,7 +168,7 @@ const AssetCard = memo(function AssetCard({
   return (
     <div
       ref={card}
-      className={`asset-card ${selected ? "selected" : ""} ${open ? "open" : ""} ${playing ? "playing" : ""}`}
+      className={`asset-card ${asset.kind} ${selected ? "selected" : ""} ${open ? "open" : ""} ${playing ? "playing" : ""}`}
       data-testid="asset-card"
       data-asset-id={asset.id}
       draggable={draggable}

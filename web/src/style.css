@@ -2071,6 +2071,12 @@ a {
   border-color: #9f3c3c;
 }
 /* Media browser (#19). */
+.template-browser-backdrop.media-browser {
+  padding: 96px 36px 76px 80px;
+}
+.media-browser .browser-layout {
+  position: relative;
+}
 .media-browser .template-browser {
   transition: opacity var(--motion-panel) var(--motion-ease);
 }
@@ -2406,10 +2412,15 @@ a {
   opacity: 0;
   transition: opacity var(--motion-fast) var(--motion-ease);
 }
+/* Video shows its Play control like the prototype; audio shows it on hover. */
+.asset-card.video .asset-play,
 .asset-card:hover .asset-play,
 .asset-play:focus-visible,
 .asset-play[aria-pressed="true"] {
   opacity: 1;
+}
+.asset-card.video.playing .asset-play:not([aria-pressed="true"]) {
+  opacity: 0;
 }
 .asset-play:hover {
   background: #102a45aa;
@@ -2798,6 +2809,22 @@ audio.card-player {
   padding: 6px 10px;
   font-size: 11px;
 }
+@media (max-width: 1180px) {
+  /* Details float over the grid instead of squeezing it to one column. */
+  .media-details {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    box-shadow: -12px 0 32px #21314c14;
+  }
+  /* Keep the selection footer and its Add button reachable. */
+  .browser-layout:has(.browser-footer) .media-details {
+    bottom: 62px;
+    border-bottom: 1px solid #e1e6ee;
+  }
+}
 @media (max-width: 1100px) {
   .browser-actions {
     max-width: none;
@@ -2807,6 +2834,9 @@ audio.card-player {
   }
 }
 @media (max-width: 900px) {
+  .template-browser-backdrop.media-browser {
+    padding: 80px 16px 16px;
+  }
   .browser-footer {
     flex-wrap: wrap;
     gap: 10px;
