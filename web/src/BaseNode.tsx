@@ -74,6 +74,41 @@ export function Status({ id }: { id: string }) {
     </span>
   );
 }
+// A job can finish before its video poster is ready; the thumbnail route then
+// answers 404 PREVIEW_PENDING. Retry a few times instead of keeping a broken image.
+const THUMB_RETRY_MS = 2000,
+  THUMB_RETRIES = 10;
+function Thumb({ src, alt }: { src?: string | null; alt: string }) {
+  const [attempt, setAttempt] = useState(0),
+    [failed, setFailed] = useState(false),
+    [waiting, setWaiting] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    setAttempt(0);
+    setFailed(false);
+    setWaiting(false);
+    return () => clearTimeout(timer.current);
+  }, [src]);
+  if (!src || failed) return null;
+  return (
+    <img
+      src={
+        attempt ? `${src}${src.includes("?") ? "&" : "?"}retry=${attempt}` : src
+      }
+      alt={alt}
+      style={{ visibility: waiting ? "hidden" : undefined }}
+      onLoad={() => setWaiting(false)}
+      onError={() => {
+        setWaiting(true);
+        if (attempt >= THUMB_RETRIES) return setFailed(true);
+        timer.current = setTimeout(
+          () => setAttempt((n) => n + 1),
+          THUMB_RETRY_MS,
+        );
+      }}
+    />
+  );
+}
 export function Preview({ id }: { id: string }) {
   const graph = useGraph(),
     node = useCanvas((s) => s.byId[id]),
@@ -140,10 +175,9 @@ export function Preview({ id }: { id: string }) {
   if (output && "id" in output)
     return (
       <div className={`preview nodrag ${values[0] ? "result-preview" : ""}`}>
-        <img
-          src={output.thumbUrl ?? undefined}
+        <Thumb
+          src={output.thumbUrl}
           alt={output.kind === "audio" ? "" : `${type.title} preview`}
-          style={{ display: output.thumbUrl ? "block" : "none" }}
         />
         {output.kind === "audio" && (
           <div className="waveform">▂▅▃▆▅▂▇▃▅▆▂▅▃▆▅▂</div>
