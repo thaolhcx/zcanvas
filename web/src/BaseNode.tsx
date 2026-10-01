@@ -11,7 +11,12 @@ import {
   WandSparkles,
   CirclePlus,
 } from "lucide-react";
-import type { Asset, Output, RecipeNode } from "../../contracts/index.ts";
+import {
+  isUnfilled,
+  type Asset,
+  type Output,
+  type RecipeNode,
+} from "../../contracts/index.ts";
 import { useGraph, PortPaletteContext } from "./context.ts";
 import { ParamForm } from "./Params.tsx";
 import {
@@ -198,7 +203,12 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
     node = useCanvas((s) => s.byId[id]),
     compact = useCanvas((s) => s.compact),
     issues = useCanvas((s) => s.issues[id] ?? EMPTY_ISSUES),
-    compat = useCanvas((s) => s.compat);
+    compat = useCanvas((s) => s.compat),
+    templateInput = useCanvas((s) =>
+      s.templateInputs.some(
+        (i) => i.nodeId === id && isUnfilled(s.byId[id]?.params[i.paramKey]),
+      ),
+    );
   const jobs = useRun((s) => s.jobs[id] ?? EMPTY_JOBS),
     runId = useRun((s) => s.run?.runId),
     runStatus = useRun((s) => s.run?.status);
@@ -211,7 +221,7 @@ export const BaseNode = memo(function BaseNode({ id, selected }: NodeProps) {
   const running = jobs.find((j) => j.status === "running");
   return (
     <article
-      className={`canvas-node ${selected ? "selected" : ""} ${compact ? "compact" : ""} ${wrong.length ? "invalid" : ""}`}
+      className={`canvas-node ${selected ? "selected" : ""} ${compact ? "compact" : ""} ${wrong.length ? "invalid" : ""} ${templateInput ? "template-input" : ""}`}
       data-testid={`node-${node.type}`}
     >
       <header>

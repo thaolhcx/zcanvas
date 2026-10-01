@@ -10,6 +10,8 @@ import { GraphContext } from "./context.ts";
 import { Canvas } from "./Canvas.tsx";
 import { request, post, SYNC } from "./api.ts";
 import { bindGraph, useCanvas, useRun } from "./store.ts";
+import { TemplateBrowser } from "./TemplateBrowser.tsx";
+import type { TemplateEntry } from "./templates.ts";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
 type CanvasEntry = {
@@ -18,7 +20,6 @@ type CanvasEntry = {
   version: number;
   updated_at: string;
 };
-type Preset = { id: string; name: string; recipe: Recipe };
 function App() {
   const [canvasId, setCanvasId] = useState(
     new URLSearchParams(location.search).get("canvas"),
@@ -27,19 +28,19 @@ function App() {
     [sync, setSync] = useState("connecting"),
     [error, setError] = useState(""),
     [list, setList] = useState<CanvasEntry[]>([]),
-    [presets, setPresets] = useState<Preset[]>([]),
-    [tab, setTab] = useState("canvases"),
+    [templates, setTemplates] = useState<TemplateEntry[]>([]),
+    [browsing, setBrowsing] = useState(false),
     [loading, setLoading] = useState(false);
   const [seed, setSeed] = useState<Recipe>();
   useEffect(() => {
     if (canvasId) return;
     void Promise.all([
       request<CanvasEntry[]>("/canvases"),
-      request<Preset[]>("/presets"),
+      request<TemplateEntry[]>("/templates"),
     ])
       .then(([canvases, saved]) => {
         setList(canvases);
-        setPresets(saved);
+        setTemplates(saved);
       })
       .catch((e) => setError(e.message));
   }, [canvasId]);
@@ -86,6 +87,7 @@ function App() {
           issues: {},
           compat: undefined,
           fieldErrors: {},
+          templateInputs: [],
           selected: [],
           selectedEdges: [],
         });
@@ -146,12 +148,20 @@ function App() {
         name: recipe?.meta.name ?? "Untitled canvas",
       });
       setSeed(recipe);
+      setBrowsing(false);
       open(canvasId);
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
+  };
+  const createFromTemplate = async (templateId: string) => {
+    const { canvasId } = await post<{ canvasId: string }>("/canvases", {
+      templateId,
+    });
+    setBrowsing(false);
+    open(canvasId);
   };
   if (canvasId && graph)
     return (
@@ -212,82 +222,62 @@ function App() {
       <section className="canvas-library">
         <div className="library-header">
           <nav>
-            <button
-              className={tab === "canvases" ? "active" : ""}
-              onClick={() => setTab("canvases")}
-            >
+            <button className="active" aria-current="page">
               Canvases <span>{list.length}</span>
             </button>
-            <button
-              className={tab === "presets" ? "active" : ""}
-              onClick={() => setTab("presets")}
-            >
-              Presets <span>{presets.length}</span>
+            <button onClick={() => setBrowsing(true)}>
+              Templates <span>{templates.length}</span>
             </button>
           </nav>
           <span>Made here. Saved here.</span>
         </div>
-        {tab === "canvases" ? (
-          <>
-            <button
-              className="pilot-row"
-              disabled={loading}
-              onClick={() => void create(pilot as Recipe)}
-            >
-              <Workflow size={30} />
-              <div>
-                <span className="eyebrow">START WITH A WORKING FLOW</span>
-                <h2>Character short</h2>
-                <p>Prompt → image → edit → video + voice → export</p>
-              </div>
-              <span>
-                Open pilot flow <ArrowUpRight size={17} />
-              </span>
-            </button>
-            <div className="canvas-list">
-              {list.map((canvas) => (
-                <button key={canvas.id} onClick={() => open(canvas.id)}>
-                  <span className="canvas-initial">{canvas.name[0]}</span>
-                  <strong>{canvas.name}</strong>
-                  <small>
-                    v{canvas.version} ·{" "}
-                    {new Date(canvas.updated_at).toLocaleDateString()}
-                  </small>
-                  <ArrowUpRight size={18} />
-                </button>
-              ))}
-            </div>
-            {!list.length && (
-              <p className="library-empty">
-                An empty desk. A little room for possibility.
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="canvas-list">
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => void create(preset.recipe)}
-              >
-                <Workflow size={22} />
-                <strong>{preset.name}</strong>
-                <small>{preset.recipe.nodes.length} nodes</small>
-                <ArrowUpRight size={18} />
-              </button>
-            ))}
-            {!presets.length && (
-              <p className="library-empty">
-                Save a canvas as a preset to use it again.
-              </p>
-            )}
+        <button
+          className="pilot-row"
+          disabled={loading}
+          onClick={() => void create(pilot as Recipe)}
+        >
+          <Workflow size={30} />
+          <div>
+            <span className="eyebrow">START WITH A WORKING FLOW</span>
+            <h2>Character short</h2>
+            <p>Prompt → image → edit → video + voice → export</p>
           </div>
+          <span>
+            Open pilot flow <ArrowUpRight size={17} />
+          </span>
+        </button>
+        <div className="canvas-list">
+          {list.map((canvas) => (
+            <button key={canvas.id} onClick={() => open(canvas.id)}>
+              <span className="canvas-initial">{canvas.name[0]}</span>
+              <strong>{canvas.name}</strong>
+              <small>
+                v{canvas.version} ·{" "}
+                {new Date(canvas.updated_at).toLocaleDateString()}
+              </small>
+              <ArrowUpRight size={18} />
+            </button>
+          ))}
+        </div>
+        {!list.length && (
+          <p className="library-empty">
+            An empty desk. A little room for possibility.
+          </p>
         )}
       </section>
       {error && (
         <p className="field-error" role="alert">
           {error}
         </p>
+      )}
+      {browsing && (
+        <TemplateBrowser
+          variant="page"
+          primaryLabel="New canvas"
+          onPick={(template) => createFromTemplate(template.id)}
+          onBlank={() => void create()}
+          onClose={() => setBrowsing(false)}
+        />
       )}
       <footer>
         <span>POC 01</span>

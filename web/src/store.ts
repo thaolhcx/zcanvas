@@ -13,6 +13,7 @@ import type {
   Recipe,
   RecipeNode,
   Run,
+  TemplateInput,
 } from "../../contracts/index.ts";
 import type { Graph } from "../../graph/src/index.ts";
 export const EMPTY_ISSUES: Issue[] = [],
@@ -29,6 +30,8 @@ export interface CanvasState {
   compat?: Set<string>;
   error: string;
   fieldErrors: Record<string, string>;
+  /** Template inputs to highlight while they stay unfilled (derived, never in Yjs). */
+  templateInputs: TemplateInput[];
   onNodesChange: (
     changes: NodeChange[],
     snap?: (nodes: Node[]) => Node[],
@@ -47,6 +50,7 @@ export const useCanvas = create<CanvasState>((set, get) => ({
   compat: undefined,
   error: "",
   fieldErrors: {},
+  templateInputs: [],
   onNodesChange(changes, snap) {
     const nodes = get().nodes;
     if (snap) {

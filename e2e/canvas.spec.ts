@@ -80,7 +80,7 @@ async function connect(
     })
     .toBe(true);
 }
-test("builds pilot by palette and port dragging, runs, exports, saves and opens preset", async ({
+test("builds pilot by palette and port dragging, runs, exports, saves and opens template", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -138,11 +138,18 @@ test("builds pilot by palette and port dragging, runs, exports, saves and opens 
   const exportedPath = (await download.path())!;
   const exported = JSON.parse(await readFile(exportedPath, "utf8"));
   await page
-    .getByRole("button", { name: "Save as preset", exact: true })
+    .getByRole("button", { name: "Save as template", exact: true })
     .click();
+  const title = `Pilot template ${Date.now()}`;
+  const dialog = page.getByRole("dialog", { name: "Save as template" });
+  await dialog.getByLabel("Title").fill(title);
+  await dialog.getByRole("button", { name: "Save template" }).click();
+  await expect(page.getByRole("status")).toContainText(title);
   await page.getByRole("button", { name: "Back to canvases" }).click();
-  await page.getByRole("button", { name: /^Presets/ }).click();
-  await page.locator(".canvas-list>button").first().click();
+  await page.getByRole("button", { name: /^Templates/ }).click();
+  const browser = page.getByRole("dialog", { name: "Templates" });
+  await browser.getByRole("button", { name: title, exact: true }).click();
+  await browser.getByRole("button", { name: "New canvas" }).click();
   await expect(page.getByTestId("node-output.export")).toBeVisible();
   await page.screenshot({
     path: "test-results/canvas-pilot.png",

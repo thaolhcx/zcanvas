@@ -87,7 +87,7 @@ it("rejects a recipe without meta.template or with inputs naming missing params"
   expect(bad.json()).toMatchObject({ code: "VALIDATION" });
   expect(bad.json().error).toMatch(/n_gone/);
   const unknown = template();
-  (unknown.meta.template as Record<string, unknown>).author = "x";
+  (unknown.meta.template as unknown as Record<string, unknown>).author = "x";
   expect((await save(unknown)).statusCode).toBe(422);
 });
 it("creates a canvas from a template whose snapshot equals the template recipe except meta.id", async () => {
