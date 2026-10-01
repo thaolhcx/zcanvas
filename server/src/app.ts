@@ -5,7 +5,12 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
 import { Graph, Y, emptyRecipe } from "../../graph/src/index.ts";
-import { validate, type Recipe, type Run } from "../../contracts/index.ts";
+import {
+  validate,
+  type CanvasInfo,
+  type Recipe,
+  type Run,
+} from "../../contracts/index.ts";
 import { db } from "./db.ts";
 import { registry } from "./registry.ts";
 import { config } from "./config.ts";
@@ -85,6 +90,8 @@ export async function createApp(options: { actorId?: string } = {}) {
   });
   await app.register(cors, {
     origin: /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    // Rename and delete come from the browser too (the default is GET, HEAD, POST).
+    methods: ["GET", "HEAD", "POST", "PATCH", "DELETE"],
   });
   await app.register(multipart, {
     limits: { fileSize: 100 * 1024 * 1024, files: 1 },
@@ -186,6 +193,25 @@ export async function createApp(options: { actorId?: string } = {}) {
         return reply.code(404).send({ error: "Canvas not found" });
       return rows[0].snapshot;
     },
+  );
+  app.get<{ Params: { id: string } }>(
+    "/canvases/:id/info",
+    { schema: { params: idParams } },
+    async (request): Promise<CanvasInfo> => {
+      await requireCanvas(actor, request.params.id, "read");
+      const { rows } = await db.query(
+        'SELECT id, name, space_id AS "spaceId", project_id AS "projectId", version, updated_at AS "updatedAt" FROM canvases WHERE id=$1',
+        [request.params.id],
+      );
+      return rows[0];
+    },
+  );
+  // No stock media source exists yet. Clients show an honest unavailable state.
+  app.get("/stock", async (_request, reply) =>
+    reply.code(503).send({
+      error: "Stock media is not configured",
+      code: "STOCK_UNAVAILABLE",
+    }),
   );
   app.get(
     "/presets",

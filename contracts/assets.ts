@@ -10,6 +10,15 @@ export interface Project {
   spaceId: string;
   name: string;
 }
+/** GET /canvases/:id/info: where a canvas lives, without its recipe. */
+export interface CanvasInfo {
+  id: string;
+  name: string;
+  spaceId: string;
+  projectId: string | null;
+  version: number;
+  updatedAt: string;
+}
 export interface Space {
   id: string;
   kind: SpaceKind;
@@ -141,6 +150,7 @@ export type ApiErrorCode =
   | "PREVIEW_PENDING"
   | "PREVIEW_FAILED"
   | "STORAGE_UNAVAILABLE"
+  | "STOCK_UNAVAILABLE"
   | "CONFLICT";
 /** `error` stays a readable string so existing clients keep working. */
 export interface ApiError {
