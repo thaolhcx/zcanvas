@@ -1,0 +1,76 @@
+{
+ "generatedAt": "2026-10-01T11:27:06.136Z",
+ "driver": "s3",
+ "profile": "s3",
+ "fileBytes": 104076078,
+ "maxUploadBytes": 104857600,
+ "machine": {
+  "cpus": 4,
+  "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "memoryGb": 16,
+  "node": "v22.22.0",
+  "note": "Cloud container; API, Postgres and storage on one host."
+ },
+ "note": "rssDeltaMb is the API process's peak RSS increase during the phase. A full-buffering route would add at least the file size (~100 MB).",
+ "phases": [
+  {
+   "label": "upload 100 MB (multipart, streamed to temp file, then store)",
+   "ms": 1197.8,
+   "rssBeforeMb": 158.2,
+   "rssPeakMb": 180,
+   "rssDeltaMb": 21.8,
+   "result": {
+    "id": "ast_8a8717d4-1712-41bc-bdbf-f8e4e1dfb25a",
+    "bytes": 104076078
+   }
+  },
+  {
+   "label": "download full file",
+   "ms": 324.1,
+   "rssBeforeMb": 165.6,
+   "rssPeakMb": 202.3,
+   "rssDeltaMb": 36.8,
+   "result": "200 104076078"
+  },
+  {
+   "label": "range 1 MiB at 0",
+   "ms": 48.1,
+   "rssBeforeMb": 189,
+   "rssPeakMb": 189,
+   "rssDeltaMb": 0,
+   "result": "206 1048576 0.024859"
+  },
+  {
+   "label": "range 1 MiB at 52038039",
+   "ms": 28.1,
+   "rssBeforeMb": 189,
+   "rssPeakMb": 189,
+   "rssDeltaMb": 0,
+   "result": "206 1048576 0.011933"
+  },
+  {
+   "label": "range 1 MiB at 103027502",
+   "ms": 24.3,
+   "rssBeforeMb": 189,
+   "rssPeakMb": 189,
+   "rssDeltaMb": 0,
+   "result": "206 1048576 0.010863"
+  },
+  {
+   "label": "suffix range bytes=-65536",
+   "ms": 22.4,
+   "rssBeforeMb": 189,
+   "rssPeakMb": 189,
+   "rssDeltaMb": 0,
+   "result": "206 65536"
+  },
+  {
+   "label": "client aborts after 1 MiB of a full download",
+   "ms": 518.7,
+   "rssBeforeMb": 189,
+   "rssPeakMb": 189.1,
+   "rssDeltaMb": 0.1,
+   "result": "aborted"
+  }
+ ]
+}

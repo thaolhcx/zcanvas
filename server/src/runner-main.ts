@@ -1,8 +1,8 @@
 import { migrate, db } from "./db.ts";
 import { startRunner } from "./runner.ts";
-import { ensureBucket } from "./assets.ts";
+import { checkStorage } from "./storage.ts";
 await migrate();
-await ensureBucket();
+await checkStorage();
 const stop = await startRunner();
 console.log("Runner ready (pg-boss)");
 let closing = false;

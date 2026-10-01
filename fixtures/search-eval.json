@@ -1,0 +1,392 @@
+{
+ "description": "Search evaluation fixture. File names are deliberately opaque: matches must come from description, tags, generation prompt or reference names. ast_eval_32 has no metadata and is relevant to no query.",
+ "assets": [
+  {
+   "id": "ast_eval_01",
+   "name": "IMG_2041.jpg",
+   "kind": "image",
+   "prompt": "A lighthouse on a rocky cliff at sunrise, waves crashing below"
+  },
+  {
+   "id": "ast_eval_02",
+   "name": "IMG_2042.jpg",
+   "kind": "image",
+   "description": "Con mèo đen đang ngủ trên ghế sofa màu xám"
+  },
+  {
+   "id": "ast_eval_03",
+   "name": "DSC0193.png",
+   "kind": "image",
+   "prompt": "Close-up portrait of an elderly fisherman with a weathered face, golden hour"
+  },
+  {
+   "id": "ast_eval_04",
+   "name": "render_final_v3.png",
+   "kind": "image",
+   "prompt": "Futuristic city skyline at night with neon signs and flying cars"
+  },
+  {
+   "id": "ast_eval_05",
+   "name": "clip_0007.mp4",
+   "kind": "video",
+   "description": "Cảnh mưa rơi trên phố cổ Hội An vào ban đêm, đèn lồng lung linh"
+  },
+  {
+   "id": "ast_eval_06",
+   "name": "clip_0008.mp4",
+   "kind": "video",
+   "prompt": "Drone shot flying over rice terraces in the mountains, misty morning"
+  },
+  {
+   "id": "ast_eval_07",
+   "name": "audio_take2.wav",
+   "kind": "audio",
+   "description": "Tiếng sóng biển vỗ vào bờ, âm thanh thư giãn"
+  },
+  {
+   "id": "ast_eval_08",
+   "name": "audio_take3.wav",
+   "kind": "audio",
+   "prompt": "Upbeat electronic background music for a product launch video",
+   "tags": [
+    "music",
+    "energetic"
+   ]
+  },
+  {
+   "id": "ast_eval_09",
+   "name": "IMG_3300.jpg",
+   "kind": "image",
+   "description": "Bát phở bò nóng hổi với rau thơm và chanh"
+  },
+  {
+   "id": "ast_eval_10",
+   "name": "IMG_3301.jpg",
+   "kind": "image",
+   "prompt": "A golden retriever puppy playing in fresh snow"
+  },
+  {
+   "id": "ast_eval_11",
+   "name": "export_final.mp4",
+   "kind": "video",
+   "prompt": "Slow motion of a woman in a red coat walking on a rainy street, cinematic"
+  },
+  {
+   "id": "ast_eval_12",
+   "name": "vo_line_04.wav",
+   "kind": "audio",
+   "description": "Giọng nữ đọc lời chào mừng khách hàng"
+  },
+  {
+   "id": "ast_eval_13",
+   "name": "bg_plate_12.png",
+   "kind": "image",
+   "prompt": "Empty desert road under a starry night sky, milky way"
+  },
+  {
+   "id": "ast_eval_14",
+   "name": "IMG_7781.jpg",
+   "kind": "image",
+   "description": "Hoa sen hồng nở trong đầm vào buổi sáng"
+  },
+  {
+   "id": "ast_eval_15",
+   "name": "shot_A12.mp4",
+   "kind": "video",
+   "prompt": "Chef chopping vegetables quickly in a busy restaurant kitchen"
+  },
+  {
+   "id": "ast_eval_16",
+   "name": "tex_0042.png",
+   "kind": "image",
+   "description": "Seamless oak grain",
+   "tags": [
+    "texture",
+    "wood"
+   ]
+  },
+  {
+   "id": "ast_eval_17",
+   "name": "IMG_5512.jpg",
+   "kind": "image",
+   "description": "Chiếc xe máy cũ đỗ trước quán cà phê vỉa hè ở Sài Gòn"
+  },
+  {
+   "id": "ast_eval_18",
+   "name": "sfx_011.wav",
+   "kind": "audio",
+   "prompt": "Thunder rumbling with heavy rain"
+  },
+  {
+   "id": "ast_eval_19",
+   "name": "char_ref_01.png",
+   "kind": "image",
+   "prompt": "Character sheet of a young warrior girl with short silver hair and blue armor"
+  },
+  {
+   "id": "ast_eval_20",
+   "name": "IMG_9001.jpg",
+   "kind": "image",
+   "description": "Bãi biển cát trắng với hàng dừa, nước trong xanh"
+  },
+  {
+   "id": "ast_eval_21",
+   "name": "clip_0101.mp4",
+   "kind": "video",
+   "prompt": "Time-lapse of clouds moving over a mountain peak at sunset"
+  },
+  {
+   "id": "ast_eval_22",
+   "name": "logo_draft.png",
+   "kind": "image",
+   "description": "Minimal logo of a fox head in orange geometric shapes"
+  },
+  {
+   "id": "ast_eval_23",
+   "name": "audio_0200.wav",
+   "kind": "audio",
+   "description": "Tiếng chim hót trong rừng buổi sớm"
+  },
+  {
+   "id": "ast_eval_24",
+   "name": "IMG_4410.jpg",
+   "kind": "image",
+   "prompt": "Cup of latte art coffee on a wooden table, cozy cafe"
+  },
+  {
+   "id": "ast_eval_25",
+   "name": "scene_04.png",
+   "kind": "image",
+   "prompt": "Medieval castle on a hill surrounded by autumn forest"
+  },
+  {
+   "id": "ast_eval_26",
+   "name": "IMG_8820.jpg",
+   "kind": "image",
+   "description": "Em bé cười tươi khi thổi nến sinh nhật"
+  },
+  {
+   "id": "ast_eval_27",
+   "name": "clip_0333.mp4",
+   "kind": "video",
+   "description": "Pháo hoa rực rỡ trên sông Hàn đêm giao thừa"
+  },
+  {
+   "id": "ast_eval_28",
+   "name": "IMG_6060.jpg",
+   "kind": "image",
+   "prompt": "Astronaut floating in space with Earth in the background"
+  },
+  {
+   "id": "ast_eval_29",
+   "name": "voice_ad_02.wav",
+   "kind": "audio",
+   "prompt": "Deep male narrator voice for a movie trailer"
+  },
+  {
+   "id": "ast_eval_30",
+   "name": "IMG_1212.jpg",
+   "kind": "image",
+   "description": "Đôi giày thể thao trắng trên nền xanh pastel"
+  },
+  {
+   "id": "ast_eval_31",
+   "name": "ref_pose_03.png",
+   "kind": "image",
+   "prompt": "Warrior girl in a fighting pose, dynamic angle",
+   "references": [
+    "char_ref_01.png"
+   ]
+  },
+  {
+   "id": "ast_eval_32",
+   "name": "IMG_0001.jpg",
+   "kind": "image"
+  }
+ ],
+ "queries": [
+  {
+   "q": "lighthouse by the sea",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_01"
+   ]
+  },
+  {
+   "q": "ngọn hải đăng",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_01"
+   ]
+  },
+  {
+   "q": "black cat",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_02"
+   ]
+  },
+  {
+   "q": "con mèo ngủ",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_02"
+   ]
+  },
+  {
+   "q": "old man portrait",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_03"
+   ]
+  },
+  {
+   "q": "thành phố tương lai về đêm",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_04"
+   ]
+  },
+  {
+   "q": "rainy night in Hoi An with lanterns",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_05"
+   ]
+  },
+  {
+   "q": "ruộng bậc thang",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_06"
+   ]
+  },
+  {
+   "q": "ocean waves sound",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_07"
+   ]
+  },
+  {
+   "q": "nhạc nền sôi động",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_08"
+   ]
+  },
+  {
+   "q": "beef noodle soup",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_09"
+   ]
+  },
+  {
+   "q": "chó con chơi tuyết",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_10"
+   ]
+  },
+  {
+   "q": "woman in red coat in the rain",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_11"
+   ]
+  },
+  {
+   "q": "female voice welcome message",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_12"
+   ]
+  },
+  {
+   "q": "bầu trời đầy sao trên sa mạc",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_13"
+   ]
+  },
+  {
+   "q": "lotus flower",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_14"
+   ]
+  },
+  {
+   "q": "đầu bếp thái rau",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_15"
+   ]
+  },
+  {
+   "q": "wood texture",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_16"
+   ]
+  },
+  {
+   "q": "old motorbike in front of a Saigon cafe",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_17"
+   ]
+  },
+  {
+   "q": "tiếng sấm và mưa",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_18"
+   ]
+  },
+  {
+   "q": "silver haired warrior girl",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_19",
+    "ast_eval_31"
+   ]
+  },
+  {
+   "q": "bãi biển có hàng dừa",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_20"
+   ]
+  },
+  {
+   "q": "fireworks over the river on new year's eve",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_27"
+   ]
+  },
+  {
+   "q": "phi hành gia ngoài không gian",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_28"
+   ]
+  },
+  {
+   "q": "birthday candles kid",
+   "lang": "en",
+   "relevant": [
+    "ast_eval_26"
+   ]
+  },
+  {
+   "q": "giọng nam trầm lồng tiếng trailer",
+   "lang": "vi",
+   "relevant": [
+    "ast_eval_29"
+   ]
+  }
+ ]
+}

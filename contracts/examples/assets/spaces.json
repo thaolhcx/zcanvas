@@ -1,0 +1,25 @@
+{
+  "defaultSpaceId": "spc_local",
+  "spaces": [
+    {
+      "id": "spc_local",
+      "kind": "personal",
+      "name": "Personal Space",
+      "role": "owner",
+      "projects": []
+    },
+    {
+      "id": "spc_team_7f3a",
+      "kind": "team",
+      "name": "Studio Team",
+      "role": "viewer",
+      "projects": [
+        {
+          "id": "prj_short",
+          "spaceId": "spc_team_7f3a",
+          "name": "Rainy short"
+        }
+      ]
+    }
+  ]
+}

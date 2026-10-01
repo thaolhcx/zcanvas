@@ -1,0 +1,13 @@
+{
+  "error": "This asset was deleted",
+  "code": "ASSET_DELETED",
+  "details": {
+    "asset": {
+      "id": "ast_7d0f2c4e-1b8a-4f0e-9c3a-2b1d5e6f7a80",
+      "name": "Hero portrait.png",
+      "kind": "image",
+      "status": "deleted",
+      "deletedAt": "2026-10-01T09:00:00.000Z"
+    }
+  }
+}

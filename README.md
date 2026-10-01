@@ -8,6 +8,8 @@ A local-first node canvas for creative media workflows. This POC implements the 
 
 Install Node 22+, pnpm 10, Docker and ffmpeg (`ffprobe` must also be on PATH).
 
+Assets are stored on the local filesystem (`.data/assets`) by default, and Postgres runs with pgvector for semantic search. MinIO is needed only with `STORAGE_DRIVER=s3`. The first semantic index downloads a small multilingual embedding model; set `EMBEDDING_PROVIDER=none` to skip it. See [the asset platform notes](docs/asset-platform.md).
+
 ```sh
 cp .env.example .env.local
 docker compose up -d --build --wait
@@ -25,8 +27,8 @@ The first Docker build compiles MinIO from a pinned official source revision bec
 | Canvas (production preview) | http://127.0.0.1:4173 |
 | HTTP API + run events | http://127.0.0.1:4310 |
 | Hocuspocus graph sync | ws://127.0.0.1:4311 |
-| Postgres 16 | localhost:55432 |
-| MinIO API / console | localhost:59000 / localhost:59001 |
+| Postgres 16 + pgvector | localhost:55432 |
+| MinIO API / console (optional, S3 mode) | localhost:59000 / localhost:59001 |
 
 All services bind to loopback. This is a single-user local POC, with no login or deployment setup. The example credentials are for these local containers only.
 
@@ -41,7 +43,7 @@ pnpm exec playwright install chromium
 pnpm e2e
 ```
 
-`pnpm test` reproduces the supplied 20 contract tests, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres, pg-boss, MinIO and ffmpeg. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
+`pnpm test` reproduces the supplied 20 contract tests, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres (with pgvector), pg-boss, the local storage adapter and ffmpeg. Set `S3_TEST_ENDPOINT` to also run the storage contract against MinIO. `pnpm bench:catalog`, `pnpm bench:storage` and `EMBEDDING_PROVIDER=local pnpm search:eval` record the asset evidence in `docs/evidence/`. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
 
 For a persistent production preview:
 
@@ -71,7 +73,7 @@ Append `?debug=1` (or `&debug=1`) to show an FPS meter, frame-duration measureme
 | --- | --- |
 | `contracts/` | Schemas, eight node definitions, shared TypeScript contracts, browser-safe validator |
 | `graph/` | Yjs Graph API, atomic draft validation, import/export, grouping/layout, undo |
-| `server/` | HTTP API, Hocuspocus persistence, pg-boss run processing, asset service, models boundary |
+| `server/` | HTTP API, Hocuspocus persistence, pg-boss run processing, asset catalog/storage/search, models boundary |
 | `workers/` | Small worker functions using only `RunContext` |
 | `web/` | React Flow canvas, registry-driven BaseNode, Zustand UI/run stores, IndexedDB |
 | `fixtures/` | Original generated test media: portrait PNG, 12-second MP4, 12-second WAV |
@@ -83,5 +85,7 @@ The graph contains only recipe data. Run state, outputs and validation issues ne
 ## Boundaries
 
 Real model providers are deferred. `MOCK_WORKERS=0` fails explicitly when a model worker runs; there is no silent fallback or paid API call. Mock credits test accounting and are not actual charges. `userId` and `projectId` in usage records remain null.
+
+There is no login. The server acts as one configured identity (`ZCANVAS_ACTOR_ID`) and applies space access rules to that identity; clients cannot choose it.
 
 The automated tests are evidence for the implementation, not acceptance of the human criteria. Thao's unassisted 10-minute usability test, the independent developer's one-hour extension test, and the 16 GB reference-laptop performance check still require those real observations. See [implementation notes](docs/implementation.md).

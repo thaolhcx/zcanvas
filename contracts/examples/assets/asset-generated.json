@@ -1,0 +1,55 @@
+{
+  "id": "ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d",
+  "kind": "video",
+  "mime": "video/mp4",
+  "bytes": 2210943,
+  "url": "http://127.0.0.1:4310/assets/ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d/file",
+  "thumbUrl": "http://127.0.0.1:4310/assets/ast_1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d/thumbnail",
+  "meta": {
+    "durationSec": 12,
+    "width": 720,
+    "height": 1280
+  },
+  "createdBy": {
+    "runId": "run_0b9e",
+    "nodeId": "n_vid"
+  },
+  "createdAt": "2026-10-01T08:10:00.000Z",
+  "name": "Generate video 1.mp4",
+  "spaceId": "spc_local",
+  "creatorId": "usr_local",
+  "source": {
+    "type": "generated",
+    "canvasId": "rcp_pilot",
+    "runId": "run_0b9e",
+    "nodeId": "n_vid"
+  },
+  "status": "ready",
+  "previewStatus": "pending",
+  "generation": {
+    "nodeType": "video.generate",
+    "typeVersion": 1,
+    "prompt": "A girl in a red coat on a rainy street, cinematic",
+    "prompts": {
+      "prompt": "A girl in a red coat on a rainy street, cinematic"
+    },
+    "model": "seedance-1.5",
+    "settings": {
+      "durationSec": 5
+    },
+    "references": [
+      {
+        "name": "Hero portrait.png",
+        "id": "ast_5f0c2d1e-7a3b-4c8d-9e1f-2a3b4c5d6e7f",
+        "port": "image"
+      }
+    ],
+    "provider": {
+      "name": "seedance",
+      "model": "seedance-1.5-pro-250528",
+      "seed": 42817,
+      "requestId": "req_7f3a"
+    }
+  },
+  "updatedAt": "2026-10-01T08:10:00.000Z"
+}
