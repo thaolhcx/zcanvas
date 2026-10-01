@@ -131,3 +131,26 @@ export function reachable(recipe: Recipe, start: string, upstream: boolean) {
       }
   return result;
 }
+
+const MEDIA_KINDS = ["image", "video", "audio"] as const;
+/**
+ * Media kinds an Asset node may hold without breaking its connections: the
+ * kinds every connected input accepts. All media when it is not connected.
+ */
+export function acceptedMediaKinds(
+  recipe: Recipe,
+  registry: Registry,
+  nodeId: string,
+): (typeof MEDIA_KINDS)[number][] {
+  const nodes = new Map(recipe.nodes.map((node) => [node.id, node]));
+  let kinds: (typeof MEDIA_KINDS)[number][] = [...MEDIA_KINDS];
+  for (const edge of recipe.edges) {
+    if (edge.source !== nodeId) continue;
+    const target = nodes.get(edge.target);
+    const port = target
+      ? registry.get(target.type)?.inputs.find((p) => p.key === edge.targetPort)
+      : undefined;
+    if (port) kinds = kinds.filter((kind) => acceptsKind(kind, port.kind));
+  }
+  return kinds;
+}

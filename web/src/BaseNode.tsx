@@ -10,6 +10,7 @@ import {
   Upload,
   WandSparkles,
   CirclePlus,
+  Images,
 } from "lucide-react";
 import {
   isUnfilled,
@@ -26,7 +27,10 @@ import {
   useCanvas,
   useRun,
 } from "./store.ts";
-import { post, request } from "./api.ts";
+import { post, statusOf } from "./api.ts";
+import { cachedAsset } from "./media/api.ts";
+import { media, useMedia } from "./media/store.ts";
+import { acceptedMediaKinds } from "./connections.ts";
 const icons = {
   input: Type,
   image: Image,
@@ -74,20 +78,58 @@ export function Preview({ id }: { id: string }) {
   const graph = useGraph(),
     node = useCanvas((s) => s.byId[id]),
     jobs = useRun((s) => s.jobs[id] ?? EMPTY_JOBS);
-  const [uploaded, setUploaded] = useState<Asset>();
+  const [uploaded, setUploaded] = useState<Asset>(),
+    [missing, setMissing] = useState<"deleted" | "unavailable">();
+  const assetId =
+    node?.type === "input.asset" && typeof node.params.asset === "string"
+      ? node.params.asset
+      : undefined;
+  // Renames and deletes in the Media browser bump this, so the node refetches.
+  const revision = useMedia((s) => (assetId ? s.revisions[assetId] : 0));
   useEffect(() => {
     let live = true;
-    if (node?.type === "input.asset" && node.params.asset)
-      void request<Asset>(`/assets/${node.params.asset}`)
+    setUploaded(undefined);
+    setMissing(undefined);
+    if (assetId)
+      void cachedAsset(assetId, revision)
         .then((a) => {
           if (live) setUploaded(a);
         })
-        .catch(() => {});
+        .catch((e) => {
+          if (!live) return;
+          if (statusOf(e) === 410) setMissing("deleted");
+          else if (statusOf(e) === 404) setMissing("unavailable");
+        });
     return () => {
       live = false;
     };
-  }, [node?.params.asset]);
+  }, [assetId, revision]);
   if (!node) return null;
+  if (missing && !jobs.some((j) => j.outputs))
+    return (
+      <div className="preview missing-file nodrag" role="status">
+        <strong>
+          {missing === "deleted" ? "Deleted file" : "File not available"}
+        </strong>
+        <span>
+          {missing === "deleted"
+            ? "This file was deleted. Choose another file."
+            : "This file is missing or you no longer have access. Choose another file."}
+        </span>
+        <button
+          onClick={() =>
+            media.openPicker({
+              kinds: acceptedMediaKinds(graph.toRecipe(), graph.registry, id),
+              onPick: (asset) =>
+                action(() => graph.setParam(id, "asset", asset.id)),
+            })
+          }
+        >
+          <Images size={13} />
+          Choose another file
+        </button>
+      </div>
+    );
   const type = graph.registry.get(node.type)!,
     port = type.ui?.previewPort ?? type.outputs[0]?.key;
   const values = jobs.flatMap((j) => {

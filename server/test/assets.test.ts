@@ -574,6 +574,44 @@ describe("generated outputs", () => {
   });
 });
 describe("access", () => {
+  it("describes a canvas's space without its recipe, and reports stock as unavailable", async () => {
+    const team = await teamSpace({ usr_local: "viewer" });
+    const { canvasId } = await newCanvas(app);
+    const info = (await app.inject(`/canvases/${canvasId}/info`)).json();
+    expect(info).toMatchObject({
+      id: canvasId,
+      name: "Asset test",
+      spaceId: personalSpaceId("usr_local"),
+      projectId: null,
+    });
+    expect(typeof info.version).toBe("number");
+    expect(info).not.toHaveProperty("recipe");
+    await db.query("UPDATE canvases SET space_id=$2 WHERE id=$1", [
+      canvasId,
+      team,
+    ]);
+    expect(
+      (await app.inject(`/canvases/${canvasId}/info`)).json().spaceId,
+    ).toBe(team);
+    // The web app renames and deletes from another local origin.
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: "/assets/x",
+      headers: {
+        origin: "http://127.0.0.1:4173",
+        "access-control-request-method": "DELETE",
+      },
+    });
+    expect(preflight.headers["access-control-allow-methods"]).toContain(
+      "PATCH",
+    );
+    expect(preflight.headers["access-control-allow-methods"]).toContain(
+      "DELETE",
+    );
+    const stock = await app.inject("/stock");
+    expect(stock.statusCode).toBe(503);
+    expect(stock.json().code).toBe("STOCK_UNAVAILABLE");
+  });
   it("isolates spaces on list, detail, files, thumbnails, usage, writes and runs", async () => {
     const asset = (await upload(app, await png("private.png"))).json<Asset>();
     const { canvasId } = await newCanvas(app);
@@ -618,6 +656,9 @@ describe("access", () => {
       (await upload(other, await png(), `?canvasId=${canvasId}`)).statusCode,
     ).toBe(404);
     expect((await other.inject(`/canvases/${canvasId}`)).statusCode).toBe(404);
+    expect((await other.inject(`/canvases/${canvasId}/info`)).statusCode).toBe(
+      404,
+    );
     expect(
       (await other.inject("/canvases")).json().map((c: { id: string }) => c.id),
     ).not.toContain(canvasId);

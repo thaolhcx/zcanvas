@@ -1,0 +1,32 @@
+{
+  "test": "e2e/media-performance.spec.ts — scrolls 500 assets smoothly with a bounded number of cards and no players",
+  "machine": "Cloud container, 4 vCPU, 15 GB RAM, headless Chromium 141 (software rendering), viewport 1440×1000",
+  "fixture": "500 ready assets in one team space (2 uploaded, 498 catalog rows sharing their stored files and thumbnails), 1/3 video",
+  "method": "160 wheel steps of 140 px, 16 ms apart, pointer over the grid; frames counted with requestAnimationFrame; mounted cards and <video>/<audio> elements sampled every frame",
+  "baselineFps": 60,
+  "runs": [
+    {
+      "storage": "local",
+      "embeddings": "local",
+      "fps": 59,
+      "worstFrameMs": 33,
+      "maxMountedCards": 40,
+      "maxMediaElements": 0,
+      "usedJSHeapMB": 12,
+      "scrolledPx": 22400,
+      "loaded": "500 files"
+    },
+    {
+      "storage": "s3 (MinIO)",
+      "embeddings": "none",
+      "fps": 60,
+      "worstFrameMs": 33,
+      "maxMountedCards": 40,
+      "maxMediaElements": 0,
+      "usedJSHeapMB": 11,
+      "scrolledPx": 22400,
+      "loaded": "500 files"
+    }
+  ],
+  "notes": "baselineFps is the same wheel method on an empty scrolling page in this container. When the test ran right after uploads that leave preview and indexing jobs running, it measured 48–53 FPS, so it lives in its own file that runs first."
+}

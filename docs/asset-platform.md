@@ -1,29 +1,29 @@
 # Asset platform: catalog, storage and search
 
-Backend for [issue #11](https://github.com/thaolhcx/zcanvas/issues/11), covering the catalog ([#16](https://github.com/thaolhcx/zcanvas/issues/16)), storage and delivery ([#17](https://github.com/thaolhcx/zcanvas/issues/17)) and semantic search ([#18](https://github.com/thaolhcx/zcanvas/issues/18)). The media browser frontend ([#19](https://github.com/thaolhcx/zcanvas/issues/19)) builds on these contracts. The design handoff is [PR #15](https://github.com/thaolhcx/zcanvas/pull/15).
+Backend for [issue #11](https://github.com/thaolhcx/zcanvas/issues/11), covering the catalog ([#16](https://github.com/thaolhcx/zcanvas/issues/16)), storage and delivery ([#17](https://github.com/thaolhcx/zcanvas/issues/17)) and semantic search ([#18](https://github.com/thaolhcx/zcanvas/issues/18)). The media browser frontend ([#19](https://github.com/thaolhcx/zcanvas/issues/19), [`media-browser.md`](media-browser.md)) builds on these contracts. The design handoff is [PR #15](https://github.com/thaolhcx/zcanvas/pull/15).
 
 Shared types are in [`contracts/assets.ts`](../contracts/assets.ts). Example responses are in [`contracts/examples/assets/`](../contracts/examples/assets), and a test checks them against the live API.
 
 ## Plan and status
 
-| Step | Scope | Status |
-| --- | --- | --- |
-| 1. Contracts | Space, asset, list/search/delete/usage types, error shape | Done |
-| 2. Schema and migration | Spaces, members, projects, catalog columns, objects, indexes, rerunnable legacy migration | Done |
-| 3. Access | Server-resolved actor, space roles on every space-owned route and on the graph/run path (presets are global, see below) | Done |
-| 4. Storage | `ObjectStore` with local and S3 adapters, opaque keys, a storage profile per object | Done |
-| 5. Ingest and lifecycle | Streamed uploads, upload/processing/ready/failed/deleted states, previews (video in the background), cleanup, sweeper | Done |
-| 6. Delivery | Streaming range/HEAD/validators, private caching, safe names, disconnect handling | Done |
-| 7. Catalog API | Spaces, paged list, details, upload, rename, delete, usage, media URLs | Done |
-| 8. Runner integration | Space-scoped `input.asset`, generation metadata, publish-on-success, cache safety | Done |
-| 9. Semantic search | Provider boundary, pgvector index, background jobs, hybrid query, fallback states | Done |
-| 10. Evidence | Contract, access and search tests; 10k-row benchmark; 100 MB storage benchmark; real-embedding evaluation | Done (local and MinIO) |
+| Step                    | Scope                                                                                                                   | Status                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1. Contracts            | Space, asset, list/search/delete/usage types, error shape                                                               | Done                   |
+| 2. Schema and migration | Spaces, members, projects, catalog columns, objects, indexes, rerunnable legacy migration                               | Done                   |
+| 3. Access               | Server-resolved actor, space roles on every space-owned route and on the graph/run path (presets are global, see below) | Done                   |
+| 4. Storage              | `ObjectStore` with local and S3 adapters, opaque keys, a storage profile per object                                     | Done                   |
+| 5. Ingest and lifecycle | Streamed uploads, upload/processing/ready/failed/deleted states, previews (video in the background), cleanup, sweeper   | Done                   |
+| 6. Delivery             | Streaming range/HEAD/validators, private caching, safe names, disconnect handling                                       | Done                   |
+| 7. Catalog API          | Spaces, paged list, details, upload, rename, delete, usage, media URLs                                                  | Done                   |
+| 8. Runner integration   | Space-scoped `input.asset`, generation metadata, publish-on-success, cache safety                                       | Done                   |
+| 9. Semantic search      | Provider boundary, pgvector index, background jobs, hybrid query, fallback states                                       | Done                   |
+| 10. Evidence            | Contract, access and search tests; 10k-row benchmark; 100 MB storage benchmark; real-embedding evaluation               | Done (local and MinIO) |
 
 ## Ownership and access model
 
 - **User**: the actor. The POC has no login. The server takes one identity from configuration (`ZCANVAS_ACTOR_ID`, default `usr_local`). Request data never chooses the identity or grants a permission. Tests create a second app instance with another configured actor to check isolation.
 - **Space**: owns canvases and assets. Each user has one personal space (`spc_<user>`; the default actor's is `spc_local`). Team spaces have explicit members. A member's role is `owner`, `editor` or `viewer`.
-- **Project**: groups canvases *inside* a space (`projects.space_id`, `canvases.project_id`). A project is not a team and grants no access of its own.
+- **Project**: groups canvases _inside_ a space (`projects.space_id`, `canvases.project_id`). A project is not a team and grants no access of its own.
 - **Canvas**: belongs to exactly one space. Its runs inherit that space.
 - **Asset**: has exactly one owning space (`space_id`). `creator_id` (who uploaded it or started the run), `source` (upload or generated, with canvas/run/node) and the physical location (`asset_objects`: storage profile and key) are separate fields. Ownership never changes when a file is renamed, reused or moved between stores.
 
@@ -43,16 +43,16 @@ Not built (extension points only): login, invitations, team admin UI, cross-spac
 
 Only assets made by a run on the platform have `source.type = "generated"` and a `generation` record. Files made elsewhere are uploads: they have a name, description and tags, never a `generation` record, and clients cannot set one. The runner writes the record once, from the run snapshot, when the output is stored (`generationInfo` in `server/src/runner.ts`). Later node edits, renames and deletes never rewrite it.
 
-| Field | Content |
-| --- | --- |
-| `nodeType`, `typeVersion` | The node that made the asset |
-| `prompts` | Text inputs by input port (for example `prompt`, `negative`), or `prompt` when the text came from the node param |
-| `prompt` | All prompts joined. Used for display and search |
-| `model` | The model the node asked for |
-| `settings` | The other node params as JSON, including objects and lists |
-| `references` | One `{ name, id, port }` per input file. `name` is the file name at run time, as plain text. `id` is lineage only, not permission: the asset may since have been deleted. Records saved before IDs were kept have only `name`; `migrate()` converts the old plain-string form and is safe to rerun |
-| `provider` | What the model provider reported, when it reports it: `name`, the `model` and version that actually ran, `seed`, `requestId`. A worker passes it as `meta.provider` to `putAsset`; unknown fields are dropped. The mock provider reports `mock` |
-| `truncated` | `prompt` and/or `settings` when a value went over a limit: 4,000 characters per prompt and 8,000 characters of settings JSON. Over that limit only short scalar settings are kept. Nothing is dropped without this mark |
+| Field                     | Content                                                                                                                                                                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nodeType`, `typeVersion` | The node that made the asset                                                                                                                                                                                                                                                                       |
+| `prompts`                 | Text inputs by input port (for example `prompt`, `negative`), or `prompt` when the text came from the node param                                                                                                                                                                                   |
+| `prompt`                  | All prompts joined. Used for display and search                                                                                                                                                                                                                                                    |
+| `model`                   | The model the node asked for                                                                                                                                                                                                                                                                       |
+| `settings`                | The other node params as JSON, including objects and lists                                                                                                                                                                                                                                         |
+| `references`              | One `{ name, id, port }` per input file. `name` is the file name at run time, as plain text. `id` is lineage only, not permission: the asset may since have been deleted. Records saved before IDs were kept have only `name`; `migrate()` converts the old plain-string form and is safe to rerun |
+| `provider`                | What the model provider reported, when it reports it: `name`, the `model` and version that actually ran, `seed`, `requestId`. A worker passes it as `meta.provider` to `putAsset`; unknown fields are dropped. The mock provider reports `mock`                                                    |
+| `truncated`               | `prompt` and/or `settings` when a value went over a limit: 4,000 characters per prompt and 8,000 characters of settings JSON. Over that limit only short scalar settings are kept. Nothing is dropped without this mark                                                                            |
 
 Credits stay in the `usage` table by job, and `source.runId` leads to the run's full recipe snapshot.
 
@@ -67,7 +67,7 @@ generated:  uploading ──► processing ──► ready (only when the job fi
 preview:    pending ──► ready | failed      (audio: none)
 ```
 
-- `beginAsset` records the asset and its intended storage key *before* any bytes arrive. An interrupted request therefore leaves a `failed` row that cleanup can find. A crash is caught by the sweeper, which fails uploads/outputs stuck longer than `ASSET_STALE_WRITE_SEC` and queues cleanup.
+- `beginAsset` records the asset and its intended storage key _before_ any bytes arrive. An interrupted request therefore leaves a `failed` row that cleanup can find. A crash is caught by the sweeper, which fails uploads/outputs stuck longer than `ASSET_STALE_WRITE_SEC` and queues cleanup.
 - Uploads stream to a private temp file (SHA-256, byte limit). The file is checked with sharp or ffprobe, written to the store, and then marked `ready`. Postgres and the object store do not share a transaction. Each step is ordered so that a failure leaves a `failed` row and a cleanup job, never a `ready` row without bytes.
 - Previews are 300 px JPEGs. Image thumbnails take milliseconds, so they are made during upload from the temp file. Video posters, and any failed image thumbnail, are built by the `asset-derive` pg-boss job with retries; a job that keeps failing marks the preview `failed`. While an image preview is pending or failed, the thumbnail URL serves the original with an `X-Preview-Status` header, so a broken preview never blocks a valid file. Video returns `404 PREVIEW_PENDING` or `PREVIEW_FAILED`.
 - Dimensions and duration are read during upload because that read is also the validity check, and it takes milliseconds.
@@ -81,18 +81,20 @@ preview:    pending ──► ready | failed      (audio: none)
 
 All responses are JSON unless noted. Errors use `{ error, code, details? }`; `error` stays a readable string for existing clients. `code` is one of `ApiErrorCode`.
 
-| Method and path | Purpose | Notes |
-| --- | --- | --- |
-| `GET /spaces` | Spaces the actor belongs to, with role and projects | `SpacesResponse` |
-| `GET /assets?spaceId&q&kind&source&sort&cursor&limit` | Paged catalog list | Ready assets only. `sort`: `created_desc` (default), `created_asc`, `name_asc`. `limit` 1–100 (default 50). Keyset cursor with an ID tie-breaker. `q` is a case-insensitive name match with LIKE wildcards escaped. |
-| `GET /assets/search?q&spaceId&kind&source&limit` | Hybrid name + semantic search | `limit` 1–50 (default 20), `q` ≤ 200 characters. See below. |
-| `POST /assets?spaceId` or `?canvasId` | Multipart upload (`file`, optional `name` field before the file) | `201 Asset`. The default space is the actor's personal space. `413 TOO_LARGE`, `415 UNSUPPORTED_MEDIA`, `400 UPLOAD_INTERRUPTED` |
-| `GET /assets/:id` | Details | `410` when deleted |
-| `PATCH /assets/:id` | `{ name?, description?, tags? }` | Name 1–200 visible characters, description ≤ 2000, up to 20 tags of 1–40 characters. Unknown fields are rejected. |
-| `DELETE /assets/:id?canvasId` | Soft delete plus affected nodes | `AssetDeleteResponse` |
-| `GET /assets/:id/usage?canvasId` | Nodes on that canvas that reference the asset | Current canvas only, not the whole space |
-| `GET`/`HEAD /assets/:id/file[?download=1]` | Original bytes | Ranges, `ETag`, `If-None-Match`, `If-Range` |
-| `GET`/`HEAD /assets/:id/thumbnail` | Preview | See Lifecycle |
+| Method and path                                       | Purpose                                                          | Notes                                                                                                                                                                                                               |
+| ----------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /spaces`                                         | Spaces the actor belongs to, with role and projects              | `SpacesResponse`                                                                                                                                                                                                    |
+| `GET /assets?spaceId&q&kind&source&sort&cursor&limit` | Paged catalog list                                               | Ready assets only. `sort`: `created_desc` (default), `created_asc`, `name_asc`. `limit` 1–100 (default 50). Keyset cursor with an ID tie-breaker. `q` is a case-insensitive name match with LIKE wildcards escaped. |
+| `GET /assets/search?q&spaceId&kind&source&limit`      | Hybrid name + semantic search                                    | `limit` 1–50 (default 20), `q` ≤ 200 characters. See below.                                                                                                                                                         |
+| `POST /assets?spaceId` or `?canvasId`                 | Multipart upload (`file`, optional `name` field before the file) | `201 Asset`. The default space is the actor's personal space. `413 TOO_LARGE`, `415 UNSUPPORTED_MEDIA`, `400 UPLOAD_INTERRUPTED`                                                                                    |
+| `GET /assets/:id`                                     | Details                                                          | `410` when deleted                                                                                                                                                                                                  |
+| `PATCH /assets/:id`                                   | `{ name?, description?, tags? }`                                 | Name 1–200 visible characters, description ≤ 2000, up to 20 tags of 1–40 characters. Unknown fields are rejected.                                                                                                   |
+| `DELETE /assets/:id?canvasId`                         | Soft delete plus affected nodes                                  | `AssetDeleteResponse`                                                                                                                                                                                               |
+| `GET /assets/:id/usage?canvasId`                      | Nodes on that canvas that reference the asset                    | Current canvas only, not the whole space                                                                                                                                                                            |
+| `GET`/`HEAD /assets/:id/file[?download=1]`            | Original bytes                                                   | Ranges, `ETag`, `If-None-Match`, `If-Range`                                                                                                                                                                         |
+| `GET`/`HEAD /assets/:id/thumbnail`                    | Preview                                                          | See Lifecycle                                                                                                                                                                                                       |
+| `GET /canvases/:id/info`                              | A canvas's space and project, without its recipe                 | `CanvasInfo`. Access `read`. The Media browser starts in this space.                                                                                                                                                |
+| `GET /stock`                                          | Stock media                                                      | `503 STOCK_UNAVAILABLE` until a stock source is configured                                                                                                                                                          |
 
 `Asset.url` and `Asset.thumbUrl` keep their old form (`/assets/:id/file`), so stored run outputs and old clients keep working. The new catalog fields on `Asset` are optional because older records do not have them.
 
@@ -142,16 +144,16 @@ Measured on a cloud container (4 vCPU Xeon 2.8 GHz, 16 GB), with Postgres 16.14 
 
 **Catalog, 10,000 rows in the space plus 10,000 in another space** ([`asset-catalog-bench.json`](evidence/asset-catalog-bench.json), query plans included). Target: 200 ms per page of 100.
 
-| Query | p50 | p95 |
-| --- | --- | --- |
-| List first page (100, newest first) | 1.6 ms | 2.3 ms |
-| List page 51 via cursor | 1.9 ms | 2.2 ms |
-| List filtered by kind | 1.9 ms | 2.2 ms |
-| List by name | 2.0 ms | 2.5 ms |
-| Name search `lantern` | 5.8 ms | 10.7 ms |
+| Query                                                          | p50     | p95     |
+| -------------------------------------------------------------- | ------- | ------- |
+| List first page (100, newest first)                            | 1.6 ms  | 2.3 ms  |
+| List page 51 via cursor                                        | 1.9 ms  | 2.2 ms  |
+| List filtered by kind                                          | 1.9 ms  | 2.2 ms  |
+| List by name                                                   | 2.0 ms  | 2.5 ms  |
+| Name search `lantern`                                          | 5.8 ms  | 10.7 ms |
 | Semantic retrieval top 20, excluding embedding (target 500 ms) | 20.8 ms | 25.7 ms |
-| Hybrid search service path (hash query vector) | 89 ms | 117 ms |
-| Query embedding (local MiniLM) + retrieval | 33 ms | 49 ms |
+| Hybrid search service path (hash query vector)                 | 89 ms   | 117 ms  |
+| Query embedding (local MiniLM) + retrieval                     | 33 ms   | 49 ms   |
 
 **Storage, 99 MiB WAV, local adapter** ([`storage-bench-local.json`](evidence/storage-bench-local.json)): upload 1.6 s, with peak API RSS +20 MB; full download 0.36 s, +22 MB; 1 MiB range at start, middle and end ≈ 20 ms each, +0 MB. A client abort stops the read. A route that buffered whole files would need at least +100 MB.
 
@@ -159,10 +161,10 @@ Measured on a cloud container (4 vCPU Xeon 2.8 GHz, 16 GB), with Postgres 16.14 
 
 **Search quality with real embeddings** ([fixture](../fixtures/search-eval.json): 32 assets with opaque names, 26 queries, 14 English and 12 Vietnamese, with expected IDs; several queries are cross-lingual).
 
-| Model | recall@10 | English | Vietnamese | MRR |
-| --- | --- | --- | --- | --- |
-| `paraphrase-multilingual-MiniLM-L12-v2` (default) | **0.962** | 1.000 | 0.917 | 0.917 |
-| `multilingual-e5-small` | 0.769 | 0.929 | 0.583 | 0.601 |
+| Model                                             | recall@10 | English | Vietnamese | MRR   |
+| ------------------------------------------------- | --------- | ------- | ---------- | ----- |
+| `paraphrase-multilingual-MiniLM-L12-v2` (default) | **0.962** | 1.000   | 0.917      | 0.917 |
+| `multilingual-e5-small`                           | 0.769     | 0.929   | 0.583      | 0.601 |
 
 The only miss for the default model is "ruộng bậc thang" (rice terraces): the relevant clip is described only in English ("Drone shot flying over rice terraces…"). Reports: [`search-eval-local-xenova-paraphrase-multilingual-minilm-l12-v2.json`](evidence/search-eval-local-xenova-paraphrase-multilingual-minilm-l12-v2.json) and [`search-eval-local-xenova-multilingual-e5-small.json`](evidence/search-eval-local-xenova-multilingual-e5-small.json). Hash embeddings are never used as quality evidence.
 
@@ -178,5 +180,5 @@ The only miss for the default model is "ruộng bậc thang" (rice terraces): th
 
 - **S3 coverage** is the contract suite and the 100 MB benchmark against one MinIO release. Only the S3 operations the app uses are covered, and no vendor is claimed as certified. In a cloud session without Docker, [`scripts/cloud-setup.sh`](../scripts/cloud-setup.sh) installs Postgres + pgvector and builds and starts MinIO.
 - The `openai` provider is implemented but was not called here (no key). Quality evidence uses the in-process model.
-- The frontend media browser is issue #19. The only frontend change here is that uploads now go to the canvas space.
+- The frontend media browser (#19) is described in [`media-browser.md`](media-browser.md).
 - E2E: 25 of 26 Playwright scenarios pass in this container. `pans a 128-node canvas above 50 FPS while four selected edges signal` measured 37–39 FPS. That scenario imports 128 `image.generate` nodes with no assets or runs, so it does not exercise this backend; the result reflects this headless 4-vCPU container. The other 128-node FPS scenarios passed.
