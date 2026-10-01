@@ -17,7 +17,7 @@ Shared types are in [`contracts/assets.ts`](../contracts/assets.ts). Example res
 | 7. Catalog API | Spaces, paged list, details, upload, rename, delete, usage, media URLs | Done |
 | 8. Runner integration | Space-scoped `input.asset`, generation metadata, publish-on-success, cache safety | Done |
 | 9. Semantic search | Provider boundary, pgvector index, background jobs, hybrid query, fallback states | Done |
-| 10. Evidence | Contract, access and search tests; 10k-row benchmark; 100 MB storage benchmark; real-embedding evaluation | Done (MinIO run outstanding, see [Limits](#limits)) |
+| 10. Evidence | Contract, access and search tests; 10k-row benchmark; 100 MB storage benchmark; real-embedding evaluation | Done (local and MinIO) |
 
 ## Ownership and access model
 
@@ -136,6 +136,8 @@ Measured on a cloud container (4 vCPU Xeon 2.8 GHz, 16 GB), with Postgres 16.14 
 
 **Storage, 99 MiB WAV, local adapter** ([`storage-bench-local.json`](evidence/storage-bench-local.json)): upload 1.6 s, with peak API RSS +20 MB; full download 0.36 s, +22 MB; 1 MiB range at start, middle and end ≈ 20 ms each, +0 MB. A client abort stops the read. A route that buffered whole files would need at least +100 MB.
 
+**Storage, same 99 MiB WAV, S3 adapter against MinIO** ([`storage-bench-s3.json`](evidence/storage-bench-s3.json); MinIO `RELEASE.2025-10-15T17-29-55Z` on the same host, 4 vCPU Xeon 2.1 GHz, 16 GB): upload 1.2 s, +22 MB; full download 0.32 s, +37 MB; 1 MiB range at start, middle and end 24–48 ms, +0 MB; suffix range 22 ms. A client abort after 1 MiB stops the upstream read (+0.1 MB). The storage contract suite also passes against this MinIO (`S3_TEST_ENDPOINT=http://127.0.0.1:59000`).
+
 **Search quality with real embeddings** ([fixture](../fixtures/search-eval.json): 32 assets with opaque names, 26 queries, 14 English and 12 Vietnamese, with expected IDs; several queries are cross-lingual).
 
 | Model | recall@10 | English | Vietnamese | MRR |
@@ -147,15 +149,14 @@ The only miss for the default model is "ruộng bậc thang" (rice terraces): th
 
 **Automated tests** (`pnpm test`):
 
-- `storage.test.ts`: adapter contract (write, stat, read, range, delete, short/long/failed writes, key validation), symlink escape, range parsing, download names.
+- `storage.test.ts`: adapter contract (write, stat, read, range, delete, short/long/failed writes, key validation) against a temporary directory and, with `S3_TEST_ENDPOINT`, MinIO; symlink escape, range parsing, download names.
 - `assets.test.ts`: upload, preview fallback, pagination with identical timestamps, filters and validation, rename, generated metadata and history, publish-on-success, cancelled runs, access on every route and on the run path, team viewer roles, delivery (range, suffix, 416, HEAD, 304, disconnect), delete, `INPUT_REQUIRED` and retry, cache safety, purge, interrupted upload, size limit, legacy migration and rerun.
 - `search.test.ts`: description and prompt matches, exact-name priority, filters, cross-space isolation, immediate removal on delete even with a cached query, revision ordering, model change and reindex, failure, timeout and disabled fallbacks, recorded index failures, bounds.
 - `fixtures.test.ts`: example responses match the live API.
 
 ## Limits
 
-- **MinIO was not run in this environment.** The S3 adapter shares the contract suite with the local adapter, but the suite was not run against MinIO here because building MinIO from source was not permitted. In a cloud session, [`scripts/cloud-setup.sh`](../scripts/cloud-setup.sh) installs Postgres + pgvector and builds and starts MinIO; add it to the environment's setup script. Then run `S3_TEST_ENDPOINT=http://127.0.0.1:59000 pnpm vitest run server/test/storage.test.ts` and `STORAGE_DRIVER=s3 S3_AUTO_CREATE_BUCKET=1 pnpm bench:storage` with `docker compose up` to complete that check. Only the S3 operations the app uses are covered, and no vendor is claimed as certified.
+- **S3 coverage** is the contract suite and the 100 MB benchmark against one MinIO release. Only the S3 operations the app uses are covered, and no vendor is claimed as certified. In a cloud session without Docker, [`scripts/cloud-setup.sh`](../scripts/cloud-setup.sh) installs Postgres + pgvector and builds and starts MinIO.
 - The `openai` provider is implemented but was not called here (no key). Quality evidence uses the in-process model.
-- The 100 MB benchmark ran on the local adapter only.
 - The frontend media browser is issue #19. The only frontend change here is that uploads now go to the canvas space.
 - E2E: 25 of 26 Playwright scenarios pass in this container. `pans a 128-node canvas above 50 FPS while four selected edges signal` measured 37–39 FPS. That scenario imports 128 `image.generate` nodes with no assets or runs, so it does not exercise this backend; the result reflects this headless 4-vCPU container. The other 128-node FPS scenarios passed.

@@ -18,7 +18,7 @@ import {
   unlink,
 } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
-import { type Readable, Transform } from "node:stream";
+import { PassThrough, type Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
   config,
@@ -252,17 +252,46 @@ export class S3Store implements ObjectStore {
     body: Readable,
     options: { bytes: number; contentType: string },
   ) {
-    const Body = body.pipe(counter(options.bytes));
-    body.on("error", (error) => Body.destroy(error));
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: this.key(key),
-        Body,
-        ContentLength: options.bytes,
-        ContentType: options.contentType,
-      }),
-    );
+    const Key = this.key(key);
+    // The SDK does not watch its body stream for errors, so a short, long or
+    // interrupted source would leave the request hanging, and an error on the
+    // body would surface as an uncaught exception in the SDK's own wrapper
+    // stream. Abort the request instead and close the body without an error.
+    const abort = new AbortController();
+    let failure: unknown;
+    const check = counter(options.bytes);
+    const Body = new PassThrough();
+    const fail = (error: unknown) => {
+      if (failure) return;
+      failure = error;
+      abort.abort();
+      body.destroy();
+      check.destroy();
+      Body.destroy();
+    };
+    // Not `pipeline`: it would destroy Body with the error.
+    body.on("error", fail);
+    check.on("error", fail);
+    body.pipe(check).pipe(Body);
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key,
+          Body,
+          ContentLength: options.bytes,
+          ContentType: options.contentType,
+        }),
+        { abortSignal: abort.signal },
+      );
+    } catch (error) {
+      throw failure ?? error;
+    }
+    if (failure) {
+      // The store accepted `bytes` bytes, but the source turned out to be invalid.
+      await this.delete(key).catch(() => {});
+      throw failure;
+    }
   }
   async stat(key: string) {
     try {
