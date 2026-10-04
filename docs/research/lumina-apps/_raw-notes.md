@@ -1,0 +1,125 @@
+# Raw notes — Lumina standalone Image/Video + AI Apps (2026-10-02)
+
+## Sidebar / IA
+- Sidebar: Home, Image, Video (HOT), Agent (NEW), Audio, AI Apps, Canvas (NEW), Canvas Pro (NEW), Assets; bottom: Affiliate, Collapse, Discord/X/IG. Top: Help, language, gift, credit balance (38,457.643), Upgrade, avatar. Promo banner "MEMBER EXCLUSIVE up to 86% off Seedance 2.0 Mini & Fast".
+- Hover Image → flyout "Model": Seedream 5.0 Pro › (Universal Reference, Layer separation), GPT Image 2 (Beta), Seedream 5.0 Lite, Nano Banana 2 (Beta), Nano Banana Pro (Beta), Seedream 4.5, 4.0, 3.0L (Art Edition), 3.0L
+- Hover Video → flyout: Seedance 2.5 ›, 2.0 Mini ›, 2.0 ›, 2.0 Fast ›, 1.5 Pro ›, 1.0 Pro, 1.0 Fast ›, 1.0 ›, DreamActor 2.0; submenus = modes (Freestyle Creation, Multi-frame Editing, Video Editing, Extend Video, Image To Video, Text To Video — verify per model on page)
+- Home: hero carousel (Music Video Agent, Seedance 2.5 Global Launch "30S video, 50 references, video editing", Seedream 5.0 Pro Layer Separation, AI Canvas), model cards (Seedance 2.5 New Release, Seedance 2.0 Hot, GPT-image-2...), "create more with canvas" templates (keyframe camera, storyboard grid, shot designer, cinematic color), bottom quick composer "Describe the scene you want to generate" ✦84.
+
+## Image page /lumina/en/model/image?mode=image (main document, not iframe, not React Flow)
+- Layout: left sidebar; centre = chat-like FEED of past generations (newest at bottom); top-right pills "Explore" and "History"; bottom sticky COMPOSER; banner above composer "✦ Edit reference images directly with Artboard! [Draw to edit] ×".
+- Feed item: timestamp (2026-07-11 08:11:59), full prompt text (multi-line), meta chips row: [model avatar+name] [ref thumb "Reference images"] [area 1k] [Adv Params ⓘ]; result thumbnail(s) rounded; actions: ✎ Re-edit | ↻ Regenerate | 🗑
+- Composer: left square slot "image" (upload/reference), editor placeholder "Describe the scene you want to generate, you can enter @ to reference an image or annotation", ⤢ expand; footer: [AI Image ▾] [model chip] [mode chip e.g. "Universal…"] … Pricing ⓘ, [Generate ✦9]
+- Media switch [AI Image ▾]: AI Image ✓ | AI Video | Audio (same composer reused across media)
+- Model picker "Picture model" (cards: icon, name, description):
+  - Seedream 5.0 Pro — Fine-tune position and colors, separate layers, and keep more of the original texture
+  - GPT Image 2 (Beta) — High-fidelity images with built-in reasoning
+  - Seedream 5.0 Lite — Strong prompt alignment, native 2K output, 4K upscaling, and real-time web search
+  - Nano Banana 2 (Beta) — Conversational image editing with strong character consistency
+  - Nano Banana Pro (Beta) — Accurate text rendering with high-fidelity 4K output
+  - Seedream 4.5 — Consistent results, refined portraits, and solid for commercial use
+  - Seedream 4.0 — Unified image generation and editing, with multi-image references and batch creation
+  - Seedream 3.0L (Art Edition) — Art-focused text-to-image with CoT and PE variants
+  - Seedream 3.0L — Fast text-to-image generation, native 2K output, and accurate text rendering
+- Function chip (Seedream 5.0 Pro only): "Universal Reference ✓" | "Layer separation" (= model ByteDance-Seedream-5.0-pro-i2l, inference i2l)
+- Footer (wide): [AI Image ▾] [model] [function ▾] [▢ 1:1 ratio] [⇄ adv] … Pricing ⓘ [Generate ✦9]; narrow widths CLIP chips (1:1 & ⇄ hidden) — responsive bug
+- Ratio popover "Ratio adjustment" (Reset): Image ratio grid 16:9 3:2 4:3 / 1:1 3:4 2:3 / 9:16 Custom; "Image size" W 1024 ⟷ H 1024; "image area" toggle with note "The scale will fail when turned on." + select 1k|2k. Tip on image size: "The resolution (area) of the generated graph will take precedence when filled in with the width and height of the specified width and height values."
+- Adv Params popover (Reset) for Seedream 5.0 Pro shows RAW names: min_ratio slider+num (0.07), max_ratio (16), cot_mode select (enabled), seed (-1)
+- Composer form schema (props.schemas): __checkpoint "Basic model", __operation_type "Operation" (function), __size "Size" (sizeSchema format custom default 1024x1024, area_enums 1k|2k, min_dimension 1024 max_dimension 2048) + model params
+- Model objects (model-center, not canvas catalog): {id,name,description,cover_url,demo_img_urls,req_key,schema(JSON string {inputs[],outputs[]}),generate_img_count,view_count,inference_types,inference_pipeline 'vproxy_overpass',support_batch_flow,sub_task_count,...}
+- Image model schemas (visible inputs):
+  - Seedream 5.0 Pro [i2i,t2i] batch=false: prompt, min_ratio 0.07..16, max_ratio, cot_mode enabled|disabled, size custom 1024x1024 (1k|2k), img image_upload, seed ; hidden use_pre_llm, origin_img, annotation_info
+  - GPT Image 2 (Beta) batch=true: prompt, quality low(def)|medium|high, image_size 1024x1024(def)|1536x1024|1024x1536|2048x2048|2048x1152|3840x2160|2160x3840, img
+  - Seedream 5.0 Lite batch=true: prompt, force_single, seed, min/max_ratio, cot_mode enable|disable, close_search (web search toggle!), allow_llm_fallback, width/height 2048, img
+  - Nano Banana 2 / Pro (Beta): prompt, aspect_ratio 16:9(def)|9:16|4:3|3:4|1:1, image_size 1K|2K|4K, img
+  - Seedream 4.5: prompt, width/height 2560, seed, image_offset_end 1..15 (15), force_single, optimize_prompt_options_mode standard, img
+  - Seedream 4.0: prompt, negative_prompt nsfw, width/height 2048, size enum (1MP..16MP), use_pre_llm, pre_llm_result, force_single, guidance/cfg weights..., img
+  - Seedream 5.0 Pro i2l (Layer separation): prompt, size auto|1k|2k, img ; hidden layer_decomposition, origin_img, annotation_info
+  - Seedream 3.0L Art / 3.0L (sub_task_count=4 → 4 images per run): prompt (≤2000), llm_seed, use_pre_llm, negative_prompt, seed, scale, width/height 1024, i2i_strength, ddim_steps...
+- Pricing ⓘ hover → "Cost Details": Image Input Price — First image 0 credit/image, Two or more images 0.3 credit/image; Image Output Price — Resolution ≤ 2.36 MP 9 credits/image, > 2.36 MP 18 credits/image
+- Reference slot (square "image" tile): hover → menu "+ local upload" | "📖 material library"; after picking, slot shows thumbnail with "+" badge to add more (stack)
+- Material library sheet (full-screen): tab "Image"; Public | Private; Filter ▾ (Type: All, Character, Props, Costume, Scene, Effects; Clear Filter); "Selected: N"; OK; × close; 3-col grid of assets; selected tile gets outline
+- "@" in composer → menu: reference images auto-named "Image001" (avatar) + "Color selection ›"; inserting gives inline void chip (avatar + name) class model-experience-image-prompt-editor-resource-chip
+- Generate: credits deducted IMMEDIATELY on submit (38,457.643 → 38,448.643); feed appends item with timestamp, prompt (with chips), meta chips (model · Reference images (thumb) · Proportion 1:1 · Adv Params ⓘ), spinner tile, "⊘ Terminate generation" + 🗑. Composer KEEPS prompt & refs (iterate). Result after ~1.5 min.
+- Composer state NOT persisted across reload (feed is).
+- Right "artwork space" panel (Explore | History) docks to the right; at 1071px viewport it renders OFF-SCREEN (layout bug); at 1600px: tabs Explore | History, collapse ⇥ icon, search "Prompt keywords", Time ▾, Generation type ▾, masonry grid of past outputs.
+- Click result → "artwork detail" modal: left preview (× close, zoom −/slider/+, "Image/Video only mode", "Comparison mode", ⋯ (Share link, Delete), download, ☆ favorite); right info: author avatar+name, views 👁 n, likes ★ n, collapse; model; Prompt (with chips); Parameter chips (Reference images, Proportion 1:1); full param table (min_ratio 0.07, max_ratio 16, cot_mode enabled, use_pre_llm true, Seed 1041981156 = actual seed used); "Generated on 2026-10-02 10:48:04"; big "✦ Clone & try"; far-right vertical filmstrip to navigate other items.
+- Feed result hover → ⋯ button → menu: Video Editing (New) | Draw | Collect | Download | Share link | Delete
+- Feed item actions: ✎ Re-edit (load into composer) | ↻ Regenerate | 🗑
+- Draw (Artboard) modal: title "Draw", "Automatically saved at Just now", ×; left tool rail: "Mobile annotation" (hand / move — mistranslation of 移动标注), "Dot mark", "Rectangle selection", "Brush", "Arrow", undo, redo; bottom-left zoom + 100% − fit; mini composer (image thumb +, prompt, 1:1, ⇄ adv, Pricing, Generate ✦9)
+  - Rectangle draws green box labelled "Region01" with 8 handles + ×; "@" then lists group "Image001 ▾" → Image001, Region01 + Color selection → inline chip "[avatar][▣] Region01"
+  - Generate from Draw closes modal, toast "Successfully created an image generation task"; feed chip shows "Image001 · Re(gion01)"; composer ref thumb shows annotation badge (annotation_info + origin_img hidden schema fields)
+- Banner above composer "✦ Edit reference images directly with Artboard! [Draw to edit] ×" → opens same Draw modal for the composer ref
+- Region edit (Seedream 5.0 Pro + Region01 + "add a tiny red beret on the head, keep everything else unchanged"): result ~40s, beret added, rest preserved. 9 credits.
+- Layer separation selection didn't apply while composer had annotated ref (stayed "Universal Reference") — possibly gated.
+
+## Video page /lumina/en/model/video?mode=video
+- Same shell (feed + composer + Explore/History). Feed item meta chips: model · Proportion 1:1 · Resolution 1080p · Duration 4s · Adv Params ⓘ; video tile with ▶ overlay; Re-edit | Regenerate | 🗑
+- Composer: left tile "+ material" (multimodal materials), placeholder "Describe the video scene you want to generate", ⤢; footer: [AI Video ▾] [⬡ Seedance 2.5] [▣ Adaptive] [480p] [4s] [🪄 wand] [Creation mode | ✦ Director mode] [✦ 84 Generate]
+- Composer schemas: "Basic model", "video settings"
+- Video catalog = 23 entries (model × task): fields id, req_key, version_id, type, task_type, name, inference_type, icon_url, video_url (demo), model_version, description, max_image_count, max_prompt_length, schema{config_schemas[], advance_config_schemas[], input_schemas}, support_batch_flow, sub_task_count, support_comfy, disable_lumi, visibility_scope
+  - inference/task types: x2v (t2v / r2v "Freestyle Creation"), flf/f2v (first-last frame = "Multi-frame Editing"?), edit (r2v + pe_classification edit = "Video Editing"), ev (Extend Video), i2v, t2i2v (legacy text→image→video), motion (DreamActor)
+  - Descriptions: Seedance 2.5 "Up to 30s video generation with targeted editing and up to 50 references"; 2.0 Mini "Fastest, most budget-friendly multimodal video"; 2.0 "Multimodal video with synced audio and visuals, plus director-level ca(mera)…"; 2.0 Fast "Synced audio-visual video, faster 720p output"; 1.5 Pro "Cinematic visuals with a natural storytelling rhythm"; 1.0 Pro "Stable subjects, lively motion, and smooth pacing"; 1.0 Fast "Pro-level motion quality, with faster output and lower credit cost"; 1.0 "Natural movement with steady camera work"; DreamActor 2.0 "Motion Mimic 2.0 creates realistic motion, expressions, and lip-sync f(rom)…"
+  - SCHEMA SPLIT is explicit: config_schemas (inline chips) vs advance_config_schemas (Adv Params)
+  - Seedance 2.5 t2v/r2v: prompt ≤15000, resolution 480p(def)|720p|1080p, frames 97..721 (= 4..30 s; "24*seconds+1", transformer frames_to_duration), aspect_ratio adaptive(def, desc "Automatically generate the appropriate aspect ratio based on the prompt")|1:1|3:4|4:3|9:16|16:9|21:9, mm (multimodal refs); adv: seed "Result Similarity (Seed)" (tip "Different seeds produce different results. Enter -1 for a random number…"), with_audio (true)
+  - Seedance 2.0 / Fast / Mini r2v: prompt ≤5000, res (2.0: +1080p,4k; Fast/Mini: 480p|720p), frames 97..361 (4–15 s)
+  - f2v (flf): img, img (first/last), aspect adaptive only for 2.5
+  - Seedance 2.5 edit: frames hidden (-1 = follow source), mm, pe_classification edit
+  - ev (extend): mm, frames, pe_classification extend
+  - 1.5 Pro / 1.0 / 1.0 Fast / 1.0 Pro (i2v, flf, t2i2v): prompt ≤4000 / ≤500, frames 121 (49/73/97..289), aspect 16:9 default; adv creative_rephraser kuoxie|chuangkuo (expand|creative-expand, untranslated pinyin!), camerafixed, with_audio
+  - DreamActor 2.0 motion: resolution 480|720, mm {img max 1 ≤10MB required, video max 1 ≤2k ≤30s required}
+- Material (mm) constraints (Seedance 2.5 r2v/edit/ev): img max 30 (png/webp/jpeg/jpg/gif/heif/heic, ≤30MB, 300–6000px, aspect 0.4–2.5), video max 10 (mp4/mov, ≤200MB, 480p–4k, 1.8–30.2s total), audio max 10 (wav/mp3, ≤15MB, 1.8–30.2s total) → "50 references"
+  - 2.0 Mini r2v: img max 9, video max 3 (≤1080p, 2–15.2s), audio max 3 (2–15s)
+  - f2v: images only, required
+- Pricing data shipped to client: props.configState.priceInfo.algo_measure_value_calculates (18 rules) — same expression engine as canvas
+- Video model picker: cards with name + desc; promo badges "Up to 86% off" (2.0 Mini), "Up to 74% off" (2.0 Fast); ✓ on selected
+- 🪄 wand tooltip: "One-click prompt optimization: Lumina organizes the shot order, material references, durations, and global constraints into a clearer, controllable video description."
+  - Click → modal "One-click prompt optimization": "Lumina will split the existing content into clear, draggable, and adjustable-duration video clips"; warning (when timeline has content) "The timeline already contains content. Continuing will regenerate and overwrite the current scenes based on the existing storyline. Do you want to proceed?"; radio: "Text-only optimization — Automatically split into clear scene descriptions, faster speed" | "Automatically generate keyframes — Automatically split scenes, generate grid keyframes, and arrange them on the timeline"; buttons "Do not optimize for now" | "Optimize ⓘ" (Cost Details: Input 0.1 credit/1K tokens, Output 0.6 credit/1K tokens)
+  - Result on structured prompt: 9 naive shots (split by line & comma) each suffixed "，Subject’s actions develop further" / last "…complete naturally" (Chinese comma), duration → 5 s, price 84→105; balance unchanged → looks like rule-based fallback. BUG: round-trip Director→Creation→Optimize corrupts structure.
+- "video settings" popover (from Adaptive chip; Reset): Aspect Ratio tiles Adaptive|1:1|3:4|4:3|9:16|16:9|21:9 ; Resolution ⓘ 480p|720p|1080p ; Duration ⓘ slider + number (4). No Smart Duration (canvas has it).
+- Creation mode | ✦ Director mode (segmented). Director tooltip: "Director mode: Use the timeline to precisely arrange multiple shots, material references, shot durations, and audio tracks, suitable for complex video structures."
+- DIRECTOR MODE composer:
+  - "+ material" tile; "Camera timeline" (hint "drag the camera to arrange the rhythm, pull both sides to adjust the duration"), link "Transcribe to creative mode", toggle "👁 Video rhythm preview", zoom − slider + 100%
+  - Ruler 0 s…N s with playhead; empty: "add a scene first, then write what happens" [+ Add the first scene]
+  - Add scene menu: Text generation | First frame generation | First & Last Frame to Video | Grid image split | Multi-Image References | Video Reference
+  - Shot card: "Shot 1 · Plain text · 0–1 s", editable text "Describe this shot; you may input @ to reference materials", left/right drag handles (duration), trash icon on hover, ▶ play at track head; "+" after last shot adds next (same type menu); Shot 2 auto 1–2 s
+  - "Voice, style, and more controls (optional)" collapsible: "Overall visual style" textarea (ph "For example: realistic film texture, warm backlight"), "Avoid occurrence of" (ph "For example: flicker, distortion, abrupt cut", prefilled "Avoid screen flicker, distorted characters, and abrupt camera cuts"), "♫ Voice timeline [Add]" → adds Voice timeline track (remove link) with "add the first voice segment, then write music, dialogue, or sound effects" [+ Add the first voice segment] → menu "Text describing sound" | "Upload audio file" → segment card "Sound · Text sound · 0–1 s" ("Write music, dialogue, or sound effects; you may input @")
+  - Hover timeline → Video rhythm preview popover (mini player, time 2.9/4 s; "blank period — no preview available at current time" for gaps)
+  - "Transcribe to creative mode" compiles to structured prompt in Creation editor:
+      Duration: 4 s / Visual Development: / 0 s~1 s: … / 1 s~2 s: … / Music Development: / 0 s~1 s: … / Prohibited content: …
+  - Creation & Director keep separate states.
+- Material tile menu (video): local upload | material library | Portrait Gallery | 3D Director's Desk
+- Generate button shows live price: Seedance 2.5 480p 4s = 84, 5s = 105 (21 credits/s)
+
+## AI Apps /lumina/en/ai-app ("App Library")
+- Header "App Library" + search "Search for app keywords"; hero carousel (AI Twerk Dance, AI Jiggle Dance…); tabs All | Video | Image; grid cards (cover image/video, name, 2-line desc)
+- Apps seen: AI Photo Editor, AI Pole Dance, Image Edit Seedream 5.0 Pro, AI Meme Maker, AI Photo Enhancer, AI Spritesheet Maker, AI Twerk Dance, AI Clothes Changer, iPhone Wallpaper Maker, IDog New Launch, AI Influencer Look Generator, AI Anime Photo, Anime Character Creator, AI Emoji Maker, AI Background Generator, AI UGC Ad Maker, AI Muscle Filter, Esports Logo Maker, AI Peel Effect, AI Jiggle Dance …
+- App page /ai-app/<id>: "‹ Return"; H1 name; description; left FORM card: image upload tile ("image — Images must be in png, jpeg, jpg, or gif format and no larger than 20MB"), textarea "Describe the image you want to generate", chip [avatar] "Image Edit Seedr…" (workflow), primary button "✦ 9/time"; right = output panel (empty)
+- APP = PUBLISHED CANVAS WORKFLOW (same comfyui-ecology record as canvas): {id, name, description, cover, display_files, tags [Image], base_models [seedream5.0], publish_as_app true, access_control open, cost_count 9, execution_stat {p75_duration 47.08, success_rate 0.99}, statistic {views 777, likes, favorites, downloads}, revisions {1..4 each data_id}, class_type_counts, creator, support_gpus, compliance_authority generate_only, data (graph JSON)}
+- data graph (ComfyUI format): nodes [{id,type,inputs[{name,type,format:'slot'|value}],outputs,meta{title,bypass,pos,size,extra}}], links [[linkId, fromNode, fromSlot, toNode, toInput, {type}]], groups, version, is_simple_canvas false, source "ba_next", identity_sign
+  - Image Edit app graph: LoadImage(2) → ResizeImageLongEdge(6, long 1920) → GetImageSize(7) → width/height → ShowAny(9,10) → StringFunction(5, append text_a + "x" + text_c) → BALLMImage(1).extra_inputs.size ; PrimitiveString(4 "Prompt") → BALLMImage.prompt ; LoadImage → BALLMImage.image ; BALLMImage → SaveImage(3). (keeps output size = input size)
+  - ba_extra.slot_info = EXPOSED FORM: inputs [{name:'image', format:'image_upload', default, extra:{node_id:'2', input_key:'image', class_type:'LoadImage', ui_order:0, random_default_value:false}}, {name:'Prompt', format:'input', props.limit{enable,minLength,maxLength}, extra:{node_id:'4', input_key:'value', class_type:'PrimitiveString'}}], outputs [{name:'images', format:'image', extra:{node_id:'3', output_key:'images', class_type:'SaveImage'}}]
+  - ba_extra.slot_info_schema = JSON Schema draft-07 for input/output objects
+  - ba_extra.prompt = compiled ComfyUI API prompt {nodeId:{class_type, inputs{...links as [node,slot]}}}
+- App catalog (20): name [id] tags cost(credits/run) base_models nodes
+  - AI Photo Editor — Image 3.5 seedream5.0 — PrimitiveString×2, BALLMImage, LoadImage, SaveImage (views 3414)
+  - AI Pole Dance — Video 152 seedance2.0 — BALLMVideo, ResizeImageLongEdge, SaveVideo, LoadImage, LoadVideo, GetVideoComponents, BAVideoMergerNode
+  - Image Edit Seedream 5.0 Pro — Image 9 — (see above)
+  - AI Meme Maker — Image 9 — PrimitiveStringMultiline×5, StringFunction×2, BALLMImage, SaveImage, ShowAny
+  - AI Photo Enhancer — Image 9 — resize/size pipeline + BALLMImage
+  - AI Spritesheet Maker — Image 25 chatgpt_images2.0 — BALLMImage, LoadImage, SaveImage, PrimitiveStringMultiline
+  - AI Twerk Dance — Video 190 — LoadVideo, GetVideoComponents, BAVideoMergerNode, BALLMVideo, SaveVideo, LoadImage
+  - AI Clothes Changer — Image 3.5 — LoadImage×2, BALLMImage, SaveImage
+  - iPhone Wallpaper Maker — Image 9 — BALLMImage, LoadImage, AIP RandomSelectMultiLineText, PrimitiveStringMultiline, SaveImage
+  - IDog New Launch — Video 300 — BALLMVideo, PrimitiveStringMultiline, LoadImage, SaveVideo, BAVideoMergerNode, LoadAudio
+  - AI Influencer Look Generator — Video 300 — BALLMVideo, LoadImage, ShowAny, SaveVideo, BALLMText, PrimitiveStringMultiline
+  - AI Anime Photo — Image 9; Anime Character Creator — Image 9; AI Emoji Maker — Image 9; AI Background Generator — Image 9; AI Muscle Filter — Image 9
+  - AI UGC Ad Maker — Video 450 — BALLMText×2, BALLMVideo, ShowAny, PrimitiveStringMultiline, SaveVideo, LoadImage
+  - Esports Logo Maker — Image 10 — PrimitiveStringMultiline, ShowText, BALLMImage, SaveImage, BALLMText
+  - AI Peel Effect — Video 100 sd2.0; AI Jiggle Dance — Video 180
+- AI UGC Ad Maker slot_info: inputs image (image_upload, LoadImage#4, ui_order 0), Ratio (select 16:9|4:3|1:1|3:4|9:16|21:9 default 9:16 → BALLMVideo#5 extra_inputs.ratio, ui_order 106 → shown under ⇄ "Adv Params"), Prompt (input → PrimitiveStringMultiline#7.value); output video (SaveVideo#9)
+  - pipeline: LoadImage + Prompt → BALLMText#3 (system prompt "# Role：Seedance 2.0 UGC 商品广告提示词专家 … 输出一段可直接用于 Seedance 2.0 生成视频的完整中文 Prompt") → ShowAny → BALLMText#8 → BALLMVideo#5 (Seedance 2.0 pro, 720p, 15 s, ratio 9:16, pinList ["ratio"]) → SaveVideo
+  - canvas node extra has pinList: ["ratio"] → param pinned for app exposure
+  - UGC app form textarea placeholder still "Describe the image you want to generate" (copy bug for video app); right panel = demo carousel ‹ › with dots (looping output demos), replaced by result after run
+- App form ⇄ → "Adv Params" popover with exposed advanced slots (Ratio select)
+- Credits spent this round: 2 Seedream images = 18 credits (+0 for prompt optimize)
