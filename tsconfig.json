@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true, "resolveJsonModule": true,
     "esModuleInterop": true, "types": ["node"]
   },
-  "include": ["contracts/**/*.ts", "graph/**/*.ts", "server/**/*.ts", "workers/**/*.ts", "web/**/*.ts", "web/**/*.tsx", "e2e/**/*.ts", "*.ts"]
+  "include": ["contracts/**/*.ts", "graph/**/*.ts", "server/**/*.ts", "workers/**/*.ts", "web/**/*.ts", "web/**/*.tsx", "e2e/**/*.ts", "scripts/byteplus-probe.ts", "*.ts"]
 }

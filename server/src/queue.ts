@@ -33,6 +33,12 @@ export function startQueue() {
       retryBackoff: true,
       expireInSeconds: 600,
     });
+    await boss.createQueue("gen-prepare", {
+      name: "gen-prepare",
+      retryLimit: 3,
+      retryDelay: 5,
+      expireInSeconds: 900,
+    });
     await boss.createQueue("gen-cancel", {
       name: "gen-cancel",
       retryLimit: 3,

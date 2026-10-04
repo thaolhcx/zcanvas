@@ -33,6 +33,8 @@ export interface GenRequest {
   system?: string;
   effort?: string;
   texts?: string[];
+  /** Signed URL the provider may call when the task ends (wakes the fetch early). */
+  callbackUrl?: string;
 }
 /** Reads a reference's bytes (from our storage). */
 export type ReadRef = (ref: GenRef) => Promise<Uint8Array>;
@@ -54,6 +56,9 @@ export interface ProviderAdapter {
   readonly name: string;
   /** Configured (keys present)? A model of an unavailable provider cannot run. */
   available(model: ModelSpec): boolean;
+  /** Work to do before submit, as its own queue step (stage references, real-person check). */
+  needsPrepare?(request: GenRequest): boolean;
+  prepare?(request: GenRequest, read: ReadRef, signal: AbortSignal): Promise<void>;
   submit(request: GenRequest, read: ReadRef, signal: AbortSignal): Promise<SubmitResult>;
   /** Reads the task's state once, and downloads the result when it is done. */
   fetch(task: ProviderTask, signal: AbortSignal): Promise<FetchResult>;

@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "fixtures": "node scripts/fixtures.mjs",
+    "probe:byteplus": "tsx scripts/byteplus-probe.ts",
     "assets": "tsx scripts/assets.ts",
     "search:eval": "tsx scripts/search-eval.ts",
     "bench:catalog": "tsx scripts/bench-catalog.ts",

@@ -50,6 +50,7 @@ import {
 import { assetBytes, failJobAssets, publishJobAssets, putAsset } from "./assets.ts";
 import { checkValues } from "./values.ts";
 import { advance, emit } from "./run-store.ts";
+import { callbackUrl } from "./providers/callback.ts";
 
 /** Node types whose work is a model call, and what they ask the provider for. */
 export const GEN_TASKS: Record<string, GenRequest["task"]> = {
@@ -281,7 +282,7 @@ interface JobRow {
   id: string;
   run_id: string;
   node_id: string;
-  data: Job & { attempt?: number; retries?: number; phase?: string; waitingSince?: string; submittedAt?: string };
+  data: Job & { attempt?: number; retries?: number; phase?: string; waitingSince?: string; submittedAt?: string; prepared?: boolean };
   request: StoredRequest;
   replaced_at: Date | null;
   run_status: string;
@@ -304,13 +305,18 @@ const current = (job: JobRow) => job.run_status === "running" && !job.replaced_a
 async function saveJob(job: JobRow, patch: Partial<JobRow["data"]>) {
   Object.assign(job.data, patch);
   for (const [k, v] of Object.entries(patch)) if (v === undefined) delete (job.data as unknown as Record<string, unknown>)[k];
+  // The public stage mirrors the internal phase.
+  if ("phase" in patch) {
+    if (patch.phase) job.data.stage = patch.phase;
+    else delete job.data.stage;
+  }
   const { rowCount } = await db.query(
     "UPDATE jobs SET data=$2 WHERE id=$1 AND replaced_at IS NULL AND EXISTS (SELECT 1 FROM runs WHERE id=$3 AND data->>'status'='running')",
     [job.id, job.data, job.run_id],
   );
   if (!rowCount) return false;
-  const { attempt: _a, retries: _r, phase: _p, waitingSince: _w, submittedAt: _s, ...pub } = job.data;
-  await emit(job.run_id, { type: "job.status", runId: job.run_id, at: new Date().toISOString(), ...pub });
+  const { attempt: _a, retries: _r, phase: _p, waitingSince: _w, submittedAt: _s, prepared: _pr, ...pub } = job.data;
+  await emit(job.run_id, { type: "job.status", runId: job.run_id, at: new Date().toISOString(), ...pub, ...(_p ? { stage: _p } : {}) });
   return true;
 }
 /** Public job data: the queue's own bookkeeping stays in the row. */
@@ -413,6 +419,12 @@ export async function submitJob(jobId: string) {
   const adapter = adapterFor(model);
   if (!adapter.available(model))
     return failJob(job, "PROVIDER_NOT_CONFIGURED", `${model.title} is not available: its provider key is not configured.`);
+  // Before the first submit: the adapter's own preparation, as a separate queue step.
+  if (adapter.prepare && !job.data.prepared && adapter.needsPrepare?.(toGenRequest(job, stored, model))) {
+    await saveJob(job, { status: "running", phase: "preparing", model: model.key });
+    await boss.send("gen-prepare", { jobId }, { singletonKey: `${jobId}:prepare` });
+    return;
+  }
   const attempt = job.data.attempt ?? 1;
   const { rows: tasks } = await db.query("SELECT * FROM gen_tasks WHERE job_id=$1 AND attempt=$2", [job.id, attempt]);
   const existing = tasks[0];
@@ -445,8 +457,8 @@ export async function submitJob(jobId: string) {
       finalPrompt = (await autoPrompt(job, stored, controller.signal).catch(() => undefined)) ?? stored.intent;
     }
     await saveJob(job, { status: "running", phase: "submitting", model: model.key, queuePosition: undefined, waitingSince: undefined, ...intentShown, ...(finalPrompt !== undefined && stored.autoPrompt ? { finalPrompt } : {}), submittedAt: new Date().toISOString() });
-    const request = toGenRequest(job, stored, model);
-    const read = async (ref: GenRef) => new Uint8Array(await assetBytes(ref.assetId));
+    const request = { ...toGenRequest(job, stored, model), ...(model.sync ? {} : { callbackUrl: callbackUrl(slot.id) }) };
+    const read = readRef;
     const result = await adapter.submit(request, read, controller.signal);
     if (result.type === "done") {
       await setTask(slot.id, { state: "done", submitted_at: new Date(), finished_at: new Date() });
@@ -481,6 +493,28 @@ export async function submitJob(jobId: string) {
   } finally {
     clearTimeout(timer);
   }
+}
+const readRef = async (ref: GenRef) => new Uint8Array(await assetBytes(ref.assetId));
+/** gen-prepare: stage references and check them (real person) before the first submit. */
+export async function prepareJob(jobId: string) {
+  const job = await loadJob(jobId);
+  if (!job || !current(job) || !["queued", "running"].includes(job.data.status)) return;
+  const model = modelByKey(job.request.model)!;
+  const adapter = adapterFor(model);
+  try {
+    await adapter.prepare?.(toGenRequest(job, job.request, model), readRef, AbortSignal.timeout(600000));
+  } catch (error) {
+    const transient = error instanceof ProviderError ? error.transient : isNetworkError(error);
+    const retries = job.data.retries ?? 0;
+    if (transient && retries < settings.transientRetries) {
+      await saveJob(job, { retries: retries + 1 });
+      await boss.send("gen-prepare", { jobId }, { startAfter: later(Math.min(60, 2 ** retries * 2)), singletonKey: `${jobId}:prepare` });
+      return;
+    }
+    return failJob(job, error instanceof ProviderError ? error.code : "PROVIDER_ERROR", (error as Error).message);
+  }
+  await saveJob(job, { prepared: true });
+  await boss.send("gen-submit", { jobId }, { singletonKey: jobId });
 }
 const isNetworkError = (error: unknown) =>
   error instanceof TypeError || /ECONNRESET|ETIMEDOUT|ENOTFOUND|fetch failed|socket/i.test(String((error as Error)?.message));
@@ -674,4 +708,5 @@ export async function startGenWorkers() {
   await boss.work<{ jobId: string }>("gen-submit", options, each((d) => submitJob(d.jobId)));
   await boss.work<{ taskId: string }>("gen-fetch", options, each((d) => fetchTask(d.taskId)));
   await boss.work<{ taskId: string }>("gen-cancel", options, each((d) => cancelTask(d.taskId)));
+  await boss.work<{ jobId: string }>("gen-prepare", options, each((d) => prepareJob(d.jobId)));
 }

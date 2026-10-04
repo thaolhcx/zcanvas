@@ -282,6 +282,8 @@ export interface Job {
   finalPrompt?: string;
   /** When the job ended (done, failed or cancelled). */
   finishedAt?: string;
+  /** Where a model job is: waiting (for a slot), auto-prompt, preparing, submitting, provider-queued, provider. */
+  stage?: string;
 }
 export interface Run {
   runId: string;
