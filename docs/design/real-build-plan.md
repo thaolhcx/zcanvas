@@ -63,12 +63,36 @@ Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ 
 
 **Mẫu tham khảo:** harness của AI SDK 6 (`Agent` là interface, `ToolLoopAgent` là bản mặc định): chỉ dẫn + tool + điều kiện dừng, móc trước và sau mỗi bước, tin nhắn chia phần (chữ, gọi tool, kết quả tool), tool cần người duyệt. Vòng lặp của mình theo đúng hình dạng đó để sau này có thể cài interface `Agent` lên hàng đợi của mình, dùng lại thư viện và UI của họ mà không phụ thuộc hạ tầng Vercel.
 
+## 3b. Port provider BytePlus có sẵn
+
+Nguồn: nhánh `byteplus-provider` của `thaolhcx/nodetool` (repo riêng tư): `docs/byteplus-provider.md`, `docs/byteplus-handoff.md`, `packages/runtime/src/providers/byteplus-{provider,media,assets}.ts`, `packages/cli/scripts/byteplus-live-probe.ts`. Đã chạy thật với key của chủ repo cho Seedream và Seedance.
+
+**Mang sang:**
+- **Cách gửi request:** Seedream `POST {base}/images/generations`; Seedance `POST {base}/contents/generations/tasks` với `content` có `role` (`first_frame`, `last_frame`, `reference_image`, `reference_audio`, `reference_video`), thứ tự ảnh → audio → video; Seed Audio TTS ở host Voice riêng với `X-Api-Key`; LLM qua `/chat/completions` tương thích OpenAI.
+- **Giới hạn học từ lỗi 400 thật** → đưa vào catalog model để UI chặn trước: Seedance 2.5 nhận 4–30 giây (họ 2.0: 4–15), số nguyên; Seedream tối thiểu 1280×720 pixel, Seedream 5.0 Pro tối đa 4.624.220 pixel và không có preset 4K; preset `1K/2K` bỏ qua tỉ lệ nên gửi `WxH`; có khung đầu thì không gửi `ratio`. Lỗi 400 nêu giới hạn pixel thì co giãn và thử lại một lần.
+- **Tham chiếu qua TOS + `asset://`:** file tham chiếu đưa lên TOS theo sha256; kiểm tra người thật bằng Seed vision (chế độ `verify`); người thật thì đăng ký Assets (ký HMAC AK/SK) và gửi `asset://`; còn lại gửi URL ký trước 1 giờ. Lưới an toàn lúc gửi: tham chiếu thứ N bị chặn thì đăng ký rồi thử lại; id hết hạn thì đăng ký lại; vẫn bị chặn thì **báo lỗi rõ**, không bao giờ lặng lẽ bỏ tham chiếu. Prompt bị chặn thì báo lỗi, không đăng ký gì.
+- **Lỗi:** 429, 5xx và lỗi mạng là tạm thời; 4xx khác dừng ngay với thông báo của API.
+- **Cấu hình:** `BYTEPLUS_API_KEY`, `BYTEPLUS_BASE_URL`, `BYTEPLUS_VOICE_API_KEY`, `BYTEPLUS_VOICE_BASE_URL`, `BYTEPLUS_ACCESS_KEY` / `BYTEPLUS_SECRET_KEY`, `BYTEPLUS_TOS_*`, `BYTEPLUS_ASSET_MODE`, `BYTEPLUS_ASSET_GROUP_ID`, `BYTEPLUS_VERIFY_MODEL`; model thêm và endpoint riêng của tài khoản (`ep-…`) qua `BYTEPLUS_{LANGUAGE,IMAGE,VIDEO}_MODELS`. Key chỉ nằm trong env, không bao giờ trong commit hay log.
+- **Script chạy thử với key thật** (tốn tiền, rẻ trước đắt sau) và **test dùng response ghi sẵn**.
+
+**Đổi khi port:**
+- **Video không ngồi chờ.** Bản gốc gửi task rồi hỏi mỗi 5 giây trong cùng lời gọi (tối đa 30 phút). Tách thành `submit` (đưa lên TOS, xác định tham chiếu, gửi, lưới an toàn) → trả `taskId`, và `fetch` (đọc trạng thái một lần, tải file) theo §3a.
+- **Huỷ thật:** gọi API huỷ của ModelArk cho task còn `queued`. Bản gốc chỉ dừng phía mình.
+- **Bộ nhớ đệm vào Postgres:** bảng `sha256 → tos_key, byteplus_asset_id, real_person, asset_type` thay cho file `.meta.json` cạnh object trên TOS. Vòng đời object TOS (ví dụ xoá sau 30 ngày) vẫn giữ; object hết hạn thì đưa lên lại.
+- **Kiểm tra người thật là một bước trong hàng đợi**, không gọi lồng trong bước gửi.
+- **Không gửi `seed`.**
+- **Giấy phép:** bản gốc kế thừa lớp `OpenAICompatProvider` của NodeTool (AGPL-3.0). Chỉ port phần logic BytePlus của chủ repo, viết lại theo `ModelsClient` của zcanvas; không chép code gốc NodeTool.
+
+**Chưa thử thật** (làm trong script chạy thử trước khi bật): `asset://` có qua bước chặn người thật trên tài khoản này không; `asset://` cho video và audio; định dạng lỗi chặn đầu vào; Seed Audio TTS.
+
+**Model đợt đầu:** LLM `seed-2-0-pro-260328`; ảnh `dola-seedream-5-0-pro-260628` (Seedream 5.0 Pro); video `dreamina-seedance-2-5-260628` (Seedance 2.5, cần resource pack 2.5); TTS `seed-audio-1.0`. Seedance 2.0 / Fast / Mini và Seedream Lite thêm qua endpoint `ep-…`.
+
 ## 4. Các bước
 
 | Bước | Nội dung | Xong khi |
 | --- | --- | --- |
 | **P0 · Contract** | Mục 3, kèm test contract và migration (`kept`, lịch sử job) | `pnpm test` xanh; registry và schema mới được validate |
-| **P1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, ETA, `gen-fetch` hẹn giờ, callback, slot dùng chung, huỷ, thử lại). Client REST: Seedream (tạo + sửa ảnh), Seedance (tạo task, hỏi trạng thái, huỷ), TTS. Config `ARK_API_KEY`, `ARK_BASE_URL`, map model. `signal` huỷ task thật. Lỗi nhà cung cấp thành lỗi job dễ đọc. Ghi `usage` (cho hạn ngạch sau này) | Chạy được ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
+| **P1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, ETA, `gen-fetch` hẹn giờ, callback, slot dùng chung, huỷ, thử lại). Adapter BytePlus **port từ provider đã chạy thật** (§3b): Seedream (tạo + sửa ảnh), Seedance (tách thành gửi task và lấy kết quả, thêm huỷ task đang xếp hàng), Seed Audio TTS, tham chiếu qua TOS + `asset://`. Lỗi nhà cung cấp thành lỗi job dễ đọc. Ghi `usage` (cho hạn ngạch sau này). Script chạy thử với key thật + test dùng response ghi sẵn | Chạy được ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
 | **P2 · LLM** | Client OpenAI-compatible trỏ vào ModelArk, đi qua hàng đợi; worker `text.generate` (đọc ảnh, video, audio làm context nếu model hỗ trợ); Auto chọn model | Node Text chạy thật; đổi provider chỉ là đổi config |
 | **P3 · Vòng lặp chất lượng (bản đầu)** | Mỗi run là một vòng lặp, mỗi bước là một job trong hàng đợi, trạng thái lưu trong Postgres: viết lại prompt → sinh → (tuỳ chọn) chấm bằng model nhìn được → thử lại. Có trần số lần và thời gian. Lưu **công thức cuối** (prompt cuối, model, tham số) vào `generation` | Run lưu được ý định gốc và công thức cuối; huỷ giữa vòng lặp giữ bản tốt nhất |
 | **P4 · Kit vào canvas thật** | Node generate dùng Composer của kit qua một `GenSource` đọc Graph (Yjs) và API thật; `@` autocomplete lấy từ edge, asset và upload thật; chip vai trò ghi lên edge; lịch sử node từ endpoint mục 3.6 | Mọi luồng của prototype canvas chạy trên dữ liệu thật |
@@ -88,9 +112,9 @@ P1 và P2 làm song song được sau P0. P4 và P5 dùng chung `GenSource` th�
 
 1. **`@asset` trên canvas** tự thêm node `input.asset` (đề xuất, để canvas thể hiện đủ flow) hay chỉ nằm trong prompt?
 2. **Vòng lặp chất lượng ở P3** bật mặc định cho mọi run, hay bắt đầu bằng "Auto prompt" rồi mới thêm bước chấm điểm?
-3. **Model cụ thể đợt đầu**: Seedream bản nào, Seedance bản nào, TTS nào, LLM nào. Plan cần danh sách để làm catalog.
 
 ## Nguồn
 
 - [BytePlus ModelArk SDK overview](https://docs.byteplus.com/en/docs/ModelArk/1302007) · [OpenAI compatibility](https://docs.byteplus.com/api/docs/ModelArk/1330626) · [Video Generation API](https://docs.byteplus.com/en/docs/ModelArk/Video_Generation_API) · [Video generation tutorial](https://docs.byteplus.com/en/docs/modelark/video-generation-tutorial?redirect=1) · [3D task API (callback_url)](https://docs.byteplus.com/en/docs/modelark/shumei-create-3d-generation-task-api?redirect=1) · [Image generation API (URL 24 giờ)](https://docs.byteplus.com/en/docs/ModelArk/1541523)
+- Provider gốc: nhánh `byteplus-provider` của `thaolhcx/nodetool` (riêng tư)
 - [AI SDK 6](https://vercel.com/blog/ai-sdk-6) · [@ai-sdk/bytedance](https://www.npmjs.com/package/@ai-sdk/bytedance)
