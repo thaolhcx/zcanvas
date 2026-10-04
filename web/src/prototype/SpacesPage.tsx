@@ -62,6 +62,20 @@ function GenFeed({ id, history, onHistory }: { id: string; history: boolean; onH
   const [picking, setPicking] = useState(false);
   const composer = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  const feed = useRef<HTMLElement>(null);
+  const node = useProto((s) => s.nodes[id]);
+  // Newest is at the bottom: open scrolled down, and follow when a card is added — a new job or a
+  // finished/stopped run — but not when one is deleted.
+  const runCount = node?.history.length ?? 0,
+    jobCount = node?.jobs?.length ?? 0;
+  const seen = useRef<{ runs: number; jobs: number }>(undefined);
+  useEffect(() => {
+    const el = feed.current,
+      prev = seen.current;
+    if (el && (!prev || runCount > prev.runs || jobCount > prev.jobs))
+      requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: prev ? "smooth" : "instant" }));
+    seen.current = { runs: runCount, jobs: jobCount };
+  }, [runCount, jobCount]);
   const addInput = useCallback(() => setPicking(true), []);
   const source = useGenSource(id, { addInput });
   const openDetail = useDetail((s) => s.open);
@@ -102,7 +116,7 @@ function GenFeed({ id, history, onHistory }: { id: string; history: boolean; onH
           <History size={14} /> History
         </button>
       )}
-      <section className="proto-feed">
+      <section className="proto-feed" ref={feed}>
         {entries.map((e) => (
           <FeedCard
             key={e.id}

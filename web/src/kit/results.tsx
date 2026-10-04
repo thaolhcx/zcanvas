@@ -538,40 +538,40 @@ export function MediaViewer({ output }: { output: Output }) {
   }, [output]);
   return (
     <>
-    {output.kind === "image" ? (
-      <img src={output.url} alt="" style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} />
-    ) : output.kind === "video" ? (
-      <VideoPlayer output={output} autoPlay controls />
-    ) : output.kind === "audio" ? (
-      <AudioWave output={output} />
-    ) : (
-      <div className="kit-text big">
-        <Markdown text={output.text ?? ""} />
-      </div>
-    )}
-    {output.kind === "image" && (
-      <div className="kit-lightbox-bar">
-        <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))} title="Zoom out">
-          <ZoomOut size={15} />
-        </button>
-        <input type="range" min={0.25} max={4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
-        <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} title="Enlarge">
-          <ZoomIn size={15} />
-        </button>
-        <button onClick={() => setZoom(1)} title="Original size">
-          <span className="kit-one">1:1</span>
-        </button>
-        <button onClick={() => setTurn(turn - 90)} title="Reverse rotation 90°">
-          <RotateCcw size={15} />
-        </button>
-        <button onClick={() => setTurn(turn + 90)} title="Clockwise 90°">
-          <RotateCw size={15} />
-        </button>
-        <a href={output.url} download="image" title="Download">
-          <Download size={15} />
-        </a>
-      </div>
-    )}
+      {output.kind === "image" ? (
+        <img src={output.url} alt="" style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} />
+      ) : output.kind === "video" ? (
+        <VideoPlayer output={output} autoPlay controls />
+      ) : output.kind === "audio" ? (
+        <AudioWave output={output} />
+      ) : (
+        <div className="kit-text big">
+          <Markdown text={output.text ?? ""} />
+        </div>
+      )}
+      {output.kind === "image" && (
+        <div className="kit-lightbox-bar">
+          <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))} title="Zoom out">
+            <ZoomOut size={15} />
+          </button>
+          <input type="range" min={0.25} max={4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
+          <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} title="Enlarge">
+            <ZoomIn size={15} />
+          </button>
+          <button onClick={() => setZoom(1)} title="Original size">
+            <span className="kit-one">1:1</span>
+          </button>
+          <button onClick={() => setTurn(turn - 90)} title="Reverse rotation 90°">
+            <RotateCcw size={15} />
+          </button>
+          <button onClick={() => setTurn(turn + 90)} title="Clockwise 90°">
+            <RotateCw size={15} />
+          </button>
+          <a href={output.url} download="image" title="Download">
+            <Download size={15} />
+          </a>
+        </div>
+      )}
     </>
   );
 }
