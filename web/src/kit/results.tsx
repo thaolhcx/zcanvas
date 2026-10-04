@@ -453,6 +453,7 @@ export function FeedCard({
               <Popover
                 width={170}
                 align="end"
+                placement="bottom"
                 trigger={(open, toggle) => (
                   <button className={`kit-feed-more ${open ? "open" : ""}`} onClick={toggle} aria-label="More">
                     <Ellipsis size={15} />
@@ -509,17 +510,11 @@ export function FeedCard({
 
 /** Full-screen preview (Lumina ref 48): image with a bottom bar — zoom −, slider, +, original size, rotate ±90°, download. */
 export function Lightbox({ output, onClose }: { output?: Output; onClose: () => void }) {
-  const [zoom, setZoom] = useState(1),
-    [turn, setTurn] = useState(0);
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
     document.addEventListener("keydown", key, true);
     return () => document.removeEventListener("keydown", key, true);
   }, [onClose]);
-  useEffect(() => {
-    setZoom(1);
-    setTurn(0);
-  }, [output]);
   if (!output) return null;
   return (
     <div className="kit-lightbox" onClick={onClose}>
@@ -527,41 +522,56 @@ export function Lightbox({ output, onClose }: { output?: Output; onClose: () => 
         <X size={16} />
       </button>
       <div className="kit-lightbox-body" onClick={(e) => e.stopPropagation()}>
-        {output.kind === "image" ? (
-          <img src={output.url} alt="" style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} />
-        ) : output.kind === "video" ? (
-          <VideoPlayer output={output} autoPlay controls />
-        ) : output.kind === "audio" ? (
-          <AudioWave output={output} />
-        ) : (
-          <div className="kit-text big">
-            <Markdown text={output.text ?? ""} />
-          </div>
-        )}
-        {output.kind === "image" && (
-          <div className="kit-lightbox-bar">
-            <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))} title="Zoom out">
-              <ZoomOut size={15} />
-            </button>
-            <input type="range" min={0.25} max={4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
-            <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} title="Enlarge">
-              <ZoomIn size={15} />
-            </button>
-            <button onClick={() => setZoom(1)} title="Original size">
-              <span className="kit-one">1:1</span>
-            </button>
-            <button onClick={() => setTurn(turn - 90)} title="Reverse rotation 90°">
-              <RotateCcw size={15} />
-            </button>
-            <button onClick={() => setTurn(turn + 90)} title="Clockwise 90°">
-              <RotateCw size={15} />
-            </button>
-            <a href={output.url} download="image" title="Download">
-              <Download size={15} />
-            </a>
-          </div>
-        )}
+        <MediaViewer output={output} />
       </div>
     </div>
+  );
+}
+
+/** The Lightbox's viewer without the overlay, so a detail modal can embed it. */
+export function MediaViewer({ output }: { output: Output }) {
+  const [zoom, setZoom] = useState(1),
+    [turn, setTurn] = useState(0);
+  useEffect(() => {
+    setZoom(1);
+    setTurn(0);
+  }, [output]);
+  return (
+    <>
+    {output.kind === "image" ? (
+      <img src={output.url} alt="" style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} />
+    ) : output.kind === "video" ? (
+      <VideoPlayer output={output} autoPlay controls />
+    ) : output.kind === "audio" ? (
+      <AudioWave output={output} />
+    ) : (
+      <div className="kit-text big">
+        <Markdown text={output.text ?? ""} />
+      </div>
+    )}
+    {output.kind === "image" && (
+      <div className="kit-lightbox-bar">
+        <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))} title="Zoom out">
+          <ZoomOut size={15} />
+        </button>
+        <input type="range" min={0.25} max={4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
+        <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} title="Enlarge">
+          <ZoomIn size={15} />
+        </button>
+        <button onClick={() => setZoom(1)} title="Original size">
+          <span className="kit-one">1:1</span>
+        </button>
+        <button onClick={() => setTurn(turn - 90)} title="Reverse rotation 90°">
+          <RotateCcw size={15} />
+        </button>
+        <button onClick={() => setTurn(turn + 90)} title="Clockwise 90°">
+          <RotateCw size={15} />
+        </button>
+        <a href={output.url} download="image" title="Download">
+          <Download size={15} />
+        </a>
+      </div>
+    )}
+    </>
   );
 }

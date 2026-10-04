@@ -11,31 +11,12 @@ import { useProto } from "./store.ts";
 import { TYPE_ICON } from "./nodes.tsx";
 import { MEDIA_LIBRARY, SAMPLES, upload } from "./actions.ts";
 import { Clapperboard, FolderOpen, Upload, UserSquare } from "lucide-react";
-import { useLightbox } from "./lightbox.ts";
+import { TABS, useDetail, useSpace } from "./spaces.ts";
 
-export const TABS = ["image", "video", "audio", "text"] as const;
 const TAB_LABEL = { image: "Image", video: "Video", audio: "Audio", text: "Text" };
-export type Tab = (typeof TABS)[number];
-
-const readTab = (): Tab => {
-  try {
-    const t = localStorage.getItem("proto.space");
-    return TABS.includes(t as Tab) ? (t as Tab) : "image";
-  } catch {
-    return "image";
-  }
-};
 
 export function SpacesPage() {
-  const [tab, setTabState] = useState<Tab>(readTab);
-  const setTab = (t: Tab) => {
-    setTabState(t);
-    try {
-      localStorage.setItem("proto.space", t);
-    } catch {
-      /* private mode: the tab is just not remembered */
-    }
-  };
+  const { tab, setTab } = useSpace();
   const id = `page:${tab}`;
   const exists = useProto((s) => !!s.nodes[id]);
   useEffect(() => {
@@ -79,7 +60,7 @@ function GenFeed({ id }: { id: string }) {
   const file = useRef<HTMLInputElement>(null);
   const addInput = useCallback(() => setPicking(true), []);
   const source = useGenSource(id, { addInput });
-  const open = useLightbox((s) => s.open);
+  const openDetail = useDetail((s) => s.open);
   if (!source) return null;
   const api = useProto.getState();
   const model = modelOf(source.models, source.value.model);
@@ -126,7 +107,14 @@ function GenFeed({ id }: { id: string }) {
             }}
             onRerun={() => source.rerun?.(e.id)}
             onDelete={() => source.removeEntry?.(e.id)}
-            onOpen={(i) => e.outputs[i] && open(e.outputs[i])}
+            onOpen={(i) => {
+              const done = entries.filter((x) => !x.cancelled);
+              openDetail(
+                done.map((x) => ({ nodeId: id, entryId: x.id })),
+                Math.max(0, done.indexOf(e)),
+                i,
+              );
+            }}
             onDownload={download}
             onOpenInCanvas={() => api.toast("Open in canvas is not in this prototype.", "info")}
           />

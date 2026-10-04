@@ -66,6 +66,8 @@ interface State {
   cancel(id: string, jobId?: string): void;
   setActive(id: string, entryId: string, index?: number): void;
   reEdit(id: string, entryId: string): void;
+  /** Fill a node's composer from any run (Re-edit, Clone & try): its value, and its references as uploads. */
+  fillFrom(id: string, entry: RunEntry): void;
   /** Regenerate: run a past entry's value again; the composer stays as the user left it. */
   rerun(id: string, entryId: string): void;
   removeEntry(id: string, entryId: string): void;
@@ -256,9 +258,12 @@ export const useProto = create<State>((set, get) => ({
   reEdit(id, entryId) {
     const n = get().nodes[id];
     const entry = n.history.find((e) => e.id === entryId);
-    if (!entry) return;
-    // References come back as uploads; those that came over an edge (ids from nid("e")) stay wired on the canvas.
-    const uploads = entry.refs.filter((r) => !r.id.startsWith("e_"));
+    if (entry) get().fillFrom(id, entry);
+  },
+  fillFrom(id, entry) {
+    // References come back as uploads. On the canvas, those that came over an edge (ids from nid("e"))
+    // are still wired; in a space there are no edges, so every reference becomes an upload.
+    const uploads = onCanvasNode(id) ? entry.refs.filter((r) => !r.id.startsWith("e_")) : entry.refs;
     patchNode(id, { value: structuredClone(entry.value), uploads });
     afterInputsChanged(id);
     get().toast("Filled in parameters", "info");
@@ -314,6 +319,7 @@ export const useProto = create<State>((set, get) => ({
 }));
 
 const HISTORY_MAX = 50;
+const onCanvasNode = (id: string) => !id.startsWith("page:");
 
 /** Start a fake job from a frozen value + inputs. Several jobs may run on one node at once. */
 function start(id: string, value: GenValue, inputs: RefItem[]) {

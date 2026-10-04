@@ -8,6 +8,7 @@ import { Lightbox } from "../kit/results.tsx";
 import type { RunEntry } from "../kit/types.ts";
 import { CanvasProto } from "./CanvasProto.tsx";
 import { SpacesPage } from "./SpacesPage.tsx";
+import { RunDetail } from "./RunDetail.tsx";
 import { NODES, VOICE_SCENES, VOICES } from "./catalog.ts";
 import { audioClip, generateOutputs, imageUrl } from "./generate.ts";
 import { inputsOf, useProto, type ProtoType } from "./store.ts";
@@ -206,6 +207,7 @@ function App() {
       </header>
       <ReactFlowProvider>{view === "canvas" ? <CanvasProto /> : <SpacesPage />}</ReactFlowProvider>
       <Toasts />
+      <RunDetail />
       <Lightbox output={lightbox.output} onClose={lightbox.close} />
     </KitContext.Provider>
   );
