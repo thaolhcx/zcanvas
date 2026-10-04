@@ -1,6 +1,6 @@
 // Spaces: one generation page per media kind (Lumina /model/image, /video, /audio), plus Text.
 // Each space is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "../kit/Composer.tsx";
 import { FeedCard } from "../kit/results.tsx";
 import { modelOf } from "../kit/logic.ts";
@@ -60,6 +60,7 @@ export function SpacesPage() {
 
 function GenFeed({ id }: { id: string }) {
   const [picking, setPicking] = useState(false);
+  const composer = useRef<HTMLDivElement>(null);
   const addInput = useCallback(() => setPicking(true), []);
   const source = useGenSource(id, { addInput });
   const open = useLightbox((s) => s.open);
@@ -84,11 +85,13 @@ function GenFeed({ id }: { id: string }) {
             node={source.node}
             models={source.models}
             entry={e}
-            onReEdit={() => source.reEdit(e.id)}
-            onRerun={() => {
+            onReEdit={() => {
               source.reEdit(e.id);
-              setTimeout(() => api.run(id), 0);
+              composer.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              composer.current?.querySelector("textarea")?.focus();
             }}
+            onRerun={() => source.rerun?.(e.id)}
+            onDelete={() => source.removeEntry?.(e.id)}
             onOpen={(i) => e.outputs[i] && open(e.outputs[i])}
             onDownload={download}
             onOpenInCanvas={() => api.toast("Open in canvas is not in this prototype.", "info")}
@@ -110,7 +113,7 @@ function GenFeed({ id }: { id: string }) {
           </div>
         )}
       </section>
-      <div className="proto-gen-composer">
+      <div className="proto-gen-composer" ref={composer}>
         <Composer source={source} layout="wide" />
       </div>
       {picking && (

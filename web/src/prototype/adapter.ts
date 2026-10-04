@@ -49,6 +49,8 @@ export function useGenSource(id: string, opts?: { addInput?: () => void }): GenS
       active: node.active,
       setActive: (entryId, index) => api.setActive(id, entryId, index),
       reEdit: (entryId) => api.reEdit(id, entryId),
+      rerun: (entryId) => api.rerun(id, entryId),
+      removeEntry: (entryId) => api.removeEntry(id, entryId),
     };
   }, [node, edges, nodes, id, api, opts?.addInput]);
 }

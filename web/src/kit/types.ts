@@ -237,5 +237,9 @@ export interface GenSource {
   history: RunEntry[];
   active?: { entryId: string; index: number };
   setActive(entryId: string, index?: number): void;
+  /** Fill the composer from a past run (prompt, settings, references). */
   reEdit(entryId: string): void;
+  /** Run a past entry again as it was, without touching the composer. */
+  rerun?(entryId: string): void;
+  removeEntry?(entryId: string): void;
 }

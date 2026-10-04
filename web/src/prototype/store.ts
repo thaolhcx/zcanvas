@@ -66,6 +66,9 @@ interface State {
   cancel(id: string, jobId?: string): void;
   setActive(id: string, entryId: string, index?: number): void;
   reEdit(id: string, entryId: string): void;
+  /** Regenerate: run a past entry's value again; the composer stays as the user left it. */
+  rerun(id: string, entryId: string): void;
+  removeEntry(id: string, entryId: string): void;
   editText(id: string, text: string): void;
   setSticky(id: string, patch: Partial<NonNullable<ProtoNode["sticky"]>>): void;
   toast(text: string, tone?: Toast["tone"], undo?: () => void): void;
@@ -253,8 +256,31 @@ export const useProto = create<State>((set, get) => ({
   reEdit(id, entryId) {
     const n = get().nodes[id];
     const entry = n.history.find((e) => e.id === entryId);
-    if (entry) patchNode(id, { value: structuredClone(entry.value) });
-    get().toast("Loaded that run's prompt and settings.", "info");
+    if (!entry) return;
+    patchNode(id, { value: structuredClone(entry.value) });
+    get().toast("Filled in parameters", "info");
+  },
+  rerun(id, entryId) {
+    const s = get(),
+      n = s.nodes[id];
+    const entry = n?.history.find((e) => e.id === entryId);
+    if (!entry || n.type === "sticky") return;
+    const spec = NODES[n.type],
+      model = modelOf(modelsFor(spec), entry.value.model),
+      inputs = inputsOf(s, id);
+    const issues = validate(spec, model, entry.value, inputs);
+    if (issues.length) return get().toast(issues[0], "warn");
+    start(id, structuredClone(entry.value), inputs);
+  },
+  removeEntry(id, entryId) {
+    const n = get().nodes[id];
+    if (!n) return;
+    const before = { history: n.history, active: n.active };
+    const history = n.history.filter((e) => e.id !== entryId);
+    const keep = n.active?.entryId !== entryId && history.some((e) => e.id === n.active?.entryId);
+    const next = history.find((e) => !e.cancelled);
+    patchNode(id, { history, active: keep ? n.active : next && { entryId: next.id, index: 0 } });
+    get().toast("Deleted.", "info", () => patchNode(id, before));
   },
   editText(id, text) {
     const n = get().nodes[id];
