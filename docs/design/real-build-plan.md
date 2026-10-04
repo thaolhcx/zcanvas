@@ -45,18 +45,21 @@ Trạng thái: **plan, chưa làm**. Thay prototype ([node-prototype-summary.md]
 
 Hiện tại mỗi run là **một** job pg-boss (`canvas-run`). Bên trong job, worker `await` thẳng model, và giới hạn đồng thời là một `Map` trong bộ nhớ của process (`withWorkerSlot`). Với video mất vài phút, cách này giữ job suốt lúc chờ, mất task của nhà cung cấp khi restart (có thể gửi lại, tốn hai lần) và không giới hạn được giữa nhiều process.
 
-Mô hình mới: **gửi, ghi lại, hỏi lại sau**.
+Mô hình mới: **tạo task, hẹn giờ theo thời gian dự kiến, đến hạn thì lấy về**. Không có gì ngồi chờ, cũng không hỏi trạng thái dày đặc.
 
 1. **Một node cần chạy = một job riêng** (`gen-submit`), không phải một bước trong job của run. Run chỉ điều phối: khi node phía trên xong thì đẩy job của node phía dưới.
-2. **`gen-submit`** chiếm một slot của nhà cung cấp, gửi task, rồi **lưu `providerTaskId` vào Postgres trước khi trả về**. Khoá idempotency theo `jobId + attempt` để restart không gửi trùng.
-3. **`gen-poll`** được hẹn giờ (`sendAfter`, giãn dần 2s → 30s). Nó hỏi trạng thái rồi hẹn lần sau, không ngồi chờ. Xong thì tải file, `putAsset`, phát `run_events` và nhả slot.
-4. **Slot và rate limit dùng chung** trong Postgres theo nhà cung cấp và model, ví dụ Seedance tối đa 10 task đồng thời cho mỗi model và giới hạn số request mỗi phút. Hết slot thì job chờ trong hàng, không gọi thử.
-5. **Huỷ** = gọi API huỷ của nhà cung cấp với `providerTaskId`, rồi đánh dấu job. Task đã xong thì vẫn lưu kết quả (đã tốn tiền).
-6. **Lỗi:** 429 và 5xx thử lại có giãn cách; lỗi nội dung hoặc tham số thì dừng ngay với thông báo dễ đọc. Quá hạn thì huỷ phía nhà cung cấp.
-7. **Công bằng giữa người dùng:** mỗi người có trần số job đang chạy, để một người chạy hàng loạt không chặn người khác.
-8. **LLM cũng đi qua hàng đợi** (node Text, các bước của vòng lặp chất lượng). Gọi nhanh thì `gen-submit` làm luôn, không cần `gen-poll`.
+2. **`gen-submit`** chiếm một slot của nhà cung cấp, tạo task, rồi **lưu `providerTaskId` và thời điểm dự kiến xong (ETA) vào Postgres trước khi trả về**. Khoá idempotency theo `jobId + attempt` để restart không tạo trùng.
+3. **ETA** lấy từ thời gian thật của các lần trước, theo model và tham số chính (độ dài, độ phân giải, số ảnh). Dùng mức p50 để hẹn, p90 làm hạn chót mềm. Nhà cung cấp có trả ước lượng thì ưu tiên. Mỗi task xong lại cập nhật thống kê.
+4. **`gen-fetch`** được hẹn đúng ETA (`sendAfter`). Đến hạn thì lấy kết quả: xong thì **tải file về kho của mình ngay** (URL của nhà cung cấp hết hạn, ảnh ModelArk chỉ sống 24 giờ), `putAsset`, phát `run_events`, nhả slot. Chưa xong thì hẹn lại theo phần thời gian còn lại, có trần số lần.
+5. **Callback khi nhà cung cấp hỗ trợ** (`callback_url` của ModelArk): callback chỉ đánh thức `gen-fetch` sớm hơn, không thay nó. Mất callback thì lần hẹn theo ETA vẫn lấy về được.
+6. **UI hiện thời gian dự kiến** ("≈ 1 phút 40 giây"), và vị trí trong hàng nếu đang chờ slot, thay cho thanh tiến độ giả.
+7. **Slot và rate limit dùng chung** trong Postgres theo nhà cung cấp và model, ví dụ Seedance tối đa 10 task đồng thời cho mỗi model và giới hạn số request mỗi phút. Hết slot thì job chờ trong hàng, không gọi thử.
+8. **Huỷ:** ModelArk chỉ huỷ được task **đang xếp hàng**. Task đã chạy thì dừng phía mình, vẫn lấy kết quả về khi xong (đã tốn tiền) và không đưa vào feed. Khớp với `ModelSpec.cancel: "queued"` của kit.
+9. **Lỗi:** 429 và 5xx thử lại có giãn cách; lỗi nội dung hoặc tham số thì dừng ngay với thông báo dễ đọc. Quá hạn chót cứng thì huỷ nếu được và báo lỗi.
+10. **Công bằng giữa người dùng:** mỗi người có trần số job đang chạy, để một người chạy hàng loạt không chặn người khác.
+11. **LLM cũng đi qua hàng đợi** (node Text, các bước của vòng lặp chất lượng). Gọi nhanh thì `gen-submit` làm luôn, không cần `gen-fetch`.
 
-Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ chế: mỗi bước là một job, trạng thái nằm trong Postgres, chờ media thì ngủ và được đánh thức khi job xong. Không cần thư viện durable workflow nào.
+Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ chế: mỗi bước là một job, trạng thái nằm trong Postgres, chờ media thì ngủ đến ETA hoặc tới khi callback đánh thức. Không cần thư viện durable workflow nào.
 
 **Mẫu tham khảo:** harness của AI SDK 6 (`Agent` là interface, `ToolLoopAgent` là bản mặc định): chỉ dẫn + tool + điều kiện dừng, móc trước và sau mỗi bước, tin nhắn chia phần (chữ, gọi tool, kết quả tool), tool cần người duyệt. Vòng lặp của mình theo đúng hình dạng đó để sau này có thể cài interface `Agent` lên hàng đợi của mình, dùng lại thư viện và UI của họ mà không phụ thuộc hạ tầng Vercel.
 
@@ -65,7 +68,7 @@ Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ 
 | Bước | Nội dung | Xong khi |
 | --- | --- | --- |
 | **P0 · Contract** | Mục 3, kèm test contract và migration (`kept`, lịch sử job) | `pnpm test` xanh; registry và schema mới được validate |
-| **P1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, `gen-poll`, slot dùng chung, huỷ, thử lại). Client REST: Seedream (tạo + sửa ảnh), Seedance (tạo task, hỏi trạng thái, huỷ), TTS. Config `ARK_API_KEY`, `ARK_BASE_URL`, map model. `signal` huỷ task thật. Lỗi nhà cung cấp thành lỗi job dễ đọc. Ghi `usage` (cho hạn ngạch sau này) | Chạy được ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
+| **P1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, ETA, `gen-fetch` hẹn giờ, callback, slot dùng chung, huỷ, thử lại). Client REST: Seedream (tạo + sửa ảnh), Seedance (tạo task, hỏi trạng thái, huỷ), TTS. Config `ARK_API_KEY`, `ARK_BASE_URL`, map model. `signal` huỷ task thật. Lỗi nhà cung cấp thành lỗi job dễ đọc. Ghi `usage` (cho hạn ngạch sau này) | Chạy được ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
 | **P2 · LLM** | Client OpenAI-compatible trỏ vào ModelArk, đi qua hàng đợi; worker `text.generate` (đọc ảnh, video, audio làm context nếu model hỗ trợ); Auto chọn model | Node Text chạy thật; đổi provider chỉ là đổi config |
 | **P3 · Vòng lặp chất lượng (bản đầu)** | Mỗi run là một vòng lặp, mỗi bước là một job trong hàng đợi, trạng thái lưu trong Postgres: viết lại prompt → sinh → (tuỳ chọn) chấm bằng model nhìn được → thử lại. Có trần số lần và thời gian. Lưu **công thức cuối** (prompt cuối, model, tham số) vào `generation` | Run lưu được ý định gốc và công thức cuối; huỷ giữa vòng lặp giữ bản tốt nhất |
 | **P4 · Kit vào canvas thật** | Node generate dùng Composer của kit qua một `GenSource` đọc Graph (Yjs) và API thật; `@` autocomplete lấy từ edge, asset và upload thật; chip vai trò ghi lên edge; lịch sử node từ endpoint mục 3.6 | Mọi luồng của prototype canvas chạy trên dữ liệu thật |
@@ -89,5 +92,5 @@ P1 và P2 làm song song được sau P0. P4 và P5 dùng chung `GenSource` th�
 
 ## Nguồn
 
-- [BytePlus ModelArk SDK overview](https://docs.byteplus.com/en/docs/ModelArk/1302007) · [OpenAI compatibility](https://docs.byteplus.com/api/docs/ModelArk/1330626) · [Video Generation API](https://docs.byteplus.com/en/docs/ModelArk/Video_Generation_API)
+- [BytePlus ModelArk SDK overview](https://docs.byteplus.com/en/docs/ModelArk/1302007) · [OpenAI compatibility](https://docs.byteplus.com/api/docs/ModelArk/1330626) · [Video Generation API](https://docs.byteplus.com/en/docs/ModelArk/Video_Generation_API) · [Video generation tutorial](https://docs.byteplus.com/en/docs/modelark/video-generation-tutorial?redirect=1) · [3D task API (callback_url)](https://docs.byteplus.com/en/docs/modelark/shumei-create-3d-generation-task-api?redirect=1) · [Image generation API (URL 24 giờ)](https://docs.byteplus.com/en/docs/ModelArk/1541523)
 - [AI SDK 6](https://vercel.com/blog/ai-sdk-6) · [@ai-sdk/bytedance](https://www.npmjs.com/package/@ai-sdk/bytedance)
