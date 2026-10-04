@@ -7,6 +7,7 @@ import type {
   ModelSpec,
   NodeSpec,
   RefItem,
+  RoleSpec,
 } from "./types.ts";
 
 export function modelOf(models: ModelSpec[], key: string) {
@@ -121,6 +122,53 @@ export function suggestMode(node: NodeSpec, inputs: RefItem[]) {
   return undefined;
 }
 
+/** Roles an input of `kind` may take in `mode`, in default order. */
+export function rolesFor(node: NodeSpec, mode: string | undefined, kind: MediaKind): RoleSpec[] {
+  return (node.roles ?? []).filter((r) => r.kinds.includes(kind) && (!r.modes || !mode || r.modes.includes(mode)));
+}
+
+/**
+ * Settle every input's role for the current mode: keep a stored role while it is still valid and
+ * has room, then hand out the first free fitting role to the rest. No fitting role → undefined,
+ * and `validate` reports it. Pure, so the store and the UI always agree.
+ */
+export function assignRoles(node: NodeSpec, mode: string | undefined, inputs: RefItem[]): RefItem[] {
+  if (!node.roles) return inputs;
+  const used = new Map<string, number>();
+  const room = (r: RoleSpec) => (used.get(r.key) ?? 0) < (r.max ?? Infinity);
+  const take = (r: RoleSpec) => (used.set(r.key, (used.get(r.key) ?? 0) + 1), r.key);
+  const out: (string | undefined)[] = inputs.map((i) => {
+    const r = i.role ? rolesFor(node, mode, i.kind).find((x) => x.key === i.role) : undefined;
+    return r && room(r) ? take(r) : undefined;
+  });
+  inputs.forEach((i, n) => {
+    if (out[n]) return;
+    const r = rolesFor(node, mode, i.kind).find(room);
+    out[n] = r ? take(r) : undefined;
+  });
+  return inputs.map((i, n) => (i.role === out[n] ? i : { ...i, role: out[n] }));
+}
+
+/**
+ * The user picks a role for one input. If that role is full, its holder gets the picker's old
+ * role (first ↔ last frame swap) or whatever is free. Returns the new role per input id.
+ */
+export function reassignRole(node: NodeSpec, mode: string | undefined, inputs: RefItem[], id: string, role: string): Record<string, string | undefined> {
+  const spec = node.roles?.find((r) => r.key === role);
+  const me = inputs.find((i) => i.id === id);
+  if (!spec || !me) return {};
+  const holders = inputs.filter((i) => i.role === role && i.id !== id);
+  const next = inputs.map((i) => (i.id === id ? { ...i, role } : i));
+  if (spec.max !== undefined && holders.length >= spec.max) {
+    const bumped = holders[holders.length - 1];
+    const idx = next.findIndex((i) => i.id === bumped.id);
+    next[idx] = { ...bumped, role: me.role && me.role !== role ? me.role : undefined };
+  }
+  // Put the picker first so the settle pass honours it, then restore order.
+  const settled = assignRoles(node, mode, [next.find((i) => i.id === id)!, ...next.filter((i) => i.id !== id)]);
+  return Object.fromEntries(settled.map((i) => [i.id, i.role]));
+}
+
 /** Model can't read one of the connected kinds, or gets too many of one. */
 export function inputProblems(model: ModelSpec, inputs: RefItem[]) {
   const problems: string[] = [];
@@ -158,6 +206,15 @@ export function validate(
   const mode = node.modes?.find((m) => m.value === value.mode);
   if (mode?.needs && !inputs.some((i) => i.kind === mode.needs))
     issues.push(`${mode.label} needs a ${mode.needs} input`);
+  if (node.roles) {
+    for (const r of node.roles)
+      if (r.required && (!r.modes || !value.mode || r.modes.includes(value.mode)) && !inputs.some((i) => i.role === r.key))
+        issues.push(`Set one input as ${r.label}`);
+    for (const i of inputs)
+      if (!i.role && rolesFor(node, value.mode, i.kind).length === 0 && node.roles.some((r) => r.kinds.includes(i.kind)))
+        issues.push(`${i.label} has no place in ${mode?.label ?? "this mode"}`);
+      else if (!i.role) issues.push(`No free slot for ${i.label}`);
+  }
   return issues;
 }
 

@@ -55,5 +55,5 @@ Mọi tính năng mới của node phải trả lời được: nó thuộc đ�
 | Tab mode (Video/Audio) | **Giữ tường minh.** Model quá phức tạp, nhiều loại tham chiếu, không đoán được | Giữ nguyên |
 | Menu thêm node | **Giữ theo loại node.** Chưa cần gợi ý "Bắt đầu từ…" | Giữ nguyên |
 | Run / Run from here / Run all, badge "changed" | **Scope khác**, thiết kế sau khi chốt node | Chưa làm |
-| Vai trò trên chip đầu vào (First frame · Reference · Source) | Chưa bàn | Chưa làm |
+| Vai trò trên chip đầu vào | **Làm.** Mỗi input có một vai trò theo loại node + mode; tự xếp khi nối, xếp lại khi đổi mode, bấm để đổi (slot đầy thì hoán đổi), thiếu chỗ thì chip đỏ và khoá Run. Vai trò = port trong recipe khi ghép vào contracts | Đã sửa |
 | Ẩn tool chưa có worker | Chưa bàn | Chưa làm |

@@ -41,6 +41,8 @@ export const NODES: Record<string, NodeSpec> = {
     paramsInModel: true,
     // "@" per node type: Text can quote any input; no colour tokens.
     mentions: { kinds: ["text", "image", "video", "audio"] },
+    // Everything an LLM reads is context; one role keeps the chips quiet.
+    roles: [{ key: "context", label: "Context", kinds: ["text", "image", "video", "audio"] }],
     fields: [
       // Intent first: a preset fills the system prompt, so the user says what they want, not how.
       {
@@ -73,6 +75,13 @@ export const NODES: Record<string, NodeSpec> = {
     promptPlaceholder: PROMPT_HINT,
     // Image: place a reference or a colour ("make the cup #46a758").
     mentions: { kinds: ["image", "text"], colors: true },
+    roles: [
+      { key: "prompt", label: "Prompt", kinds: ["text"] },
+      { key: "reference", label: "Reference", kinds: ["image"] },
+      // Images being edited (SeedEdit, upscale, layers…). No fixed cap: today's models take several
+      // sources; the model's own accepts.image.max is the limit.
+      { key: "source", label: "Source", kinds: ["image"] },
+    ],
     fields: [],
   },
   video: {
@@ -91,6 +100,16 @@ export const NODES: Record<string, NodeSpec> = {
       { value: "reference", label: "Omni reference" },
       { value: "edit", label: "Video editing", needs: "video" },
       { value: "extend", label: "Video extension", needs: "video" },
+    ],
+    // Roles say which image is the first frame and which clip is being edited — Lumina leaves
+    // that to reference order and "@" in the prompt.
+    roles: [
+      { key: "prompt", label: "Prompt", kinds: ["text"] },
+      { key: "first", label: "First frame", kinds: ["image"], max: 1, modes: ["frames"], required: true },
+      { key: "last", label: "Last frame", kinds: ["image"], max: 1, modes: ["frames"] },
+      // Clips being edited / extended; several allowed, the model's accepts.video.max caps it.
+      { key: "source", label: "Source", kinds: ["video"], modes: ["edit", "extend"], required: true },
+      { key: "reference", label: "Reference", kinds: ["image", "video", "audio"], modes: ["reference", "edit", "extend"] },
     ],
     fields: [
       {
@@ -123,6 +142,11 @@ export const NODES: Record<string, NodeSpec> = {
       { value: "t2a", label: "Text to audio" },
       { value: "a2a", label: "Audio reference", needs: "audio" },
       { value: "i2a", label: "Image to audio", needs: "image" },
+    ],
+    roles: [
+      { key: "script", label: "Script", kinds: ["text"] },
+      { key: "voice", label: "Voice reference", kinds: ["audio"], max: 1, modes: ["ta2a", "a2a"] },
+      { key: "reference", label: "Reference", kinds: ["image", "video"], modes: ["i2a"] },
     ],
     fields: [],
   },

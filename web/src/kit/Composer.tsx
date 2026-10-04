@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { FieldSpec, GenSource, MediaKind, ModelSpec, NodeSpec, RefItem } from "./types.ts";
-import { compatibleModel, fieldValue, inputProblems, modeAvailability, modelOf, resolveFields } from "./logic.ts";
+import { compatibleModel, fieldValue, inputProblems, modeAvailability, modelOf, resolveFields, rolesFor } from "./logic.ts";
 import { Popover } from "./Popover.tsx";
 import { FieldChip, GroupChip, SettingsBody } from "./fields.tsx";
 
@@ -71,12 +71,12 @@ export function Composer({ source, layout = "compact" }: { source: GenSource; la
           })}
         </div>
       )}
-      <RefTray items={source.inputs} onRemove={source.removeInput} onAdd={source.addInput} model={model} />
+      <RefTray items={source.inputs} node={node} mode={value.mode} onRemove={source.removeInput} onRole={source.setRole} onAdd={source.addInput} model={model} />
       <PromptEditor
         value={value.prompt}
         placeholder={node.promptPlaceholder}
         refs={source.inputs}
-        mention={node.mentions}
+        mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
         full={full}
         onFull={setFull}
         onChange={(prompt) => source.setValue({ prompt })}
@@ -379,31 +379,81 @@ function ModelParams({
   );
 }
 
+/**
+ * Input chips. Each shows its role ("First frame · Logo.png") when the node has roles; the role
+ * is a menu listing the slots this kind can take in the current mode. A chip with no slot is red.
+ */
 export function RefTray({
   items,
+  node,
+  mode,
   onRemove,
+  onRole,
   onAdd,
   model,
 }: {
   items: RefItem[];
+  node?: NodeSpec;
+  mode?: string;
   onRemove: (id: string) => void;
+  onRole?: (id: string, role: string) => void;
   onAdd?: () => void;
   model?: ModelSpec;
 }) {
   if (!items.length && !onAdd) return null;
   const problems = model ? inputProblems(model, items) : [];
+  const roleLabel = (key?: string) => node?.roles?.find((r) => r.key === key)?.label;
   return (
     <div className="kit-refs">
       {items.map((r) => {
         const Icon = KIND_ICON[r.kind];
-        return (
-          <span key={r.id} className="kit-ref" title={r.text ?? r.label}>
+        const options = node?.roles ? rolesFor(node, mode, r.kind) : [];
+        // Only one possible role → nothing to choose; show it quietly (Text: everything is Context).
+        const choosable = options.length > 1 && onRole;
+        const current = roleLabel(r.role);
+        const chip = (open?: boolean, toggle?: () => void) => (
+          <span className={`kit-ref ${r.role || !node?.roles ? "" : "unslotted"} ${open ? "open" : ""}`} title={r.text ?? r.label}>
             {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={12} />}
+            {node?.roles &&
+              (choosable ? (
+                <button className="kit-ref-role" onClick={toggle} aria-label={`Role of ${r.label}`}>
+                  {current ?? "No slot"} <ChevronDown size={11} />
+                </button>
+              ) : (
+                <em className="kit-ref-role">{current ?? "No slot"}</em>
+              ))}
             <span>{r.label}</span>
             <button onClick={() => onRemove(r.id)} aria-label={`Remove ${r.label}`}>
               <X size={11} />
             </button>
           </span>
+        );
+        if (!choosable) return <span key={r.id}>{chip()}</span>;
+        const taken = (key: string) => items.filter((i) => i.role === key && i.id !== r.id).length;
+        return (
+          <Popover key={r.id} width={200} trigger={chip}>
+            {(close) => (
+              <div className="kit-menu kit-roles">
+                {options.map((o) => {
+                  const full = o.max !== undefined && taken(o.key) >= o.max;
+                  return (
+                    <button
+                      key={o.key}
+                      className={o.key === r.role ? "active" : ""}
+                      onClick={() => {
+                        onRole(r.id, o.key);
+                        close();
+                      }}
+                    >
+                      {o.label}
+                      {full && o.key !== r.role && <small>swap</small>}
+                      {o.key === r.role && <Check size={13} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Popover>
         );
       })}
       {onAdd && (
@@ -446,7 +496,7 @@ export function PromptEditor({
   placeholder: string;
   refs: RefItem[];
   /** What "@" may offer here; per node type (an Image node offers colours, a Text node doesn't). */
-  mention?: NodeSpec["mentions"];
+  mention?: NodeSpec["mentions"] & { roleLabel?: (key: string) => string | undefined };
   full?: boolean;
   onFull?: (full: boolean) => void;
   onChange: (v: string) => void;
@@ -597,7 +647,7 @@ export function PromptEditor({
               <button key={r.id} role="option" aria-selected={hi === i} className={hi === i ? "active" : ""} onMouseEnter={() => setHi(i)} onClick={() => insert("@" + r.label)} title={r.text}>
                 {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={14} />}
                 <Highlight text={r.label} query={query} />
-                <small>{r.kind}</small>
+                <small>{(r.role && mention?.roleLabel?.(r.role)) ?? r.kind}</small>
               </button>
             );
           })}

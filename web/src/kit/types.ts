@@ -74,6 +74,23 @@ export interface ModelSpec {
   cancel?: "always" | "queued" | "never";
 }
 
+/**
+ * A slot an input can fill ("First frame", "Source", "Reference"…). Roles are what the user
+ * sees on an input chip; the recipe keeps them as target ports. Lumina has no roles: it orders
+ * references and leaves the rest to "@" in the prompt.
+ */
+export interface RoleSpec {
+  key: string;
+  label: string;
+  kinds: MediaKind[];
+  /** How many inputs may hold this role (default unlimited). */
+  max?: number;
+  /** Only in these modes. */
+  modes?: string[];
+  /** The mode can't run without it. */
+  required?: boolean;
+}
+
 export interface ModeSpec {
   value: string;
   label: string;
@@ -90,6 +107,8 @@ export interface NodeSpec {
   /** Kinds this node accepts on its input handle. */
   accepts: MediaKind[];
   modes?: ModeSpec[];
+  /** Input roles, in default-assignment order. One role for all kinds when omitted. */
+  roles?: RoleSpec[];
   fields: FieldSpec[];
   defaultModel: string;
   promptPlaceholder: string;
@@ -124,6 +143,8 @@ export interface RefItem {
   text?: string;
   /** Width / height of the referenced media, when known. */
   aspect?: number;
+  /** Role key this input fills; undefined = no free slot in the current mode. */
+  role?: string;
 }
 
 export type GenState =
@@ -191,6 +212,8 @@ export interface GenSource {
   changeModel(key: string): void;
   inputs: RefItem[];
   removeInput(id: string): void;
+  /** Give an input another role; a full role swaps with its current holder. */
+  setRole(id: string, role: string): void;
   addInput?(): void;
   status: GenStatus;
   issues: string[];

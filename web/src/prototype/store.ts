@@ -2,8 +2,10 @@
 import { create } from "zustand";
 import type { GenStatus, GenValue, MediaKind, RefItem, RunEntry } from "../kit/types.ts";
 import {
+  assignRoles,
   changeModel as applyModel,
   compatibleModel,
+  reassignRole,
   estimate,
   inputProblems,
   modelOf,
@@ -41,7 +43,8 @@ export interface Toast {
 interface State {
   nodes: Record<string, ProtoNode>;
   /** dashed = lineage only (Lumina "virtual" edge): drawn, but carries no data. */
-  edges: { id: string; source: string; target: string; dashed?: boolean }[];
+  /** role = the slot this input fills on the target (First frame, Source…); the recipe's target port. */
+  edges: { id: string; source: string; target: string; dashed?: boolean; role?: string }[];
   toasts: Toast[];
   addNode(type: ProtoType, position: { x: number; y: number }, init?: Partial<ProtoNode>): string;
   removeNode(id: string): void;
@@ -52,6 +55,7 @@ interface State {
   changeModel(id: string, model: string): void;
   connect(source: string, target: string): boolean;
   disconnect(edgeId: string): void;
+  setRole(id: string, refId: string, role: string): void;
   addUpload(id: string, ref: RefItem): void;
   removeUpload(id: string, refId: string): void;
   run(id: string): void;
@@ -82,8 +86,14 @@ export function activeEntry(n: ProtoNode) {
   return n.history.find((e) => e.id === n.active?.entryId) ?? n.history[0];
 }
 
-/** What a node receives: one ref per incoming edge (using the source's active output) plus uploads. */
+/** What a node receives: one ref per incoming edge (using the source's active output) plus uploads, roles settled. */
 export function inputsOf(state: Pick<State, "nodes" | "edges">, id: string): RefItem[] {
+  const node = state.nodes[id];
+  const refs = rawInputs(state, id);
+  return node && node.type !== "sticky" ? assignRoles(NODES[node.type], node.value.mode, refs) : refs;
+}
+
+function rawInputs(state: Pick<State, "nodes" | "edges">, id: string): RefItem[] {
   const refs: RefItem[] = [];
   const count: Record<string, number> = {};
   for (const e of state.edges.filter((e) => e.target === id && !e.dashed)) {
@@ -96,6 +106,7 @@ export function inputsOf(state: Pick<State, "nodes" | "edges">, id: string): Ref
     const name = src.label || NODES[src.type as Exclude<ProtoType, "sticky">].title;
     refs.push({
       id: e.id,
+      role: e.role,
       kind,
       label: kind === "text" ? name : `${name} ${count[kind]}`,
       thumb: out?.poster ?? (kind === "image" ? out?.url : undefined),
@@ -142,6 +153,8 @@ export const useProto = create<State>((set, get) => ({
   setValue(id, patch) {
     const n = get().nodes[id];
     patchNode(id, { value: { ...n.value, ...patch } });
+    // A new mode has other slots: re-seat the inputs (first/last frame ↔ reference).
+    if (patch.mode !== undefined && patch.mode !== n.value.mode) settleRoles(id);
   },
   setParam(id, key, value) {
     const n = get().nodes[id];
@@ -189,6 +202,11 @@ export const useProto = create<State>((set, get) => ({
     const edge = get().edges.find((e) => e.id === edgeId);
     set((s) => ({ edges: s.edges.filter((e) => e.id !== edgeId) }));
     if (edge) afterInputsChanged(edge.target);
+  },
+  setRole(id, refId, role) {
+    const n = get().nodes[id];
+    if (!n || n.type === "sticky") return;
+    writeRoles(id, reassignRole(NODES[n.type], n.value.mode, inputsOf(get(), id), refId, role));
   },
   addUpload(id, ref) {
     const n = get().nodes[id];
@@ -306,7 +324,24 @@ function clearTimers(id: string) {
   timers.delete(id);
 }
 
-/** Inputs changed: pick a fitting mode, and switch to a model that can read them. */
+/** Persist roles per input id onto edges / uploads, so they survive reordering. */
+function writeRoles(id: string, roles: Record<string, string | undefined>) {
+  useProto.setState((st) => ({
+    edges: st.edges.map((e) => (e.target === id && e.id in roles && e.role !== roles[e.id] ? { ...e, role: roles[e.id] } : e)),
+    nodes: st.nodes[id]
+      ? { ...st.nodes, [id]: { ...st.nodes[id], uploads: st.nodes[id].uploads.map((u) => (u.id in roles && u.role !== roles[u.id] ? { ...u, role: roles[u.id] } : u)) } }
+      : st.nodes,
+  }));
+}
+
+function settleRoles(id: string) {
+  const s = useProto.getState(),
+    n = s.nodes[id];
+  if (!n || n.type === "sticky" || !NODES[n.type].roles) return;
+  writeRoles(id, Object.fromEntries(inputsOf(s, id).map((i) => [i.id, i.role])));
+}
+
+/** Inputs changed: pick a fitting mode, switch to a model that can read them, seat them in roles. */
 function afterInputsChanged(id: string) {
   const s = useProto.getState(),
     n = s.nodes[id];
@@ -335,4 +370,5 @@ function afterInputsChanged(id: string) {
   const after = useProto.getState().nodes[id];
   if (after.status.state === "empty" && (inputs.length || after.value.prompt))
     patchNode(id, { status: { state: "ready" } });
+  settleRoles(id);
 }

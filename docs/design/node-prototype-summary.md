@@ -39,7 +39,7 @@ Trạng thái ngày 2026-10-04, branch `feat/node-prototype`. Đây là bản đ
 
 Thứ tự từ trên xuống:
 1. Tab mode (Video, Audio): mode model không hỗ trợ thì ẩn, mode thiếu input thì mờ.
-2. Chip input đang nối (bấm × là xoá dây).
+2. Chip input đang nối, mỗi chip ghi **vai trò** của input đó: *Prompt · Idea → prompt*, *First frame · Key visual 1*, *Source · Clip.mp4*. Vai trò tuỳ loại node và mode (Video: First frame / Last frame ở mode khung đầu-cuối, Source ở mode sửa/nối dài, Reference ở mode tham chiếu; Image: Prompt / Reference / Source (nhiều ảnh được, giới hạn theo model); Audio: Script / Voice reference; Text: tất cả là Context). Hệ thống tự xếp khi nối dây và xếp lại khi đổi mode; bấm vào vai trò để đổi (chọn slot đã có người thì hai bên hoán đổi). Input không có chỗ trong mode hiện tại thì chip đỏ "No slot" và khoá Run. Bấm × là xoá dây.
 3. Ô prompt: gõ `@` là **autocomplete** như trong code editor: gõ tiếp để lọc các node đang nối, ↑↓ chọn, Enter/Tab chèn, Esc đóng; mục "Color selection" nằm cùng danh sách. Token đã chèn hiện thành chip dưới ô. Nút ⤢ mở to.
 4. Hàng dưới, theo thứ tự **ý định trước, model sau**: các chip kết quả (kích thước, thời lượng, số lượng…) → "Advanced Parameters" hoặc "Tone Settings" → chip model **"Auto · <tên model>"** (Auto = hệ thống chọn; chọn tay thì ghim) → "1×" (chạy nhiều lần) → nút chạy. Không có billing.
 
@@ -117,6 +117,7 @@ Gồm: file tải lên, Grid slice, Frame, Extract vocals / background sound.
 |---|---|
 | Theme sáng | Bạn chọn, quyết sau |
 | **Không có credit / billing** (badge, pill, bảng giá, toast) | Tool nội bộ; sau này nếu cần sẽ đưa credit ra làm hạn ngạch |
+| **Vai trò trên chip đầu vào** (First frame, Source, Reference…) | Lumina chỉ xếp thứ tự tham chiếu và dựa vào `@` trong prompt; mình nói rõ input nào đóng vai gì, và đây chính là port trong recipe |
 | Lịch sử chạy trên node | Lumina ghi đè kết quả |
 | "Use this node's text as context" | Lumina bỏ qua chữ đang có trong node |
 | Model mặc định "Auto", đứng cuối hàng; Text dẫn bằng preset ý định, model/effort ở dưới | User làm việc với flow, không với model ([node-flow-interaction.md](node-flow-interaction.md)) |

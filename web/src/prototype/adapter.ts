@@ -37,6 +37,7 @@ export function useGenSource(id: string, opts?: { addInput?: () => void }): GenS
       inputs,
       removeInput: (refId) =>
         edges.some((e) => e.id === refId) ? api.disconnect(refId) : api.removeUpload(id, refId),
+      setRole: (refId, role) => api.setRole(id, refId, role),
       addInput: opts?.addInput,
       status,
       issues: validate(spec, model, node.value, inputs),
