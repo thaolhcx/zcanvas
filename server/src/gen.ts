@@ -490,7 +490,8 @@ export async function submitJob(jobId: string) {
       eta_at: etaAt,
       deadline_at: later(model.eta.deadlineSec ?? 3600),
     });
-    await saveJob(job, { status: "running", phase: "provider", eta: etaAt.toISOString(), progress: 0 });
+    // A new task waits at the provider until a check says it started.
+    await saveJob(job, { status: "running", phase: "provider-queued", eta: etaAt.toISOString(), progress: 0 });
     void p90;
     await boss.send("gen-fetch", { taskId: slot.id }, { startAfter: etaAt, singletonKey: `${slot.id}:${0}` });
   } catch (error) {

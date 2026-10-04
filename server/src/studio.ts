@@ -122,6 +122,7 @@ export async function nodeHistory(canvasId: string, nodeId: string, before?: str
       ...(d.model ? { model: d.model } : {}),
       ...(d.queuePosition ? { queuePosition: d.queuePosition } : {}),
       ...(d.eta && !done ? { eta: d.eta } : {}),
+      ...(d.stage && (d.status === "queued" || d.status === "running") ? { stage: d.stage } : {}),
       ...(d.intent ?? r.request?.intent ? { intent: d.intent ?? r.request?.intent } : {}),
       ...(d.finalPrompt !== undefined ? { finalPrompt: d.finalPrompt } : {}),
       ...(d.error ? { error: d.error } : {}),

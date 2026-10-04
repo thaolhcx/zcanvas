@@ -97,7 +97,7 @@ export async function createApp(options: { actorId?: string } = {}) {
   await app.register(cors, {
     origin: /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
     // Rename and delete come from the browser too (the default is GET, HEAD, POST).
-    methods: ["GET", "HEAD", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
   });
   await app.register(multipart, {
     limits: { fileSize: 100 * 1024 * 1024, files: 1 },

@@ -48,6 +48,8 @@ export interface HistoryEntry {
   queuePosition?: number;
   /** Expected finish (ISO) while running. */
   eta?: string;
+  /** Where a queued or running job is: waiting, auto-prompt, preparing, submitting, provider-queued, provider, retry. */
+  stage?: string;
   /** What the user typed, and what was sent after Auto prompt. */
   intent?: string;
   finalPrompt?: string;

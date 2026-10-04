@@ -73,9 +73,15 @@ describe("Graph API using real Yjs documents", () => {
     expect(() => g.setParam(id, "count", 1.5)).toThrow();
     expect(() => g.setParam(id, "count", NaN)).toThrow();
     expect(() => g.setParam(id, "seed", 7)).toThrow();
-    // A role the mode lacks is allowed while drafting; it only blocks a run.
+    // The first input on a mode's port picks that mode.
     const asset = g.addNode("input.asset", { params: { asset: "ast_x" } });
+    const other = g.addNode("video.generate");
+    g.connect({ source: asset, sourcePort: "asset", target: other, targetPort: "first" });
+    expect(g.toRecipe().nodes.find((n) => n.id === other)?.params.mode).toBe("frames");
+    // Once placed, inputs keep their mode: a role the mode lacks is allowed while drafting; it only blocks a run.
+    g.connect({ source: asset, sourcePort: "asset", target: video, targetPort: "first" });
     g.connect({ source: asset, sourcePort: "asset", target: video, targetPort: "reference" });
+    expect(g.toRecipe().nodes.find((n) => n.id === video)?.params.mode).toBe("frames");
     expect(g.validate().map((i) => i.code)).toContain("MODE");
   });
   it("paste remaps ids and groups, remove cleans edges, ungroup retains nodes", () => {

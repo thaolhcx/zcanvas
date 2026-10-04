@@ -263,6 +263,13 @@ export class Graph implements GraphApi {
         );
       const id = newId("e");
       r.edges.push({ id, ...edge });
+      // A port that only exists in some modes (First frame) switches the node to the first of them,
+      const modeParam = this.registry.get(target.type)?.params.mode;
+      const mode = target.params.mode ?? (modeParam && "default" in modeParam ? modeParam.default : undefined);
+      // Only while nothing else uses a mode's port: placed inputs keep their mode (MODE then blocks the run).
+      const ports = this.registry.get(target.type)?.inputs ?? [];
+      const placed = r.edges.some((e) => e.id !== id && e.target === edge.target && ports.find((p) => p.key === e.targetPort)?.modes);
+      if (port?.modes?.length && !port.modes.includes(String(mode)) && !placed) target.params.mode = port.modes[0];
       return id;
     });
   }
