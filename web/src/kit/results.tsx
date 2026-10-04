@@ -22,14 +22,26 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { FieldSpec, GenStatus, GenValue, MediaKind, ModelSpec, NodeSpec, Output, RefItem, RunEntry, RunJob } from "./types.ts";
+import type {
+  FieldSpec,
+  GenStatus,
+  GenValue,
+  MediaKind,
+  ModelSpec,
+  NodeSpec,
+  Output,
+  RefItem,
+  RunEntry,
+  RunJob,
+} from "./types.ts";
 import { Markdown } from "./markdown.tsx";
 import { aspectOf, fieldValue, modelOf, resolveFields } from "./logic.ts";
 import { KitContext } from "./fields.tsx";
 import { Popover } from "./Popover.tsx";
 import { KIND_ICON } from "./Composer.tsx";
 
-const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const fmt = (s: number) =>
+  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 /** Placeholder at the output's aspect ratio, plus queued / running / failed states. */
 /** "≈ 1 min 40 s" until an expected time; "any moment now" once it has passed. */
@@ -81,20 +93,36 @@ export function StatusOverlay({
   const busy = status.state === "queued" || status.state === "running";
   const box = kind === "image" || kind === "video";
   const now = useNow(busy && Boolean(eta));
-  const real = eta !== undefined || queuePosition !== undefined || stage !== undefined;
+  const real =
+    eta !== undefined || queuePosition !== undefined || stage !== undefined;
   return (
-    <div className={`kit-placeholder kit-ph-${kind}`} style={box ? { aspectRatio: String(aspect) } : undefined}>
+    <div
+      className={`kit-placeholder kit-ph-${kind}`}
+      style={box ? { aspectRatio: String(aspect) } : undefined}
+    >
       {busy && real ? (
         <span className="kit-busy">
           <LoaderCircle size={20} className="kit-spin" />
-          {queuePosition ? `In line · #${queuePosition}` : ((stage && STAGE[stage]) ?? (status.state === "queued" ? "Queued" : "Generating"))}
-          {eta && !queuePosition && <small className="kit-eta">{etaText(eta, now)}</small>}
+          {queuePosition
+            ? `In line · #${queuePosition}`
+            : ((stage && STAGE[stage]) ??
+              (status.state === "queued" ? "Queued" : "Generating"))}
+          {eta && !queuePosition && (
+            <small className="kit-eta">{etaText(eta, now)}</small>
+          )}
         </span>
       ) : busy ? (
         <span className="kit-busy">
           <LoaderCircle size={20} className="kit-spin" />
-          {status.state === "queued" ? "Queued" : `Generating ${Math.round((status.progress ?? 0) * 100)}%`}
-          {status.state === "running" && <i className="kit-progress" style={{ width: `${(status.progress ?? 0) * 100}%` }} />}
+          {status.state === "queued"
+            ? "Queued"
+            : `Generating ${Math.round((status.progress ?? 0) * 100)}%`}
+          {status.state === "running" && (
+            <i
+              className="kit-progress"
+              style={{ width: `${(status.progress ?? 0) * 100}%` }}
+            />
+          )}
         </span>
       ) : status.state === "failed" ? (
         <span className="kit-failed">{status.error ?? "Failed"}</span>
@@ -124,7 +152,12 @@ export function ResultView({
 }) {
   // In a feed a single click opens the run (Lumina); on a node it picks, double-click opens.
   const card = size === "card";
-  if (kind === "text") return <div className="kit-text">{<Markdown text={outputs[0]?.text ?? ""} />}</div>;
+  if (kind === "text")
+    return (
+      <div className="kit-text">
+        {<Markdown text={outputs[0]?.text ?? ""} />}
+      </div>
+    );
   if (kind === "image")
     return (
       <div className={`kit-images n${Math.min(outputs.length, 4)}`}>
@@ -132,16 +165,36 @@ export function ResultView({
           <button
             key={i}
             className={`kit-img ${!card && outputs.length > 1 && i === index ? "active" : ""}`}
-            onClick={() => (card ? onOpen?.(o, i) : outputs.length > 1 && onPick?.(i))}
+            onClick={() =>
+              card ? onOpen?.(o, i) : outputs.length > 1 && onPick?.(i)
+            }
             onDoubleClick={() => !card && onOpen?.(o, i)}
-            title={card ? "Open details" : outputs.length > 1 ? "Click to use this one · double-click to open" : "Open"}
+            title={
+              card
+                ? "Open details"
+                : outputs.length > 1
+                  ? "Click to use this one · double-click to open"
+                  : "Open"
+            }
           >
-            <img src={o.url} alt="" style={{ aspectRatio: `${o.width}/${o.height}` }} />
+            <img
+              src={o.url}
+              alt=""
+              style={{ aspectRatio: `${o.width}/${o.height}` }}
+            />
           </button>
         ))}
       </div>
     );
-  if (kind === "video") return <VideoPlayer output={outputs[0]} autoPlay={size !== "full"} onOpen={onOpen && ((o) => onOpen(o, 0))} onTime={onTime} />;
+  if (kind === "video")
+    return (
+      <VideoPlayer
+        output={outputs[0]}
+        autoPlay={size !== "full"}
+        onOpen={onOpen && ((o) => onOpen(o, 0))}
+        onTime={onTime}
+      />
+    );
   return <AudioWave output={outputs[0]} />;
 }
 
@@ -168,18 +221,36 @@ export function VideoPlayer({
     [muted, setMuted] = useState(true);
   useEffect(() => onTime?.(t), [t, onTime]);
   if (!output) return null;
-  const aspect = output.width && output.height ? `${output.width}/${output.height}` : "16/9";
+  const aspect =
+    output.width && output.height ? `${output.width}/${output.height}` : "16/9";
   const events = {
-    onTimeUpdate: (e: React.SyntheticEvent<HTMLVideoElement>) => setT(e.currentTarget.currentTime),
-    onLoadedMetadata: (e: React.SyntheticEvent<HTMLVideoElement>) => Number.isFinite(e.currentTarget.duration) && setDur(e.currentTarget.duration),
+    onTimeUpdate: (e: React.SyntheticEvent<HTMLVideoElement>) =>
+      setT(e.currentTarget.currentTime),
+    onLoadedMetadata: (e: React.SyntheticEvent<HTMLVideoElement>) =>
+      Number.isFinite(e.currentTarget.duration) &&
+      setDur(e.currentTarget.duration),
     onPlay: () => setPlaying(true),
     onPause: () => setPlaying(false),
   };
   if (controls)
     return (
       <div className="kit-video big">
-        <video ref={video} src={output.url} poster={output.poster} controls autoPlay playsInline style={{ aspectRatio: aspect }} {...events} />
-        <a className="kit-video-download" href={output.url} download aria-label="Download">
+        <video
+          ref={video}
+          src={output.url}
+          poster={output.poster}
+          controls
+          autoPlay
+          playsInline
+          style={{ aspectRatio: aspect }}
+          {...events}
+        />
+        <a
+          className="kit-video-download"
+          href={output.url}
+          download
+          aria-label="Download"
+        >
           <Download size={14} />
         </a>
       </div>
@@ -225,7 +296,10 @@ export function VideoPlayer({
       <span className="kit-video-time">
         {fmt(t)}/{fmt(dur)}
       </span>
-      <i className="kit-video-progress" style={{ width: `${dur ? (t / dur) * 100 : 0}%` }} />
+      <i
+        className="kit-video-progress"
+        style={{ width: `${dur ? (t / dur) * 100 : 0}%` }}
+      />
     </div>
   );
 }
@@ -242,7 +316,8 @@ export function AudioWave({ output }: { output?: Output }) {
   const peaks = output.peaks ?? [];
   const seek = (e: React.MouseEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    if (audio.current) audio.current.currentTime = ((e.clientX - r.left) / r.width) * dur;
+    if (audio.current)
+      audio.current.currentTime = ((e.clientX - r.left) / r.width) * dur;
   };
   return (
     <div className="kit-audio nodrag">
@@ -251,7 +326,10 @@ export function AudioWave({ output }: { output?: Output }) {
         src={output.url}
         muted={muted}
         onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setLoaded(e.currentTarget.duration)}
+        onLoadedMetadata={(e) =>
+          Number.isFinite(e.currentTarget.duration) &&
+          setLoaded(e.currentTarget.duration)
+        }
         onEnded={() => {
           setPlaying(false);
           setT(0);
@@ -260,7 +338,11 @@ export function AudioWave({ output }: { output?: Output }) {
       {peaks.length > 0 && (
         <div className="kit-wave" onClick={seek}>
           {peaks.map((p, i) => (
-            <i key={i} style={{ height: `${p * 100}%` }} className={i / peaks.length < t / dur ? "played" : ""} />
+            <i
+              key={i}
+              style={{ height: `${p * 100}%` }}
+              className={i / peaks.length < t / dur ? "played" : ""}
+            />
           ))}
           <b className="kit-playhead" style={{ left: `${(t / dur) * 100}%` }} />
         </div>
@@ -270,7 +352,10 @@ export function AudioWave({ output }: { output?: Output }) {
         <b style={{ left: `${(t / dur) * 100}%` }} />
       </div>
       <div className="kit-audio-bar">
-        <button onClick={() => setMuted(!muted)} aria-label={muted ? "Unmute" : "Mute"}>
+        <button
+          onClick={() => setMuted(!muted)}
+          aria-label={muted ? "Unmute" : "Mute"}
+        >
           {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
         </button>
         <button
@@ -282,7 +367,11 @@ export function AudioWave({ output }: { output?: Output }) {
           }}
           aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+          {playing ? (
+            <Pause size={13} fill="currentColor" />
+          ) : (
+            <Play size={13} fill="currentColor" />
+          )}
         </button>
         <span className="kit-time">
           {fmt(t)} / {fmt(dur)}
@@ -312,18 +401,29 @@ export function RunStrip({
   const entry = entries[at];
   return (
     <div className="kit-strip nodrag">
-      <button disabled={at >= entries.length - 1} onClick={() => onPick(entries[at + 1].id)} aria-label="Older">
+      <button
+        disabled={at >= entries.length - 1}
+        onClick={() => onPick(entries[at + 1].id)}
+        aria-label="Older"
+      >
         <ChevronLeft size={13} />
       </button>
       <span title={new Date(entry.at).toLocaleTimeString()}>
         <History size={12} /> {entries.length - at}/{entries.length}
         {entry.edited ? " · edited" : ""}
       </span>
-      <button disabled={at === 0} onClick={() => onPick(entries[at - 1].id)} aria-label="Newer">
+      <button
+        disabled={at === 0}
+        onClick={() => onPick(entries[at - 1].id)}
+        aria-label="Newer"
+      >
         <ChevronRight size={13} />
       </button>
       {!entry.edited && (
-        <button onClick={() => onReEdit(entry.id)} title="Load this run's prompt and settings">
+        <button
+          onClick={() => onReEdit(entry.id)}
+          title="Load this run's prompt and settings"
+        >
           <RotateCcw size={12} />
         </button>
       )}
@@ -339,11 +439,22 @@ export function stamp(at: number) {
 }
 
 /** Read-only prompt: "@label" tokens of the run's references become chips with their thumbnail. */
-export function PromptText({ text, refs = [] }: { text: string; refs?: RefItem[] }) {
+export function PromptText({
+  text,
+  refs = [],
+}: {
+  text: string;
+  refs?: RefItem[];
+}) {
   if (!text.trim()) return <em className="kit-muted">(from inputs)</em>;
-  const known = refs.map((r) => "@" + r.label).sort((a, b) => b.length - a.length);
+  const known = refs
+    .map((r) => "@" + r.label)
+    .sort((a, b) => b.length - a.length);
   if (!known.length) return <>{text}</>;
-  const re = new RegExp(`(${known.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+  const re = new RegExp(
+    `(${known.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "g",
+  );
   return (
     <>
       {text.split(re).map((part, i) => {
@@ -364,12 +475,18 @@ export function PromptText({ text, refs = [] }: { text: string; refs?: RefItem[]
 type Voices = { id: string; name: string }[];
 
 /** Human text for one parameter value, as a meta chip or a table cell shows it. */
-export function paramText(f: FieldSpec, v: unknown, voices: Voices = []): string {
+export function paramText(
+  f: FieldSpec,
+  v: unknown,
+  voices: Voices = [],
+): string {
   if (v === undefined || v === null || v === "") return "";
-  if (f.type === "enum") return f.options?.find((o) => o.value === v)?.label ?? String(v);
+  if (f.type === "enum")
+    return f.options?.find((o) => o.value === v)?.label ?? String(v);
   if (f.type === "boolean") return v ? "on" : "off";
   if (f.type === "duration") return `${v}${f.unit ?? "s"}`;
-  if (f.type === "voice") return voices.find((x) => x.id === v)?.name ?? String(v);
+  if (f.type === "voice")
+    return voices.find((x) => x.id === v)?.name ?? String(v);
   if (f.type === "size") {
     const z = v as {
       ratio?: string;
@@ -377,7 +494,12 @@ export function paramText(f: FieldSpec, v: unknown, voices: Voices = []): string
       height?: number;
       area?: string;
     };
-    return z.area ?? (z.ratio && z.ratio !== "free" ? z.ratio : `${z.width ?? 2048}×${z.height ?? 2048}`);
+    return (
+      z.area ??
+      (z.ratio && z.ratio !== "free"
+        ? z.ratio
+        : `${z.width ?? 2048}×${z.height ?? 2048}`)
+    );
   }
   if (f.type === "camera") {
     const c = v as { camera?: string; lens?: string };
@@ -388,7 +510,12 @@ export function paramText(f: FieldSpec, v: unknown, voices: Voices = []): string
 }
 
 /** A run's parameters split like the composer: inline chips (and the voice) vs. the advanced rest. */
-export function runParams(node: NodeSpec, models: ModelSpec[], value: GenValue, voices: Voices = []) {
+export function runParams(
+  node: NodeSpec,
+  models: ModelSpec[],
+  value: GenValue,
+  voices: Voices = [],
+) {
   const model = modelOf(models, value.model);
   const fields = resolveFields(node, model, value.mode);
   const row = (f: FieldSpec) => ({
@@ -397,8 +524,14 @@ export function runParams(node: NodeSpec, models: ModelSpec[], value: GenValue, 
     text: paramText(f, fieldValue(f, value.params), voices),
   });
   const skip = (f: FieldSpec) => f.key === "system";
-  const inline = [...fields.inline, ...fields.advanced.filter((f) => f.type === "voice")]
-    .filter((f) => !skip(f) && !(f.type === "boolean" && !fieldValue(f, value.params)))
+  const inline = [
+    ...fields.inline,
+    ...fields.advanced.filter((f) => f.type === "voice"),
+  ]
+    .filter(
+      (f) =>
+        !skip(f) && !(f.type === "boolean" && !fieldValue(f, value.params)),
+    )
     .map(row)
     .filter((r) => r.text)
     .map((r) => {
@@ -417,7 +550,17 @@ export function runParams(node: NodeSpec, models: ModelSpec[], value: GenValue, 
 }
 
 /** Line 3 of a feed card: Auto · model | mode | inline values | reference thumbnails | Advanced ⓘ. */
-export function RunMeta({ node, models, value, refs }: { node: NodeSpec; models: ModelSpec[]; value: GenValue; refs: RefItem[] }) {
+export function RunMeta({
+  node,
+  models,
+  value,
+  refs,
+}: {
+  node: NodeSpec;
+  models: ModelSpec[];
+  value: GenValue;
+  refs: RefItem[];
+}) {
   const { voices } = useContext(KitContext);
   const { model, inline, advanced } = runParams(node, models, value, voices);
   const media = refs.filter((r) => r.kind !== "text");
@@ -427,17 +570,28 @@ export function RunMeta({ node, models, value, refs }: { node: NodeSpec; models:
         {value.auto && <em>Auto · </em>}
         {model.title}
       </span>
-      {node.modes && value.mode && <span>{node.modes.find((m) => m.value === value.mode)?.label ?? value.mode}</span>}
+      {node.modes && value.mode && (
+        <span>
+          {node.modes.find((m) => m.value === value.mode)?.label ?? value.mode}
+        </span>
+      )}
       {inline.map((r) => (
         <span key={r.key} title={r.label}>
           {r.text}
         </span>
       ))}
       {media.length > 0 && (
-        <span className="kit-meta-refs" title={media.map((r) => r.label).join(", ")}>
+        <span
+          className="kit-meta-refs"
+          title={media.map((r) => r.label).join(", ")}
+        >
           {media.slice(0, 3).map((r) => {
             const Icon = KIND_ICON[r.kind];
-            return r.thumb ? <img key={r.id} src={r.thumb} alt="" /> : <Icon key={r.id} size={12} />;
+            return r.thumb ? (
+              <img key={r.id} src={r.thumb} alt="" />
+            ) : (
+              <Icon key={r.id} size={12} />
+            );
           })}
           {media.length > 3 && <b>+{media.length - 3}</b>}
           References
@@ -496,12 +650,17 @@ export function FeedCard({
   /** Keep (or stop keeping) the results in the library. */
   onKeep?: (keep: boolean) => void;
 }) {
-  const kept = Boolean(entry?.outputs.length && entry.outputs.every((o) => o.kept));
+  const kept = Boolean(
+    entry?.outputs.length && entry.outputs.every((o) => o.kept),
+  );
   const run = (entry ?? job)!;
   const kind = node.output;
   const refs = entry?.refs ?? job?.refs ?? [];
   return (
-    <article className={`kit-feedcard ${job ? "running" : ""} ${entry?.cancelled ? "cancelled" : ""}`} data-run={run.id}>
+    <article
+      className={`kit-feedcard ${job ? "running" : ""} ${entry?.cancelled ? "cancelled" : ""}`}
+      data-run={run.id}
+    >
       <time>{stamp(run.at)}</time>
       <p className="kit-feed-prompt">
         <PromptText text={run.value.prompt} refs={refs} />
@@ -526,13 +685,22 @@ export function FeedCard({
         ) : (
           entry && (
             <div className="kit-feed-result">
-              <ResultView kind={kind} outputs={entry.outputs} onOpen={(_, i) => onOpen?.(i)} size="card" />
+              <ResultView
+                kind={kind}
+                outputs={entry.outputs}
+                onOpen={(_, i) => onOpen?.(i)}
+                size="card"
+              />
               <Popover
                 width={170}
                 align="end"
                 placement="bottom"
                 trigger={(open, toggle) => (
-                  <button className={`kit-feed-more ${open ? "open" : ""}`} onClick={toggle} aria-label="More">
+                  <button
+                    className={`kit-feed-more ${open ? "open" : ""}`}
+                    onClick={toggle}
+                    aria-label="More"
+                  >
                     <Ellipsis size={15} />
                   </button>
                 )}
@@ -545,13 +713,23 @@ export function FeedCard({
                       </button>
                     )}
                     {kind !== "text" && entry.outputs[0] && (
-                      <button onClick={() => (close(), onDownload?.(entry.outputs[0]))}>
+                      <button
+                        onClick={() => (
+                          close(),
+                          onDownload?.(entry.outputs[0])
+                        )}
+                      >
                         <Download size={13} /> Download
                       </button>
                     )}
                     {onKeep && kind !== "text" && (
                       <button onClick={() => (close(), onKeep(!kept))}>
-                        {kept ? <BookmarkMinus size={13} /> : <BookmarkPlus size={13} />} {kept ? "Unkeep" : "Keep"}
+                        {kept ? (
+                          <BookmarkMinus size={13} />
+                        ) : (
+                          <BookmarkPlus size={13} />
+                        )}{" "}
+                        {kept ? "Unkeep" : "Keep"}
                       </button>
                     )}
                     {onOpenInCanvas && (
@@ -559,7 +737,10 @@ export function FeedCard({
                         <ChevronRight size={13} /> Open in canvas
                       </button>
                     )}
-                    <button className="danger" onClick={() => (close(), onDelete?.())}>
+                    <button
+                      className="danger"
+                      onClick={() => (close(), onDelete?.())}
+                    >
                       <Trash2 size={13} /> Delete
                     </button>
                   </div>
@@ -571,7 +752,13 @@ export function FeedCard({
       </div>
       <footer>
         {job ? (
-          <button onClick={onStop} disabled={!canStop} title={canStop ? "Terminate generation" : "Generating, cannot cancel"}>
+          <button
+            onClick={onStop}
+            disabled={!canStop}
+            title={
+              canStop ? "Terminate generation" : "Generating, cannot cancel"
+            }
+          >
             <Square size={10} fill="currentColor" /> Stop
           </button>
         ) : (
@@ -593,9 +780,16 @@ export function FeedCard({
 }
 
 /** Full-screen preview (Lumina ref 48): image with a bottom bar — zoom −, slider, +, original size, rotate ±90°, download. */
-export function Lightbox({ output, onClose }: { output?: Output; onClose: () => void }) {
+export function Lightbox({
+  output,
+  onClose,
+}: {
+  output?: Output;
+  onClose: () => void;
+}) {
   useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onClose());
+    const key = (e: KeyboardEvent) =>
+      e.key === "Escape" && (e.stopPropagation(), onClose());
     document.addEventListener("keydown", key, true);
     return () => document.removeEventListener("keydown", key, true);
   }, [onClose]);
@@ -623,7 +817,11 @@ export function MediaViewer({ output }: { output: Output }) {
   return (
     <>
       {output.kind === "image" ? (
-        <img src={output.url} alt="" style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }} />
+        <img
+          src={output.url}
+          alt=""
+          style={{ transform: `scale(${zoom}) rotate(${turn}deg)` }}
+        />
       ) : output.kind === "video" ? (
         <VideoPlayer output={output} autoPlay controls />
       ) : output.kind === "audio" ? (
@@ -635,17 +833,34 @@ export function MediaViewer({ output }: { output: Output }) {
       )}
       {output.kind === "image" && (
         <div className="kit-lightbox-bar">
-          <button onClick={() => setZoom(Math.max(0.25, zoom - 0.25))} title="Zoom out">
+          <button
+            onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
+            title="Zoom out"
+          >
             <ZoomOut size={15} />
           </button>
-          <input type="range" min={0.25} max={4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
-          <button onClick={() => setZoom(Math.min(4, zoom + 0.25))} title="Enlarge">
+          <input
+            type="range"
+            min={0.25}
+            max={4}
+            step={0.05}
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            aria-label="Zoom"
+          />
+          <button
+            onClick={() => setZoom(Math.min(4, zoom + 0.25))}
+            title="Enlarge"
+          >
             <ZoomIn size={15} />
           </button>
           <button onClick={() => setZoom(1)} title="Original size">
             <span className="kit-one">1:1</span>
           </button>
-          <button onClick={() => setTurn(turn - 90)} title="Reverse rotation 90°">
+          <button
+            onClick={() => setTurn(turn - 90)}
+            title="Reverse rotation 90°"
+          >
             <RotateCcw size={15} />
           </button>
           <button onClick={() => setTurn(turn + 90)} title="Clockwise 90°">

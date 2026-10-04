@@ -86,13 +86,17 @@ export function countKinds(kinds: ValueKind[]) {
 /** Why a model cannot take these inputs (empty when it can). */
 export function inputProblems(model: ModelSpec, kinds: ValueKind[]): string[] {
   const problems: string[] = [];
-  for (const [kind, n] of Object.entries(countKinds(kinds)) as [ValueKind, number][]) {
+  for (const [kind, n] of Object.entries(countKinds(kinds)) as [
+    ValueKind,
+    number,
+  ][]) {
     if (kind === "json") continue;
     const limit = model.accepts[kind];
-    if (!limit)
-      problems.push(`${model.title} can't read ${kind} input.`);
+    if (!limit) problems.push(`${model.title} can't read ${kind} input.`);
     else if (n > limit.max)
-      problems.push(`${model.title} reads at most ${limit.max} ${kind} input${limit.max === 1 ? "" : "s"}.`);
+      problems.push(
+        `${model.title} reads at most ${limit.max} ${kind} input${limit.max === 1 ? "" : "s"}.`,
+      );
   }
   return problems;
 }
@@ -123,14 +127,19 @@ export function resolveModel(
 }
 /** Fields that apply in this mode. */
 export function fieldsFor(model: ModelSpec, mode?: string) {
-  return model.fields.filter((f) => !f.modes || !mode || f.modes.includes(mode));
+  return model.fields.filter(
+    (f) => !f.modes || !mode || f.modes.includes(mode),
+  );
 }
 /** A param's value, or the field's default. */
 export function fieldValue(field: ModelField, params: Params) {
   return params[field.key] ?? field.default;
 }
 /** Problem with one value, or undefined. Same rules on client and server. */
-export function fieldProblem(field: ModelField, value: unknown): string | undefined {
+export function fieldProblem(
+  field: ModelField,
+  value: unknown,
+): string | undefined {
   if (value === undefined || value === null) return undefined;
   const label = field.label;
   switch (field.type) {
@@ -146,18 +155,30 @@ export function fieldProblem(field: ModelField, value: unknown): string | undefi
         return `${label} must be at least ${field.min}${field.unit ?? ""}`;
       if (field.max !== undefined && value > field.max)
         return `${label} must be at most ${field.max}${field.unit ?? ""}`;
-      if (field.step && Math.abs((value - (field.min ?? 0)) / field.step - Math.round((value - (field.min ?? 0)) / field.step)) > 1e-8)
+      if (
+        field.step &&
+        Math.abs(
+          (value - (field.min ?? 0)) / field.step -
+            Math.round((value - (field.min ?? 0)) / field.step),
+        ) > 1e-8
+      )
         return `${label} must be a multiple of ${field.step}`;
       return undefined;
     }
     case "boolean":
-      return typeof value === "boolean" ? undefined : `${label} must be on or off`;
+      return typeof value === "boolean"
+        ? undefined
+        : `${label} must be on or off`;
     default:
       return typeof value === "string" ? undefined : `${label} must be text`;
   }
 }
 /** Model param values a run uses: defaults filled in, unknown keys dropped. */
-export function modelParams(model: ModelSpec, params: Params, mode?: string): Params {
+export function modelParams(
+  model: ModelSpec,
+  params: Params,
+  mode?: string,
+): Params {
   const out: Params = {};
   for (const f of fieldsFor(model, mode)) {
     const v = fieldValue(f, params);

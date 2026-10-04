@@ -37,7 +37,10 @@ test("motion follows the selected node and respects reduced motion", async ({
   const before = await preview.evaluate(
     (element) => getComputedStyle(element, "::before").aspectRatio,
   );
-  await node.getByLabel("aspect", { exact: true }).selectOption("1:1");
+  // The pilot image is 9:16; the model's ratio field sets the outline.
+  await inspector
+    .getByLabel("Aspect ratio", { exact: true })
+    .selectOption("1:1");
   await expect(preview).toHaveAttribute("data-aspect", "1:1");
   await expect
     .poll(() =>
@@ -53,7 +56,9 @@ test("motion follows the selected node and respects reduced motion", async ({
       ),
     )
     .toBeGreaterThan(130);
-  await node.getByLabel("aspect", { exact: true }).selectOption("16:9");
+  await inspector
+    .getByLabel("Aspect ratio", { exact: true })
+    .selectOption("16:9");
   await expect
     .poll(() =>
       preview.evaluate((element) =>

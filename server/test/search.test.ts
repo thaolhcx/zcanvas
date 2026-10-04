@@ -400,13 +400,24 @@ describe("kept results (D5)", () => {
     const all = await search(app, `spaceId=${space}&q=lantern&kept=all`);
     expect(ids(all)).toContain(loose.id);
     const listed = (await app.inject(`/assets?spaceId=${space}`)).json();
-    expect(listed.items.map((a: { id: string }) => a.id)).not.toContain(loose.id);
-    const every = (await app.inject(`/assets?spaceId=${space}&kept=all`)).json();
+    expect(listed.items.map((a: { id: string }) => a.id)).not.toContain(
+      loose.id,
+    );
+    const every = (
+      await app.inject(`/assets?spaceId=${space}&kept=all`)
+    ).json();
     expect(every.items.map((a: { id: string }) => a.id)).toContain(loose.id);
-    const kept = await app.inject({ method: "POST", url: `/assets/${loose.id}/keep` });
+    const kept = await app.inject({
+      method: "POST",
+      url: `/assets/${loose.id}/keep`,
+    });
     expect(kept.json().kept).toBe(true);
     const after = (await app.inject(`/assets?spaceId=${space}`)).json();
     expect(after.items.map((a: { id: string }) => a.id)).toContain(loose.id);
-    expect((await app.inject({ method: "POST", url: `/assets/${loose.id}/unkeep` })).json().kept).toBe(false);
+    expect(
+      (
+        await app.inject({ method: "POST", url: `/assets/${loose.id}/unkeep` })
+      ).json().kept,
+    ).toBe(false);
   });
 });

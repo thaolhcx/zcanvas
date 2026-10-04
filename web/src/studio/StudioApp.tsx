@@ -3,7 +3,12 @@
 // POST /runs and the shared queue like canvas runs do.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, FolderOpen, History, Upload } from "lucide-react";
-import { STUDIO_NODE_ID, type Asset, type AssetListResponse, type StudioKind } from "../../../contracts/index.ts";
+import {
+  STUDIO_NODE_ID,
+  type Asset,
+  type AssetListResponse,
+  type StudioKind,
+} from "../../../contracts/index.ts";
 import { request } from "../api.ts";
 import { uploadAsset } from "../media/api.ts";
 import { Composer, KIND_ICON, type SlotSpec } from "../kit/Composer.tsx";
@@ -19,18 +24,32 @@ import "../kit/kit.css";
 import "./studio.css";
 
 const TABS: StudioKind[] = ["text", "image", "video", "audio"];
-const TAB_LABEL: Record<StudioKind, string> = { text: "Text", image: "Image", video: "Video", audio: "Audio" };
-const SLOT_LABEL: Record<MediaKind, string> = { image: "image", video: "material", audio: "material", text: "file" };
+const TAB_LABEL: Record<StudioKind, string> = {
+  text: "Text",
+  image: "Image",
+  video: "Video",
+  audio: "Audio",
+};
+const SLOT_LABEL: Record<MediaKind, string> = {
+  image: "image",
+  video: "material",
+  audio: "material",
+  text: "file",
+};
 
 export function StudioApp() {
   const { tab, setTab, ready, error, toasts, dismiss } = useStudio();
   // The dock is closed until "History" is clicked; it stays open across pages.
   const [dock, setDock] = useState(false);
-  const revision = useStudio((s) => s.kinds[s.tab].history.filter((h) => h.status === "done").length);
+  const revision = useStudio(
+    (s) => s.kinds[s.tab].history.filter((h) => h.status === "done").length,
+  );
   useEffect(() => {
     void useStudio.getState().init();
     const pop = () => {
-      const kind = location.pathname.match(/^\/studio\/(\w+)/)?.[1] as StudioKind | undefined;
+      const kind = location.pathname.match(/^\/studio\/(\w+)/)?.[1] as
+        | StudioKind
+        | undefined;
       if (kind && TABS.includes(kind)) useStudio.getState().setTab(kind);
     };
     addEventListener("popstate", pop);
@@ -72,13 +91,20 @@ export function StudioApp() {
             <p role="alert">{error}</p>
           </main>
         ) : ready ? (
-          <GenFeed key={tab} kind={tab} history={dock} onHistory={() => setDock(!dock)} />
+          <GenFeed
+            key={tab}
+            kind={tab}
+            history={dock}
+            onHistory={() => setDock(!dock)}
+          />
         ) : (
           <main className="studio-main studio-feed-empty">
             <p>Loading…</p>
           </main>
         )}
-        {dock && <HistoryDock onClose={() => setDock(false)} revision={revision} />}
+        {dock && (
+          <HistoryDock onClose={() => setDock(false)} revision={revision} />
+        )}
       </div>
       <RunDetail />
       <div className="studio-toasts" aria-live="polite">
@@ -103,7 +129,15 @@ export function StudioApp() {
   );
 }
 
-function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: boolean; onHistory: () => void }) {
+function GenFeed({
+  kind,
+  history,
+  onHistory,
+}: {
+  kind: StudioKind;
+  history: boolean;
+  onHistory: () => void;
+}) {
   const [picking, setPicking] = useState(false);
   const [uploading, setUploading] = useState(0);
   const composer = useRef<HTMLDivElement>(null);
@@ -121,12 +155,23 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
   const runCount = source?.history.length ?? 0,
     jobCount = source?.jobs?.length ?? 0,
     newest = k.history[0]?.jobId;
-  const seen = useRef<{ runs: number; jobs: number; newest?: string }>(undefined);
+  const seen = useRef<{ runs: number; jobs: number; newest?: string }>(
+    undefined,
+  );
   useEffect(() => {
     const el = feed.current,
       prev = seen.current;
-    if (el && runCount + jobCount > 0 && (!prev || newest !== prev.newest || jobCount > prev.jobs))
-      requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: prev?.runs || prev?.jobs ? "smooth" : "instant" }));
+    if (
+      el &&
+      runCount + jobCount > 0 &&
+      (!prev || newest !== prev.newest || jobCount > prev.jobs)
+    )
+      requestAnimationFrame(() =>
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: prev?.runs || prev?.jobs ? "smooth" : "instant",
+        }),
+      );
     seen.current = { runs: runCount, jobs: jobCount, newest };
   }, [runCount, jobCount, newest]);
   if (!source || !k.canvas)
@@ -140,13 +185,19 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
   // Oldest at the top, newest just above the composer; runs in flight come last.
   const entries = [...source.history].reverse();
   const jobs = source.jobs ?? [];
-  const accepts = source.node.accepts.filter((x): x is Exclude<MediaKind, "text"> => x !== "text");
+  const accepts = source.node.accepts.filter(
+    (x): x is Exclude<MediaKind, "text"> => x !== "text",
+  );
   const slot: SlotSpec | undefined = accepts.length
     ? {
         label: SLOT_LABEL[source.node.output],
         actions: [
           { label: "Upload", icon: Upload, run: () => file.current?.click() },
-          { label: "From library", icon: FolderOpen, run: () => setPicking(true) },
+          {
+            label: "From library",
+            icon: FolderOpen,
+            run: () => setPicking(true),
+          },
         ],
       }
     : undefined;
@@ -169,12 +220,17 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
       )}
       <section className="studio-feed" ref={feed} aria-label="Results">
         {k.nextBefore && (
-          <button className="kit-link studio-older" onClick={() => void store.loadMore(kind)}>
+          <button
+            className="kit-link studio-older"
+            onClick={() => void store.loadMore(kind)}
+          >
             Show older results
           </button>
         )}
         {entries.map((e) => {
-          const assetIds = e.outputs.map((o) => o.assetId).filter((x): x is string => Boolean(x));
+          const assetIds = e.outputs
+            .map((o) => o.assetId)
+            .filter((x): x is string => Boolean(x));
           return (
             <FeedCard
               key={e.id}
@@ -183,7 +239,10 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
               entry={e}
               onReEdit={() => {
                 source.reEdit(e.id);
-                composer.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                composer.current?.scrollIntoView({
+                  block: "nearest",
+                  behavior: "smooth",
+                });
                 composer.current?.querySelector("textarea")?.focus();
               }}
               onRerun={() => source.rerun?.(e.id)}
@@ -191,13 +250,22 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
               onOpen={(i) => {
                 const done = entries.filter((x) => !x.cancelled && !x.error);
                 useDetail.getState().open(
-                  done.map((x) => ({ canvasId, nodeId: STUDIO_NODE_ID, jobId: x.id, entry: byJob.get(x.id) })),
+                  done.map((x) => ({
+                    canvasId,
+                    nodeId: STUDIO_NODE_ID,
+                    jobId: x.id,
+                    entry: byJob.get(x.id),
+                  })),
                   Math.max(0, done.indexOf(e)),
                   i,
                 );
               }}
               onDownload={download}
-              onKeep={assetIds.length ? (keep) => void store.keep(assetIds, keep) : undefined}
+              onKeep={
+                assetIds.length
+                  ? (keep) => void store.keep(assetIds, keep)
+                  : undefined
+              }
             />
           );
         })}
@@ -220,7 +288,9 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
       <div className="studio-composer" ref={composer}>
         <Composer source={source} layout="wide" slot={slot} parallel />
       </div>
-      {uploading > 0 && <p className="studio-uploading">Uploading {uploading}…</p>}
+      {uploading > 0 && (
+        <p className="studio-uploading">Uploading {uploading}…</p>
+      )}
       <input
         ref={file}
         type="file"
@@ -233,13 +303,18 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
           e.target.value = "";
           for (const f of files) {
             if (!accepts.some((x) => f.type.startsWith(x))) {
-              store.toast(`${f.name}: this page doesn't take that file.`, "warn");
+              store.toast(
+                `${f.name}: this page doesn't take that file.`,
+                "warn",
+              );
               continue;
             }
             setUploading((n) => n + 1);
             uploadAsset(f, { canvasId })
               .then((asset) => attachAssets(kind, [asset]))
-              .catch((err) => store.toast(`${f.name}: ${(err as Error).message}`, "warn"))
+              .catch((err) =>
+                store.toast(`${f.name}: ${(err as Error).message}`, "warn"),
+              )
               .finally(() => setUploading((n) => n - 1));
           }
         }}
@@ -261,19 +336,44 @@ function GenFeed({ kind, history, onHistory }: { kind: StudioKind; history: bool
 
 /** Still on our side (waiting for a slot, preparing) a job can always stop; at the provider it depends on the model. */
 function canStop(cancel: ModelSpec["cancel"], job: RunJob) {
-  if (job.status.state === "queued" || ["waiting", "retry", "auto-prompt", "preparing"].includes(job.stage ?? "")) return true;
+  if (
+    job.status.state === "queued" ||
+    ["waiting", "retry", "auto-prompt", "preparing"].includes(job.stage ?? "")
+  )
+    return true;
   if (cancel === "never") return false;
   return cancel !== "queued" || job.stage !== "provider";
 }
 /** "From library": kept files of the kinds this page takes, newest first. */
-function LibraryPicker({ spaceId, kinds, onPick, onClose }: { spaceId: string; kinds: MediaKind[]; onPick: (a: Asset) => void; onClose: () => void }) {
+function LibraryPicker({
+  spaceId,
+  kinds,
+  onPick,
+  onClose,
+}: {
+  spaceId: string;
+  kinds: MediaKind[];
+  onPick: (a: Asset) => void;
+  onClose: () => void;
+}) {
   const [items, setItems] = useState<Asset[]>();
   const [error, setError] = useState("");
   useEffect(() => {
     let live = true;
-    Promise.all(kinds.map((kind) => request<AssetListResponse>(`/assets?spaceId=${encodeURIComponent(spaceId)}&kind=${kind}&limit=60`)))
+    Promise.all(
+      kinds.map((kind) =>
+        request<AssetListResponse>(
+          `/assets?spaceId=${encodeURIComponent(spaceId)}&kind=${kind}&limit=60`,
+        ),
+      ),
+    )
       .then((pages) => {
-        if (live) setItems(pages.flatMap((p) => p.items).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+        if (live)
+          setItems(
+            pages
+              .flatMap((p) => p.items)
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+          );
       })
       .catch((e) => live && setError((e as Error).message));
     return () => {
@@ -282,7 +382,12 @@ function LibraryPicker({ spaceId, kinds, onPick, onClose }: { spaceId: string; k
   }, [spaceId, kinds.join()]);
   return (
     <div className="studio-modal" onMouseDown={onClose}>
-      <div className="studio-modal-card" role="dialog" aria-label="From library" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="studio-modal-card"
+        role="dialog"
+        aria-label="From library"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <header>
           <b>From library</b>
           <button className="kit-link" onClick={onClose}>
@@ -295,13 +400,23 @@ function LibraryPicker({ spaceId, kinds, onPick, onClose }: { spaceId: string; k
             const src = a.thumbUrl ?? (a.kind === "image" ? a.url : undefined);
             return (
               <button key={a.id} onClick={() => onPick(a)} title={a.name}>
-                {src ? <img src={src} alt="" /> : <span className="studio-sample-icon"><Icon size={22} /></span>}
+                {src ? (
+                  <img src={src} alt="" />
+                ) : (
+                  <span className="studio-sample-icon">
+                    <Icon size={22} />
+                  </span>
+                )}
                 <span>{a.name}</span>
               </button>
             );
           })}
         </div>
-        {(error || items?.length === 0 || !items) && <p className="studio-dock-empty">{error || (items ? "No files yet. Upload one first." : "Loading…")}</p>}
+        {(error || items?.length === 0 || !items) && (
+          <p className="studio-dock-empty">
+            {error || (items ? "No files yet. Upload one first." : "Loading…")}
+          </p>
+        )}
       </div>
     </div>
   );

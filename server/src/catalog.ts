@@ -11,7 +11,10 @@ import { adapterFor } from "./providers/index.ts";
 const builtin = loadModels(
   new URL("../../contracts/models/", import.meta.url).pathname,
 );
-function extra(kind: ModelSpec["kind"], value: string | undefined): ModelSpec[] {
+function extra(
+  kind: ModelSpec["kind"],
+  value: string | undefined,
+): ModelSpec[] {
   const base = builtin.find((m) => m.kind === kind && m.default);
   if (!value || !base) return [];
   return value
@@ -20,7 +23,11 @@ function extra(kind: ModelSpec["kind"], value: string | undefined): ModelSpec[] 
     .filter(Boolean)
     .map((entry) => {
       const [id, ...rest] = entry.split("|");
-      const key = id.trim().toLowerCase().replace(/[^a-z0-9.-]/g, "-").slice(0, 60);
+      const key = id
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9.-]/g, "-")
+        .slice(0, 60);
       return {
         ...structuredClone(base),
         key: /^[a-z]/.test(key) ? key : `m-${key}`,

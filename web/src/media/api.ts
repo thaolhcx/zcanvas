@@ -72,10 +72,13 @@ export const deleteAsset = (id: string, canvasId?: string) =>
     { method: "DELETE" },
   );
 export const keepAsset = (id: string, keep: boolean) =>
-  request<Asset>(`/assets/${encodeURIComponent(id)}/${keep ? "keep" : "unkeep"}`, {
-    method: "POST",
-    body: "{}",
-  });
+  request<Asset>(
+    `/assets/${encodeURIComponent(id)}/${keep ? "keep" : "unkeep"}`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 export const getStock = () => request<unknown>("/stock");
 export const downloadUrl = (asset: Asset) => `${asset.url}?download=1`;
 /**

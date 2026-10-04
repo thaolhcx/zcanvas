@@ -52,8 +52,15 @@ async function load(at: number, fresh = false) {
     const entry = await request<HistoryEntry>(
       `/canvases/${encodeURIComponent(item.canvasId)}/nodes/${encodeURIComponent(item.nodeId)}/history/${encodeURIComponent(item.jobId)}`,
     );
-    useDetail.setState((s) => ({ items: s.items.map((it) => (it.jobId === item.jobId ? { ...it, entry } : it)) }));
+    useDetail.setState((s) => ({
+      items: s.items.map((it) =>
+        it.jobId === item.jobId ? { ...it, entry } : it,
+      ),
+    }));
   } catch (error) {
-    if (useDetail.getState().items[useDetail.getState().at]?.jobId === item.jobId) useDetail.setState({ error: (error as Error).message });
+    if (
+      useDetail.getState().items[useDetail.getState().at]?.jobId === item.jobId
+    )
+      useDetail.setState({ error: (error as Error).message });
   }
 }

@@ -30,12 +30,20 @@ async function failed(request: GenRequest) {
   return Boolean(rowCount);
 }
 const mockFailure = () =>
-  new ProviderError("Mock job interrupted. Retry this node.", false, "MOCK_FAILURE");
+  new ProviderError(
+    "Mock job interrupted. Retry this node.",
+    false,
+    "MOCK_FAILURE",
+  );
 const PRESETS: Record<string, (topic: string) => string> = {
-  copy: (t) => `**Made for mornings.**\n${t} — small batch, big taste.\n\n_Try it today._`,
-  enrich: (t) => `${t}, warm soft backlight, shallow depth of field, 35mm lens, subtle film grain, rich color grading, highly detailed.`,
-  describe: (t) => `The input shows ${t}. Warm tones, soft directional light, the subject slightly off-centre.`,
-  script: (t) => `**Shot 1 · 0–3 s** — Wide: ${t}.\n**Shot 2 · 3–7 s** — Close-up, slow push-in.\n**Shot 3 · 7–10 s** — Product hero, logo resolve.`,
+  copy: (t) =>
+    `**Made for mornings.**\n${t} — small batch, big taste.\n\n_Try it today._`,
+  enrich: (t) =>
+    `${t}, warm soft backlight, shallow depth of field, 35mm lens, subtle film grain, rich color grading, highly detailed.`,
+  describe: (t) =>
+    `The input shows ${t}. Warm tones, soft directional light, the subject slightly off-centre.`,
+  script: (t) =>
+    `**Shot 1 · 0–3 s** — Wide: ${t}.\n**Shot 2 · 3–7 s** — Close-up, slow push-in.\n**Shot 3 · 7–10 s** — Product hero, logo resolve.`,
 };
 /** Deterministic text for the mock LLM: the preset's shape around the prompt. */
 export function mockText(request: GenRequest) {
@@ -45,14 +53,21 @@ export function mockText(request: GenRequest) {
     request.texts?.find(Boolean)?.slice(0, 80) ||
     request.refs.map((r) => r.name).join(", ") ||
     "the idea";
-  const body = (PRESETS[preset] ?? ((t: string) => `${t}. Clear, warm and easy to read.`))(topic);
-  const refs = request.refs.length ? `\n\n— read ${request.refs.length} input${request.refs.length > 1 ? "s" : ""}` : "";
+  const body = (
+    PRESETS[preset] ?? ((t: string) => `${t}. Clear, warm and easy to read.`)
+  )(topic);
+  const refs = request.refs.length
+    ? `\n\n— read ${request.refs.length} input${request.refs.length > 1 ? "s" : ""}`
+    : "";
   return body + refs;
 }
 /** Mock Auto prompt: keeps the user's words (and their image N names) and adds detail. */
 export const mockRewrite = (prompt: string, kind: string) =>
   kind === "audio"
-    ? prompt.trim().replace(/\s+/g, " ").replace(/([^.!?])$/, "$1.")
+    ? prompt
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/([^.!?])$/, "$1.")
     : `${prompt.trim()}, cinematic lighting, rich detail, clean composition`;
 function credits(request: GenRequest, outputs: number) {
   if (request.task === "video") return 2 * Number(request.params.duration ?? 5);
@@ -82,46 +97,80 @@ export const mockAdapter: ProviderAdapter = {
     if (request.task === "llm")
       outputs.push({ type: "text", text: mockText(request) });
     else if (request.task === "audio")
-      outputs.push({ type: "file", file: blob(await fixture("voice.wav"), "audio/wav"), meta: meta("audio") });
+      outputs.push({
+        type: "file",
+        file: blob(await fixture("voice.wav"), "audio/wav"),
+        meta: meta("audio"),
+      });
     else {
-      const count = request.task === "image" ? Number(request.params.count ?? 1) : 1;
+      const count =
+        request.task === "image" ? Number(request.params.count ?? 1) : 1;
       let bytes: Uint8Array = await fixture("portrait.png");
-      const source = request.refs.find((r) => r.role === "source" || r.role === "image");
-      if (request.task === "image-edit" && request.params.mode === "upscale" && source)
+      const source = request.refs.find(
+        (r) => r.role === "source" || r.role === "image",
+      );
+      if (
+        request.task === "image-edit" &&
+        request.params.mode === "upscale" &&
+        source
+      )
         bytes = await sharp(await read(source))
           .resize({ width: 720 * Number(request.params.scale ?? 2) })
           .png()
           .toBuffer();
       for (let i = 0; i < count; i++)
-        outputs.push({ type: "file", file: blob(bytes, "image/png"), meta: meta("image") });
+        outputs.push({
+          type: "file",
+          file: blob(bytes, "image/png"),
+          meta: meta("image"),
+        });
     }
     return { type: "done", outputs, credits: credits(request, outputs.length) };
   },
   async fetch(task: ProviderTask): Promise<FetchResult> {
     if (await failed(task.request))
-      return { state: "failed", message: mockFailure().message, code: "MOCK_FAILURE" };
+      return {
+        state: "failed",
+        message: mockFailure().message,
+        code: "MOCK_FAILURE",
+      };
     const { rows } = await db.query(
       "SELECT state, extract(epoch FROM ready_at - now()) AS remaining, extract(epoch FROM now() - created_at) AS elapsed, extract(epoch FROM ready_at - created_at) AS total FROM mock_tasks WHERE id=$1",
       [task.taskId],
     );
     const row = rows[0];
-    if (!row) return { state: "failed", message: "Mock task not found", code: "PROVIDER_ERROR" };
+    if (!row)
+      return {
+        state: "failed",
+        message: "Mock task not found",
+        code: "PROVIDER_ERROR",
+      };
     if (row.state === "cancelled")
-      return { state: "failed", message: "The task was cancelled", code: "CANCELLED" };
+      return {
+        state: "failed",
+        message: "The task was cancelled",
+        code: "CANCELLED",
+      };
     const remaining = Number(row.remaining);
     if (remaining > 0)
       return {
-        state: Number(row.elapsed) < Number(row.total) / 2 ? "queued" : "running",
+        state:
+          Number(row.elapsed) < Number(row.total) / 2 ? "queued" : "running",
         etaSec: remaining,
       };
-    await db.query("UPDATE mock_tasks SET state='done' WHERE id=$1", [task.taskId]);
+    await db.query("UPDATE mock_tasks SET state='done' WHERE id=$1", [
+      task.taskId,
+    ]);
     return {
       state: "done",
       outputs: [
         {
           type: "file",
           file: blob(await fixture("clip.mp4"), "video/mp4"),
-          meta: { kind: "video", provider: { name: "mock", model: `mock:${task.request.model.key}` } },
+          meta: {
+            kind: "video",
+            provider: { name: "mock", model: `mock:${task.request.model.key}` },
+          },
         },
       ],
       credits: credits(task.request, 1),

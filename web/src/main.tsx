@@ -4,7 +4,12 @@ import { HocuspocusProvider } from "@hocuspocus/provider";
 import { IndexeddbPersistence } from "y-indexeddb";
 import { Plus, ArrowUpRight, Sparkles, Workflow } from "lucide-react";
 import { Graph, Y } from "../../graph/src/index.ts";
-import type { ModelSpec, ModelsResponse, NodeType, Recipe } from "../../contracts/index.ts";
+import type {
+  ModelSpec,
+  ModelsResponse,
+  NodeType,
+  Recipe,
+} from "../../contracts/index.ts";
 import pilot from "../../contracts/examples/pilot.recipe.json" with { type: "json" };
 import { GraphContext } from "./context.ts";
 import { Canvas } from "./Canvas.tsx";

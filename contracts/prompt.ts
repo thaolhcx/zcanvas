@@ -18,8 +18,13 @@ export type PromptPart =
 const TOKEN = /@\[([^\]\n]{0,120})\]\((asset|node):([A-Za-z0-9_-]{1,100})\)/g;
 /** Label text a token can carry: no brackets or line breaks, at most 80 characters. */
 export const cleanLabel = (label: string) =>
-  label.replace(/[[\]\n\r]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "input";
-export const refKey = (ref: Pick<PromptRef, "scheme" | "id">) => `${ref.scheme}:${ref.id}`;
+  label
+    .replace(/[[\]\n\r]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "input";
+export const refKey = (ref: Pick<PromptRef, "scheme" | "id">) =>
+  `${ref.scheme}:${ref.id}`;
 export function refToken(ref: PromptRef) {
   return `@[${cleanLabel(ref.label)}](${ref.scheme}:${ref.id})`;
 }
@@ -27,8 +32,15 @@ export function parsePrompt(text: string): PromptPart[] {
   const parts: PromptPart[] = [];
   let last = 0;
   for (const m of text.matchAll(TOKEN)) {
-    if (m.index > last) parts.push({ type: "text", text: text.slice(last, m.index) });
-    parts.push({ type: "ref", raw: m[0], label: m[1], scheme: m[2] as RefScheme, id: m[3] });
+    if (m.index > last)
+      parts.push({ type: "text", text: text.slice(last, m.index) });
+    parts.push({
+      type: "ref",
+      raw: m[0],
+      label: m[1],
+      scheme: m[2] as RefScheme,
+      id: m[3],
+    });
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push({ type: "text", text: text.slice(last) });
@@ -48,7 +60,9 @@ export function promptRefs(text: string): PromptRef[] {
 /** The prompt with each token replaced: by `names[key]` when given, else "@label". */
 export function renderPrompt(text: string, names: Record<string, string> = {}) {
   return parsePrompt(text)
-    .map((p) => (p.type === "text" ? p.text : (names[refKey(p)] ?? `@${p.label}`)))
+    .map((p) =>
+      p.type === "text" ? p.text : (names[refKey(p)] ?? `@${p.label}`),
+    )
     .join("");
 }
 /** For search and history: tokens read as "@label". */

@@ -75,7 +75,8 @@ export async function migrate() {
     -- #25: kept assets, per-node job history, the model queue, Studio canvases, provider caches.
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS kept boolean;
     UPDATE assets SET kept = (COALESCE(source_type, 'upload') <> 'generated') WHERE kept IS NULL;
-    ALTER TABLE assets ALTER COLUMN kept SET DEFAULT false;
+    -- Rows that do not say (scripts, older paths) are kept; results set false explicitly.
+    ALTER TABLE assets ALTER COLUMN kept SET DEFAULT true;
     ALTER TABLE assets ALTER COLUMN kept SET NOT NULL;
     CREATE INDEX IF NOT EXISTS assets_list_kept ON assets(space_id, kept, created_at DESC, id DESC) WHERE status = 'ready';
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request jsonb;

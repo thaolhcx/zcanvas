@@ -19,11 +19,14 @@ export function loadRegistry(dir) {
 /** Model catalog: one JSON file per model. Keys are unique; each kind has at most one default. */
 export function loadModels(dir) {
   const models = [];
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+  for (const file of readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .sort()) {
     const entry = JSON.parse(readFileSync(join(dir, file), "utf8"));
     const issues = checkModelEntry(entry);
     if (issues.length) throw new Error(`model ${file}: ${issues.join("; ")}`);
-    if (models.some((m) => m.key === entry.key)) throw new Error(`models: duplicate key ${entry.key}`);
+    if (models.some((m) => m.key === entry.key))
+      throw new Error(`models: duplicate key ${entry.key}`);
     if (entry.default && models.some((m) => m.default && m.kind === entry.kind))
       throw new Error(`models: two defaults for ${entry.kind}`);
     models.push(entry);

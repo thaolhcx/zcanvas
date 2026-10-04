@@ -355,7 +355,10 @@ test("generated prompt, settings and reference names stay as saved after the sou
   await expect(generation.getByRole("link")).toHaveCount(0);
   // Keep puts it in the library; it then lists without the switch.
   await details.getByRole("button", { name: "Keep", exact: true }).click();
-  await expect(details.getByRole("button", { name: "Kept" })).toHaveAttribute("aria-pressed", "true");
+  await expect(details.getByRole("button", { name: "Kept" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await browser.getByLabel("Show results not kept").uncheck();
   await expect(browser.getByTestId("asset-card")).toHaveCount(1);
 });

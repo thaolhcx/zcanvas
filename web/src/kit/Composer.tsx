@@ -20,12 +20,38 @@ import {
   Video,
   X,
 } from "lucide-react";
-import type { FieldSpec, GenSource, MediaKind, ModelSpec, NodeSpec, RefItem } from "./types.ts";
-import { compatibleModel, fieldValue, inputProblems, modeAvailability, modelOf, resolveFields, rolesFor } from "./logic.ts";
+import type {
+  FieldSpec,
+  GenSource,
+  MediaKind,
+  ModelSpec,
+  NodeSpec,
+  RefItem,
+} from "./types.ts";
+import {
+  compatibleModel,
+  fieldValue,
+  inputProblems,
+  modeAvailability,
+  modelOf,
+  resolveFields,
+  rolesFor,
+} from "./logic.ts";
 import { Popover } from "./Popover.tsx";
-import { FieldChip, GroupChip, KitContext, SettingsBody, VoicePicker } from "./fields.tsx";
+import {
+  FieldChip,
+  GroupChip,
+  KitContext,
+  SettingsBody,
+  VoicePicker,
+} from "./fields.tsx";
 
-export const KIND_ICON: Record<MediaKind, typeof Type> = { text: Type, image: ImageIcon, video: Video, audio: Mic };
+export const KIND_ICON: Record<MediaKind, typeof Type> = {
+  text: Type,
+  image: ImageIcon,
+  video: Video,
+  audio: Mic,
+};
 
 /** What the reference slot of a wide composer offers (Lumina: local upload · library · …). */
 export interface SlotSpec {
@@ -57,21 +83,34 @@ export function Composer({
   const model = modelOf(models, value.model);
   const fields = resolveFields(node, model, value.mode);
   const availability = modeAvailability(node, model, source.inputs);
-  const busy = !parallel && (source.status.state === "queued" || source.status.state === "running");
+  const busy =
+    !parallel &&
+    (source.status.state === "queued" || source.status.state === "running");
   const [full, setFull] = useState(false);
   const values = (f: FieldSpec) => fieldValue(f, value.params);
   // Inline fields: ungrouped ones get their own chip, grouped ones share one.
   const groups = new Map<string, FieldSpec[]>();
-  for (const f of fields.inline) if (f.group) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);
+  for (const f of fields.inline)
+    if (f.group) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);
   const seen = new Set<string>();
   const useSlot = layout === "wide" && !!slot;
   // Seed TTS takes no media: its slot is the voice (Lumina A07 "Voice").
   const voiceField = fields.all.find((f) => f.type === "voice");
   // TTS: "Vibe Prompt" (how to speak) gets its own line above the text instead of a chip.
-  const vibeField = node.promptLayout === "vibe+text" ? fields.inline.find((f) => f.key === "vibe") : undefined;
+  const vibeField =
+    node.promptLayout === "vibe+text"
+      ? fields.inline.find((f) => f.key === "vibe")
+      : undefined;
   return (
-    <div className={`kit-composer kit-${layout} nodrag nopan nowheel`} onKeyDown={(e) => e.stopPropagation()}>
-      <button className="kit-icon kit-expand" onClick={() => setFull(!full)} title={full ? "Collapse" : "Expand"}>
+    <div
+      className={`kit-composer kit-${layout} nodrag nopan nowheel`}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        className="kit-icon kit-expand"
+        onClick={() => setFull(!full)}
+        title={full ? "Collapse" : "Expand"}
+      >
         {full ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
       </button>
       {node.modes && layout !== "form" && (
@@ -97,7 +136,15 @@ export function Composer({
         </div>
       )}
       {!useSlot && (
-        <RefTray items={source.inputs} node={node} mode={value.mode} onRemove={source.removeInput} onRole={source.setRole} onAdd={source.addInput} model={model} />
+        <RefTray
+          items={source.inputs}
+          node={node}
+          mode={value.mode}
+          onRemove={source.removeInput}
+          onRole={source.setRole}
+          onAdd={source.addInput}
+          model={model}
+        />
       )}
       <div className="kit-body">
         {useSlot && (
@@ -110,7 +157,14 @@ export function Composer({
             onRemove={source.removeInput}
             onRole={source.setRole}
             model={model}
-            voice={voiceField && !Object.keys(model.accepts).length ? { value: String(values(voiceField) ?? ""), onChange: (v) => source.setParam(voiceField.key, v) } : undefined}
+            voice={
+              voiceField && !Object.keys(model.accepts).length
+                ? {
+                    value: String(values(voiceField) ?? ""),
+                    onChange: (v) => source.setParam(voiceField.key, v),
+                  }
+                : undefined
+            }
           />
         )}
         <div className={`kit-prompts ${vibeField ? "vibe" : ""}`}>
@@ -120,9 +174,17 @@ export function Composer({
               <input
                 value={String(value.params[vibeField.key] ?? "")}
                 placeholder={vibeField.placeholder}
-                onChange={(e) => source.setParam(vibeField.key, e.target.value || undefined)}
+                onChange={(e) =>
+                  source.setParam(vibeField.key, e.target.value || undefined)
+                }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !busy && !source.issues.length) source.run();
+                  if (
+                    e.key === "Enter" &&
+                    (e.metaKey || e.ctrlKey) &&
+                    !busy &&
+                    !source.issues.length
+                  )
+                    source.run();
                 }}
               />
             </label>
@@ -130,9 +192,14 @@ export function Composer({
           {vibeField && <span className="kit-text-label">Text</span>}
           <PromptEditor
             value={value.prompt}
-            placeholder={vibeField ? "Input the text to generate." : node.promptPlaceholder}
+            placeholder={
+              vibeField ? "Input the text to generate." : node.promptPlaceholder
+            }
             refs={source.inputs}
-            mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
+            mention={{
+              ...node.mentions,
+              roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label,
+            }}
             full={full}
             onFull={setFull}
             onChange={(prompt) => source.setValue({ prompt })}
@@ -145,7 +212,14 @@ export function Composer({
           {/* Model first (feedback #30): what runs, then what it makes (size, duration, count…), then Advanced. */}
           {layout !== "form" && !node.paramsInModel && (
             <ModelPicker
-              models={node.listByMode && value.mode ? models.filter((m) => m.modes.includes(value.mode!) || m.key === model.key) : models}
+              models={
+                node.listByMode && value.mode
+                  ? models.filter(
+                      (m) =>
+                        m.modes.includes(value.mode!) || m.key === model.key,
+                    )
+                  : models
+              }
               value={model.key}
               auto={value.auto === true}
               inputs={source.inputs}
@@ -155,7 +229,10 @@ export function Composer({
               }}
               onAuto={() => {
                 source.setValue({ auto: true });
-                source.changeModel(compatibleModel(models, source.inputs)?.key ?? node.defaultModel);
+                source.changeModel(
+                  compatibleModel(models, source.inputs)?.key ??
+                    node.defaultModel,
+                );
               }}
             />
           )}
@@ -177,30 +254,57 @@ export function Composer({
                 <GroupChip
                   key={f.group}
                   fields={groups.get(f.group)!}
-                  values={Object.fromEntries(groups.get(f.group)!.map((g) => [g.key, values(g)]))}
+                  values={Object.fromEntries(
+                    groups.get(f.group)!.map((g) => [g.key, values(g)]),
+                  )}
                   onChange={(k, v) => source.setParam(k, v)}
                 />
               );
             }
-            return <FieldChip key={f.key} field={f} value={values(f)} onChange={(v) => source.setParam(f.key, v)} />;
+            return (
+              <FieldChip
+                key={f.key}
+                field={f}
+                value={values(f)}
+                onChange={(v) => source.setParam(f.key, v)}
+              />
+            );
           })}
           {!node.paramsInModel && fields.advanced.length > 0 && (
             <Popover
               width={320}
               trigger={(open, toggle) => (
-                <button className={`kit-chip ${open ? "open" : ""}`} onClick={toggle}>
-                  {node.settingsLabel ? <Music size={13} /> : <ArrowLeftRight size={13} />}
+                <button
+                  className={`kit-chip ${open ? "open" : ""}`}
+                  onClick={toggle}
+                >
+                  {node.settingsLabel ? (
+                    <Music size={13} />
+                  ) : (
+                    <ArrowLeftRight size={13} />
+                  )}
                   {node.settingsLabel ?? "Advanced Parameters"}
                 </button>
               )}
             >
               <div className="kit-pop-head">
                 {node.settingsLabel ?? "Advanced Parameters"}
-                <button className="kit-link" onClick={() => fields.advanced.forEach((f) => source.setParam(f.key, undefined))}>
+                <button
+                  className="kit-link"
+                  onClick={() =>
+                    fields.advanced.forEach((f) =>
+                      source.setParam(f.key, undefined),
+                    )
+                  }
+                >
                   reset
                 </button>
               </div>
-              <SettingsBody fields={fields.advanced} values={values} onChange={(k, v) => source.setParam(k, v)} />
+              <SettingsBody
+                fields={fields.advanced}
+                values={values}
+                onChange={(k, v) => source.setParam(k, v)}
+              />
             </Popover>
           )}
         </div>
@@ -210,7 +314,9 @@ export function Composer({
               className="kit-chip"
               disabled={!value.prompt.trim()}
               title="Automatically create matched vibe prompts"
-              onClick={() => source.setParam(vibeField.key, autoVibe(value.prompt))}
+              onClick={() =>
+                source.setParam(vibeField.key, autoVibe(value.prompt))
+              }
             >
               <Sparkle size={13} /> Auto prompt
             </button>
@@ -220,7 +326,11 @@ export function Composer({
               width={90}
               align="end"
               trigger={(open, toggle) => (
-                <button className={`kit-times ${open ? "open" : ""}`} onClick={toggle} title="Run several times">
+                <button
+                  className={`kit-times ${open ? "open" : ""}`}
+                  onClick={toggle}
+                  title="Run several times"
+                >
                   {value.times}×
                 </button>
               )}
@@ -253,26 +363,57 @@ export function Composer({
 
 /** Prototype stand-in for the vibe writer: the first words of the text, read as a tone. */
 export function autoVibe(text: string) {
-  const words = text.replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 3);
-  return words.length ? `${words.join(" ").toLowerCase()} tone, warm and natural` : "";
+  const words = text
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3);
+  return words.length
+    ? `${words.join(" ").toLowerCase()} tone, warm and natural`
+    : "";
 }
 
-export function RunButton({ source, busy, cancel = "always" }: { source: GenSource; busy: boolean; cancel?: ModelSpec["cancel"] }) {
+export function RunButton({
+  source,
+  busy,
+  cancel = "always",
+}: {
+  source: GenSource;
+  busy: boolean;
+  cancel?: ModelSpec["cancel"];
+}) {
   const blocked = source.issues[0];
-  if (busy && (cancel === "never" || (cancel === "queued" && source.status.state === "running")))
+  if (
+    busy &&
+    (cancel === "never" ||
+      (cancel === "queued" && source.status.state === "running"))
+  )
     return (
-      <button className="kit-runbtn stop" disabled title="Generating, cannot cancel">
+      <button
+        className="kit-runbtn stop"
+        disabled
+        title="Generating, cannot cancel"
+      >
         <Square size={11} fill="currentColor" />
       </button>
     );
   if (busy)
     return (
-      <button className="kit-runbtn stop" onClick={() => source.cancel()} title="Stop">
+      <button
+        className="kit-runbtn stop"
+        onClick={() => source.cancel()}
+        title="Stop"
+      >
         <Square size={11} fill="currentColor" />
       </button>
     );
   return (
-    <button className="kit-runbtn" disabled={!!blocked} title={blocked ?? "Generate (⌘Enter)"} onClick={source.run}>
+    <button
+      className="kit-runbtn"
+      disabled={!!blocked}
+      title={blocked ?? "Generate (⌘Enter)"}
+      onClick={source.run}
+    >
       <Sparkles size={14} />
     </button>
   );
@@ -305,7 +446,11 @@ export function ModelPicker({
     <Popover
       width={280}
       trigger={(open, toggle) => (
-        <button className={`kit-chip kit-model ${auto ? "auto" : ""} ${open ? "open" : ""}`} onClick={toggle} title={auto ? `Auto: ${current.title}` : current.title}>
+        <button
+          className={`kit-chip kit-model ${auto ? "auto" : ""} ${open ? "open" : ""}`}
+          onClick={toggle}
+          title={auto ? `Auto: ${current.title}` : current.title}
+        >
           {Mark ? <Mark size={13} /> : <span className="kit-model-dot" />}
           {auto && <em>Auto ·</em>}
           {current.title}
@@ -364,7 +509,9 @@ export function ModelPicker({
                         </em>
                       )}
                     </span>
-                    {(problems[0] ?? m.description) && <small>{problems[0] ?? m.description}</small>}
+                    {(problems[0] ?? m.description) && (
+                      <small>{problems[0] ?? m.description}</small>
+                    )}
                   </span>
                   {m.key === value && !auto && <Check size={14} />}
                 </button>
@@ -397,7 +544,8 @@ function ModelParams({
   const own = fields.filter((f) => node.fields.includes(f) && f !== preset);
   const params = fields.filter((f) => !node.fields.includes(f));
   const presetValue = preset ? values(preset) : undefined;
-  const presetLabel = preset?.options?.find((o) => o.value === presetValue)?.label ?? "Custom";
+  const presetLabel =
+    preset?.options?.find((o) => o.value === presetValue)?.label ?? "Custom";
   const auto = source.value.auto === true;
   // The chip names the model; a preset shows only once one is picked ("Custom" alone said nothing).
   const picked = !!presetValue && presetValue !== "custom";
@@ -405,7 +553,11 @@ function ModelParams({
     <Popover
       width={340}
       trigger={(open, toggle) => (
-        <button className={`kit-chip kit-model ${open ? "open" : ""}`} onClick={toggle} title={`${presetLabel} · ${auto ? "Auto: " : ""}${model.title}`}>
+        <button
+          className={`kit-chip kit-model ${open ? "open" : ""}`}
+          onClick={toggle}
+          title={`${presetLabel} · ${auto ? "Auto: " : ""}${model.title}`}
+        >
           <span className="kit-model-dot" />
           {auto && <em>Auto ·</em>}
           {model.title}
@@ -420,14 +572,22 @@ function ModelParams({
             <div className="kit-pop-head">What to write</div>
             <div className="kit-presets">
               {preset.options?.map((o) => (
-                <button key={o.value} className={values(preset) === o.value ? "active" : ""} onClick={() => source.setParam(preset.key, o.value)}>
+                <button
+                  key={o.value}
+                  className={values(preset) === o.value ? "active" : ""}
+                  onClick={() => source.setParam(preset.key, o.value)}
+                >
                   {o.label}
                 </button>
               ))}
             </div>
           </>
         )}
-        <SettingsBody fields={own} values={values} onChange={(k, v) => source.setParam(k, v)} />
+        <SettingsBody
+          fields={own}
+          values={values}
+          onChange={(k, v) => source.setParam(k, v)}
+        />
         <div className="kit-pop-head kit-section">Model</div>
         <select
           className="kit-llm-select"
@@ -435,7 +595,10 @@ function ModelParams({
           onChange={(e) => {
             if (e.target.value === "__auto") {
               source.setValue({ auto: true });
-              source.changeModel(compatibleModel(source.models, source.inputs)?.key ?? node.defaultModel);
+              source.changeModel(
+                compatibleModel(source.models, source.inputs)?.key ??
+                  node.defaultModel,
+              );
             } else {
               source.setValue({ auto: false });
               source.changeModel(e.target.value);
@@ -446,13 +609,23 @@ function ModelParams({
           {source.models
             .filter((m) => !m.hidden)
             .map((m) => (
-              <option key={m.key} value={m.key} disabled={inputProblems(m, source.inputs).length > 0}>
+              <option
+                key={m.key}
+                value={m.key}
+                disabled={inputProblems(m, source.inputs).length > 0}
+              >
                 {m.title}
                 {m.badge ? ` (${m.badge})` : ""}
               </option>
             ))}
         </select>
-        {params.length > 0 && <SettingsBody fields={params} values={values} onChange={(k, v) => source.setParam(k, v)} />}
+        {params.length > 0 && (
+          <SettingsBody
+            fields={params}
+            values={values}
+            onChange={(k, v) => source.setParam(k, v)}
+          />
+        )}
       </div>
     </Popover>
   );
@@ -487,10 +660,23 @@ export function RefTray({
   /** Slot shows the voice instead of media (TTS). */
   voice?: { value: string; onChange: (id: string) => void };
 }) {
-  if (variant === "slot") return <RefSlot items={items} node={node} mode={mode} onRemove={onRemove} onRole={onRole} model={model} slot={slot} voice={voice} />;
+  if (variant === "slot")
+    return (
+      <RefSlot
+        items={items}
+        node={node}
+        mode={mode}
+        onRemove={onRemove}
+        onRole={onRole}
+        model={model}
+        slot={slot}
+        voice={voice}
+      />
+    );
   if (!items.length && !onAdd) return null;
   const problems = model ? inputProblems(model, items) : [];
-  const roleLabel = (key?: string) => node?.roles?.find((r) => r.key === key)?.label;
+  const roleLabel = (key?: string) =>
+    node?.roles?.find((r) => r.key === key)?.label;
   return (
     <div className="kit-refs">
       {items.map((r) => {
@@ -500,24 +686,35 @@ export function RefTray({
         const choosable = options.length > 1 && onRole;
         const current = roleLabel(r.role);
         const chip = (open?: boolean, toggle?: () => void) => (
-          <span className={`kit-ref ${r.role || !node?.roles ? "" : "unslotted"} ${open ? "open" : ""}`} title={r.text ?? r.label}>
+          <span
+            className={`kit-ref ${r.role || !node?.roles ? "" : "unslotted"} ${open ? "open" : ""}`}
+            title={r.text ?? r.label}
+          >
             {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={12} />}
             {node?.roles &&
               (choosable ? (
-                <button className="kit-ref-role" onClick={toggle} aria-label={`Role of ${r.label}`}>
+                <button
+                  className="kit-ref-role"
+                  onClick={toggle}
+                  aria-label={`Role of ${r.label}`}
+                >
                   {current ?? "No slot"} <ChevronDown size={11} />
                 </button>
               ) : (
                 <em className="kit-ref-role">{current ?? "No slot"}</em>
               ))}
             <span>{r.label}</span>
-            <button onClick={() => onRemove(r.id)} aria-label={`Remove ${r.label}`}>
+            <button
+              onClick={() => onRemove(r.id)}
+              aria-label={`Remove ${r.label}`}
+            >
               <X size={11} />
             </button>
           </span>
         );
         if (!choosable) return <span key={r.id}>{chip()}</span>;
-        const taken = (key: string) => items.filter((i) => i.role === key && i.id !== r.id).length;
+        const taken = (key: string) =>
+          items.filter((i) => i.role === key && i.id !== r.id).length;
         return (
           <Popover key={r.id} width={200} trigger={chip}>
             {(close) => (
@@ -549,7 +746,9 @@ export function RefTray({
           <Plus size={12} /> Reference
         </button>
       )}
-      {problems.length > 0 && <span className="kit-ref-warn">{problems[0]}</span>}
+      {problems.length > 0 && (
+        <span className="kit-ref-warn">{problems[0]}</span>
+      )}
     </div>
   );
 }
@@ -584,8 +783,19 @@ function RefSlot({
       <Popover
         width={560}
         trigger={(open, toggle) => (
-          <button className={`kit-slot voice ${open ? "open" : ""}`} onClick={toggle} title="Pick a voice">
-            {v ? <i className="kit-slot-avatar" style={{ background: `hsl(${v.hue} 60% 55%)` }} /> : <AudioLines size={18} />}
+          <button
+            className={`kit-slot voice ${open ? "open" : ""}`}
+            onClick={toggle}
+            title="Pick a voice"
+          >
+            {v ? (
+              <i
+                className="kit-slot-avatar"
+                style={{ background: `hsl(${v.hue} 60% 55%)` }}
+              />
+            ) : (
+              <AudioLines size={18} />
+            )}
             <span>{v?.name ?? "Voice"}</span>
           </button>
         )}
@@ -600,16 +810,29 @@ function RefSlot({
       width={items.length ? 300 : 190}
       trigger={(open, toggle) =>
         items.length ? (
-          <button className={`kit-slot filled ${open ? "open" : ""} ${problems.length ? "warn" : ""}`} onClick={toggle} title={problems[0] ?? items.map((r) => r.label).join(", ")}>
+          <button
+            className={`kit-slot filled ${open ? "open" : ""} ${problems.length ? "warn" : ""}`}
+            onClick={toggle}
+            title={problems[0] ?? items.map((r) => r.label).join(", ")}
+          >
             {items.slice(0, 3).map((r, i) => {
               const Icon = KIND_ICON[r.kind];
               return (
-                <span key={r.id} className="kit-slot-card" style={{ transform: `translate(${i * 6}px, ${i * -4}px) rotate(${(i - 1) * 6}deg)`, zIndex: 3 - i }}>
+                <span
+                  key={r.id}
+                  className="kit-slot-card"
+                  style={{
+                    transform: `translate(${i * 6}px, ${i * -4}px) rotate(${(i - 1) * 6}deg)`,
+                    zIndex: 3 - i,
+                  }}
+                >
                   {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={18} />}
                 </span>
               );
             })}
-            {items.length > 1 && <b className="kit-slot-count">+{items.length - 1}</b>}
+            {items.length > 1 && (
+              <b className="kit-slot-count">+{items.length - 1}</b>
+            )}
           </button>
         ) : (
           <button className={`kit-slot ${open ? "open" : ""}`} onClick={toggle}>
@@ -621,7 +844,16 @@ function RefSlot({
     >
       {(close) => (
         <div className="kit-slot-pop">
-          {items.length > 0 && <RefTray items={items} node={node} mode={mode} onRemove={onRemove} onRole={onRole} model={model} />}
+          {items.length > 0 && (
+            <RefTray
+              items={items}
+              node={node}
+              mode={mode}
+              onRemove={onRemove}
+              onRole={onRole}
+              model={model}
+            />
+          )}
           <div className="kit-menu kit-menu-icons">
             {slot?.actions.map((a) => {
               const Icon = a.icon ?? Plus;
@@ -657,7 +889,20 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-const COLORS = ["#e5484d", "#f76b15", "#ffc53d", "#7be188", "#46a758", "#12a594", "#0090ff", "#6e56cf", "#d6409f", "#1c2024", "#8b8d98", "#ffffff"];
+const COLORS = [
+  "#e5484d",
+  "#f76b15",
+  "#ffc53d",
+  "#7be188",
+  "#46a758",
+  "#12a594",
+  "#0090ff",
+  "#6e56cf",
+  "#d6409f",
+  "#1c2024",
+  "#8b8d98",
+  "#ffffff",
+];
 
 /** Prompt with @ references and colour tokens. Tokens stay plain text: "@Image 1", "#46a758". */
 export function PromptEditor({
@@ -674,7 +919,9 @@ export function PromptEditor({
   placeholder: string;
   refs: RefItem[];
   /** What "@" may offer here; per node type (an Image node offers colours, a Text node doesn't). */
-  mention?: NodeSpec["mentions"] & { roleLabel?: (key: string) => string | undefined };
+  mention?: NodeSpec["mentions"] & {
+    roleLabel?: (key: string) => string | undefined;
+  };
   full?: boolean;
   onFull?: (full: boolean) => void;
   onChange: (v: string) => void;
@@ -688,9 +935,15 @@ export function PromptEditor({
     [colors, setColors] = useState(false);
   const menu = at !== undefined;
   const query = menu ? value.slice(at + 1, caret) : "";
-  const pool = mention?.kinds ? refs.filter((r) => mention.kinds!.includes(r.kind)) : refs;
-  const matches = menu ? pool.filter((r) => r.label.toLowerCase().includes(query.toLowerCase())) : [];
-  const colorItem = (mention?.colors ?? false) && (!query || "color selection".includes(query.toLowerCase()));
+  const pool = mention?.kinds
+    ? refs.filter((r) => mention.kinds!.includes(r.kind))
+    : refs;
+  const matches = menu
+    ? pool.filter((r) => r.label.toLowerCase().includes(query.toLowerCase()))
+    : [];
+  const colorItem =
+    (mention?.colors ?? false) &&
+    (!query || "color selection".includes(query.toLowerCase()));
   const count = matches.length + (colorItem ? 1 : 0);
   // The "@" of a mention just inserted or dismissed: don't reopen on it until the user types a new "@".
   const skip = useRef<number>(undefined);
@@ -732,13 +985,23 @@ export function PromptEditor({
   };
   useEffect(() => {
     if (!full) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), onFull?.(false));
+    const key = (e: KeyboardEvent) =>
+      e.key === "Escape" && (e.stopPropagation(), onFull?.(false));
     document.addEventListener("keydown", key, true);
     return () => document.removeEventListener("keydown", key, true);
   }, [full, onFull]);
   // Tokens: every "@<label>" of a connected input (labels may hold spaces or arrows), unknown "@words", colours.
-  const known = refs.map((r) => "@" + r.label).sort((a, b) => b.length - a.length);
-  const tokenRe = new RegExp([...known.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "@[\\wÀ-ɏ.]+", "#[0-9a-fA-F]{6}"].join("|"), "g");
+  const known = refs
+    .map((r) => "@" + r.label)
+    .sort((a, b) => b.length - a.length);
+  const tokenRe = new RegExp(
+    [
+      ...known.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      "@[\\wÀ-ɏ.]+",
+      "#[0-9a-fA-F]{6}",
+    ].join("|"),
+    "g",
+  );
   const tokens = [...value.matchAll(tokenRe)].map((m) => m[0]);
   return (
     <div className="kit-prompt">
@@ -746,8 +1009,16 @@ export function PromptEditor({
         // Portal: the panel may sit inside a transformed canvas, where position:fixed would not cover the page.
         createPortal(
           <div className="kit-prompt-full" onMouseDown={() => onFull?.(false)}>
-            <div className="kit-prompt-full-card" onMouseDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              <button className="kit-icon kit-collapse" onClick={() => onFull?.(false)} title="Collapse">
+            <div
+              className="kit-prompt-full-card"
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <button
+                className="kit-icon kit-collapse"
+                onClick={() => onFull?.(false)}
+                title="Collapse"
+              >
                 <Minimize2 size={14} />
               </button>
               <textarea
@@ -777,7 +1048,8 @@ export function PromptEditor({
         }}
         onClick={(e) => track(e.currentTarget)}
         onKeyUp={(e) => {
-          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) track(e.currentTarget);
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key))
+            track(e.currentTarget);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -809,7 +1081,10 @@ export function PromptEditor({
                 {t}
               </span>
             ) : (
-              <span key={i} className={`kit-token ${refs.some((r) => "@" + r.label === t) ? "" : "missing"}`}>
+              <span
+                key={i}
+                className={`kit-token ${refs.some((r) => "@" + r.label === t) ? "" : "missing"}`}
+              >
                 {t}
               </span>
             ),
@@ -818,14 +1093,28 @@ export function PromptEditor({
       )}
       {menu && (
         // mousedown is swallowed so the textarea keeps focus and the caret while picking.
-        <div className="kit-mention" role="listbox" onMouseDown={(e) => e.preventDefault()}>
+        <div
+          className="kit-mention"
+          role="listbox"
+          onMouseDown={(e) => e.preventDefault()}
+        >
           {matches.map((r, i) => {
             const Icon = KIND_ICON[r.kind];
             return (
-              <button key={r.id} role="option" aria-selected={hi === i} className={hi === i ? "active" : ""} onMouseEnter={() => setHi(i)} onClick={() => insert("@" + r.label)} title={r.text}>
+              <button
+                key={r.id}
+                role="option"
+                aria-selected={hi === i}
+                className={hi === i ? "active" : ""}
+                onMouseEnter={() => setHi(i)}
+                onClick={() => insert("@" + r.label)}
+                title={r.text}
+              >
                 {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={14} />}
                 <Highlight text={r.label} query={query} />
-                <small>{(r.role && mention?.roleLabel?.(r.role)) ?? r.kind}</small>
+                <small>
+                  {(r.role && mention?.roleLabel?.(r.role)) ?? r.kind}
+                </small>
               </button>
             );
           })}
@@ -835,18 +1124,28 @@ export function PromptEditor({
               onMouseEnter={() => setHi(matches.length)}
               onClick={() => setColors(!colors)}
             >
-              <span className="kit-swatch-dot" /> Color selection <span className="kit-chev">›</span>
+              <span className="kit-swatch-dot" /> Color selection{" "}
+              <span className="kit-chev">›</span>
             </button>
           )}
-          {count === 0 && <div className="kit-mention-empty">No input matches “{query}”</div>}
+          {count === 0 && (
+            <div className="kit-mention-empty">No input matches “{query}”</div>
+          )}
           {colors && (
             <div className="kit-swatches">
               {COLORS.map((c) => (
-                <button key={c} style={{ background: c }} title={c} onClick={() => insert(c)} />
+                <button
+                  key={c}
+                  style={{ background: c }}
+                  title={c}
+                  onClick={() => insert(c)}
+                />
               ))}
             </div>
           )}
-          <div className="kit-mention-hint">↑↓ choose · Enter insert · Esc close</div>
+          <div className="kit-mention-hint">
+            ↑↓ choose · Enter insert · Esc close
+          </div>
         </div>
       )}
     </div>

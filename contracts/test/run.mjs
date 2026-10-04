@@ -69,6 +69,12 @@ t('migrate: v1 pilot becomes the v2 pilot', () => {
   v1.edges.find(e => e.id === 'e_4').targetPort = 'image';
   assert.deepEqual(migrateRecipe(v1), pilot);
   assert.equal(migrateRecipe(pilot), pilot, 'a current recipe is returned as is');
+  // A template's inputs follow the renamed params; gone ones (seed, voice) are dropped.
+  v1.meta = { ...v1.meta, template: { title: 'T', inputs: [
+    { nodeId: 'n_vid', paramKey: 'durationSec' }, { nodeId: 'n_img', paramKey: 'aspect' }, { nodeId: 'n_img', paramKey: 'seed' },
+    { nodeId: 'n_voice', paramKey: 'voice' }, { nodeId: 'n_prompt', paramKey: 'text' },
+  ] } };
+  assert.deepEqual(migrateRecipe(v1).meta.template.inputs.map(i => `${i.nodeId}.${i.paramKey}`), ['n_vid.duration', 'n_img.ratio', 'n_prompt.text']);
 });
 t('models: auto picks the default that fits, else another fitting model', () => {
   assert.equal(resolveModel(models, 'video', 'auto', ['image'], 'frames').key, 'seedance-2-5');

@@ -58,8 +58,16 @@ export interface ProviderAdapter {
   available(model: ModelSpec): boolean;
   /** Work to do before submit, as its own queue step (stage references, real-person check). */
   needsPrepare?(request: GenRequest): boolean;
-  prepare?(request: GenRequest, read: ReadRef, signal: AbortSignal): Promise<void>;
-  submit(request: GenRequest, read: ReadRef, signal: AbortSignal): Promise<SubmitResult>;
+  prepare?(
+    request: GenRequest,
+    read: ReadRef,
+    signal: AbortSignal,
+  ): Promise<void>;
+  submit(
+    request: GenRequest,
+    read: ReadRef,
+    signal: AbortSignal,
+  ): Promise<SubmitResult>;
   /** Reads the task's state once, and downloads the result when it is done. */
   fetch(task: ProviderTask, signal: AbortSignal): Promise<FetchResult>;
   /** Cancels a task the provider still queues; "running" when it is too late. */

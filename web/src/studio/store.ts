@@ -64,7 +64,9 @@ interface StudioState {
 }
 const readTab = (): StudioKind => {
   if (typeof location === "undefined") return "image";
-  const fromPath = location.pathname.match(/^\/studio\/(\w+)/)?.[1] as StudioKind | undefined;
+  const fromPath = location.pathname.match(/^\/studio\/(\w+)/)?.[1] as
+    | StudioKind
+    | undefined;
   if (fromPath && STUDIO_KINDS.includes(fromPath)) return fromPath;
   try {
     const t = localStorage.getItem("zcanvas:studio") as StudioKind | null;
@@ -73,26 +75,53 @@ const readTab = (): StudioKind => {
     return "image";
   }
 };
-const empty = (): KindState => ({ history: [], nextBefore: null, loading: false, times: 1 });
+const empty = (): KindState => ({
+  history: [],
+  nextBefore: null,
+  loading: false,
+  times: 1,
+});
 let toastSeq = 1;
 const saveTimers = new Map<StudioKind, ReturnType<typeof setTimeout>>();
 const followed = new Map<string, () => void>();
 const refreshTimers = new Map<StudioKind, ReturnType<typeof setTimeout>>();
 /** The Studio node of a draft. */
-export const studioNode = (recipe: Recipe) => recipe.nodes.find((n) => n.id === STUDIO_NODE_ID)!;
+export const studioNode = (recipe: Recipe) =>
+  recipe.nodes.find((n) => n.id === STUDIO_NODE_ID)!;
 export const studioInputs = (recipe: Recipe) => {
   const nodes = new Map(recipe.nodes.map((n) => [n.id, n]));
   return recipe.edges
-    .filter((e) => e.target === STUDIO_NODE_ID && nodes.get(e.source)?.type === "input.asset")
+    .filter(
+      (e) =>
+        e.target === STUDIO_NODE_ID &&
+        nodes.get(e.source)?.type === "input.asset",
+    )
     .map((edge) => ({ node: nodes.get(edge.source)!, edge }));
 };
 /** A copy of the draft with this node and these inputs (Re-edit, Regenerate, Clone & try). */
-export function withEntry(recipe: Recipe, node: RecipeNode, inputs: { node: RecipeNode; edge: RecipeEdge }[]): Recipe {
-  const keep = recipe.nodes.filter((n) => n.id !== STUDIO_NODE_ID && n.type !== "input.asset");
+export function withEntry(
+  recipe: Recipe,
+  node: RecipeNode,
+  inputs: { node: RecipeNode; edge: RecipeEdge }[],
+): Recipe {
+  const keep = recipe.nodes.filter(
+    (n) => n.id !== STUDIO_NODE_ID && n.type !== "input.asset",
+  );
   return {
     ...recipe,
-    nodes: [...keep, { ...structuredClone(node), id: STUDIO_NODE_ID, position: { x: 0, y: 0 } }, ...inputs.map((i) => structuredClone(i.node))],
-    edges: inputs.map((i) => ({ ...structuredClone(i.edge), target: STUDIO_NODE_ID })),
+    nodes: [
+      ...keep,
+      {
+        ...structuredClone(node),
+        id: STUDIO_NODE_ID,
+        position: { x: 0, y: 0 },
+      },
+      ...inputs.map((i) => structuredClone(i.node)),
+    ],
+    edges: inputs.map((i) => ({
+      ...structuredClone(i.edge),
+      target: STUDIO_NODE_ID,
+    })),
   };
 }
 export const useStudio = create<StudioState>((set, get) => ({
@@ -112,7 +141,8 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch {
       /* not remembered in private mode */
     }
-    if (location.pathname !== `/studio/${tab}`) history.replaceState(null, "", `/studio/${tab}`);
+    if (location.pathname !== `/studio/${tab}`)
+      history.replaceState(null, "", `/studio/${tab}`);
     void get().open(tab);
   },
   async init() {
@@ -139,7 +169,9 @@ export const useStudio = create<StudioState>((set, get) => ({
     patch(kind, { loading: true, error: undefined });
     try {
       const canvas = await request<StudioCanvas>(`/studio/${kind}`);
-      const ids = studioInputs(canvas.recipe).map((i) => String(i.node.params.asset));
+      const ids = studioInputs(canvas.recipe).map((i) =>
+        String(i.node.params.asset),
+      );
       await loadAssets(ids);
       patch(kind, { canvas, recipe: canvas.recipe });
       await get().refresh(kind);
@@ -152,17 +184,39 @@ export const useStudio = create<StudioState>((set, get) => ({
   async refresh(kind) {
     const canvas = get().kinds[kind].canvas;
     if (!canvas) return;
-    const page = await request<HistoryResponse>(`/canvases/${canvas.canvasId}/nodes/${STUDIO_NODE_ID}/history?limit=30`);
-    const older = get().kinds[kind].history.filter((h) => !page.items.some((p) => p.jobId === h.jobId) && page.nextBefore !== null && h.createdAt < page.nextBefore);
-    patch(kind, { history: [...page.items, ...older], nextBefore: older.length ? get().kinds[kind].nextBefore : page.nextBefore });
+    const page = await request<HistoryResponse>(
+      `/canvases/${canvas.canvasId}/nodes/${STUDIO_NODE_ID}/history?limit=30`,
+    );
+    const older = get().kinds[kind].history.filter(
+      (h) =>
+        !page.items.some((p) => p.jobId === h.jobId) &&
+        page.nextBefore !== null &&
+        h.createdAt < page.nextBefore,
+    );
+    patch(kind, {
+      history: [...page.items, ...older],
+      nextBefore: older.length ? get().kinds[kind].nextBefore : page.nextBefore,
+    });
     // Follow runs still in the queue, so their cards update live.
-    for (const h of page.items) if (h.status === "queued" || h.status === "running") follow(kind, h.runId);
+    for (const h of page.items)
+      if (h.status === "queued" || h.status === "running")
+        follow(kind, h.runId);
   },
   async loadMore(kind) {
     const k = get().kinds[kind];
     if (!k.canvas || !k.nextBefore) return;
-    const page = await request<HistoryResponse>(`/canvases/${k.canvas.canvasId}/nodes/${STUDIO_NODE_ID}/history?limit=30&before=${encodeURIComponent(k.nextBefore)}`);
-    patch(kind, { history: [...k.history, ...page.items.filter((p) => !k.history.some((h) => h.jobId === p.jobId))], nextBefore: page.nextBefore });
+    const page = await request<HistoryResponse>(
+      `/canvases/${k.canvas.canvasId}/nodes/${STUDIO_NODE_ID}/history?limit=30&before=${encodeURIComponent(k.nextBefore)}`,
+    );
+    patch(kind, {
+      history: [
+        ...k.history,
+        ...page.items.filter(
+          (p) => !k.history.some((h) => h.jobId === p.jobId),
+        ),
+      ],
+      nextBefore: page.nextBefore,
+    });
   },
   edit(kind, change) {
     const k = get().kinds[kind];
@@ -177,7 +231,10 @@ export const useStudio = create<StudioState>((set, get) => ({
       setTimeout(() => {
         const latest = get().kinds[kind].recipe;
         if (latest)
-          void request(`/studio/${kind}`, { method: "PUT", body: JSON.stringify({ recipe: latest }) }).catch((e) =>
+          void request(`/studio/${kind}`, {
+            method: "PUT",
+            body: JSON.stringify({ recipe: latest }),
+          }).catch((e) =>
             get().toast(`Draft not saved: ${(e as Error).message}`, "warn"),
           );
       }, 400),
@@ -209,7 +266,9 @@ export const useStudio = create<StudioState>((set, get) => ({
   async cancel(kind, jobId) {
     const entry = get().kinds[kind].history.find((h) => h.jobId === jobId);
     if (!entry) return;
-    await post(`/runs/${entry.runId}/cancel`).catch((e) => get().toast((e as Error).message, "warn"));
+    await post(`/runs/${entry.runId}/cancel`).catch((e) =>
+      get().toast((e as Error).message, "warn"),
+    );
     await get().refresh(kind);
   },
   async remove(kind, jobId) {
@@ -223,13 +282,23 @@ export const useStudio = create<StudioState>((set, get) => ({
     });
   },
   async keep(assetIds, keep) {
-    const updated = await Promise.all(assetIds.map((id) => post<Asset>(`/assets/${id}/${keep ? "keep" : "unkeep"}`)));
+    const updated = await Promise.all(
+      assetIds.map((id) =>
+        post<Asset>(`/assets/${id}/${keep ? "keep" : "unkeep"}`),
+      ),
+    );
     get().remember(updated);
-    for (const kind of STUDIO_KINDS) if (get().kinds[kind].canvas) await get().refresh(kind);
+    for (const kind of STUDIO_KINDS)
+      if (get().kinds[kind].canvas) await get().refresh(kind);
     get().toast(keep ? "Kept in the library." : "No longer kept.", "ok");
   },
   remember(assets) {
-    set((s) => ({ assets: { ...s.assets, ...Object.fromEntries(assets.map((a) => [a.id, a])) } }));
+    set((s) => ({
+      assets: {
+        ...s.assets,
+        ...Object.fromEntries(assets.map((a) => [a.id, a])),
+      },
+    }));
   },
   toast(text, tone = "info", undo) {
     const id = toastSeq++;
@@ -241,13 +310,17 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
 }));
 function patch(kind: StudioKind, change: Partial<KindState>) {
-  useStudio.setState((s) => ({ kinds: { ...s.kinds, [kind]: { ...s.kinds[kind], ...change } } }));
+  useStudio.setState((s) => ({
+    kinds: { ...s.kinds, [kind]: { ...s.kinds[kind], ...change } },
+  }));
 }
 /** Loads reference details the page does not know yet. */
 export async function loadAssets(ids: string[]) {
   const known = useStudio.getState().assets;
   const missing = [...new Set(ids)].filter((id) => id && !known[id]);
-  const found = await Promise.all(missing.map((id) => request<Asset>(`/assets/${id}`).catch(() => undefined)));
+  const found = await Promise.all(
+    missing.map((id) => request<Asset>(`/assets/${id}`).catch(() => undefined)),
+  );
   useStudio.getState().remember(found.filter((a): a is Asset => Boolean(a)));
 }
 /** Live updates: refresh the feed when a run's jobs change, until it ends. */
@@ -258,15 +331,35 @@ function follow(kind: StudioKind, runId: string) {
     clearTimeout(refreshTimers.get(kind));
     refreshTimers.set(
       kind,
-      setTimeout(() => void useStudio.getState().refresh(kind).catch(() => {}), 200),
+      setTimeout(
+        () =>
+          void useStudio
+            .getState()
+            .refresh(kind)
+            .catch(() => {}),
+        200,
+      ),
     );
     if (run.status !== "running") {
       followed.get(runId)?.();
       followed.delete(runId);
-      if (!notified && run.status === "done" && run.finishedAt && run.startedAt) {
+      if (
+        !notified &&
+        run.status === "done" &&
+        run.finishedAt &&
+        run.startedAt
+      ) {
         notified = true;
-        const seconds = (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000;
-        useStudio.getState().toast(`Generated successfully, time-consuming ${seconds.toFixed(1)} s`, "ok");
+        const seconds =
+          (new Date(run.finishedAt).getTime() -
+            new Date(run.startedAt).getTime()) /
+          1000;
+        useStudio
+          .getState()
+          .toast(
+            `Generated successfully, time-consuming ${seconds.toFixed(1)} s`,
+            "ok",
+          );
       }
     }
   });

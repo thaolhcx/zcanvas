@@ -177,7 +177,10 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
       else throw notFound("This asset has no preview");
     }
     // Downloading a result keeps it (D5).
-    if (kind === "file" && (request.query as { download?: string })?.download === "1")
+    if (
+      kind === "file" &&
+      (request.query as { download?: string })?.download === "1"
+    )
       await keepUsed([asset.id]);
     const object = await objectFor(asset.id, role);
     if (!object || object.state !== "stored")

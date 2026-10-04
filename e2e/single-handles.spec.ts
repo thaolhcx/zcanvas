@@ -162,12 +162,13 @@ test("dropping on empty canvas opens a filtered palette and connects a new node 
   await page.mouse.up();
   const palette = page.getByRole("dialog", { name: "Node palette" });
   await expect(palette).toBeVisible();
-  for (const name of ["Generate video", "Edit image", "If"]) {
+  // Text (#25) reads any kind as context, so an image offers it too.
+  for (const name of ["Generate video", "Edit image", "If", "Text"]) {
     await expect(
       palette.getByRole("button", { name: new RegExp(name) }),
     ).toBeVisible();
   }
-  await expect(palette.locator(".palette-list > button")).toHaveCount(3);
+  await expect(palette.locator(".palette-list > button")).toHaveCount(4);
   await expect(
     palette.getByRole("button", { name: /Generate image/ }),
   ).toHaveCount(0);

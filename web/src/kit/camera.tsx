@@ -1,7 +1,15 @@
 // Camera Control (Lumina image ref 33/34): four carousels — camera body, lens, focal length, aperture —
 // an on/off switch and Save. The value is composed into the prompt by the runner, not sent as a model param.
 import { useState } from "react";
-import { Aperture, Camera, CameraOff, ChevronLeft, ChevronRight, Circle, Video } from "lucide-react";
+import {
+  Aperture,
+  Camera,
+  CameraOff,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Video,
+} from "lucide-react";
 import { Popover } from "./Popover.tsx";
 
 export interface CameraValue {
@@ -11,26 +19,67 @@ export interface CameraValue {
   aperture: string;
 }
 
-const COLUMNS: { key: keyof CameraValue; options: string[]; icon: typeof Camera }[] = [
+const COLUMNS: {
+  key: keyof CameraValue;
+  options: string[];
+  icon: typeof Camera;
+}[] = [
   {
     key: "camera",
     icon: Video,
-    options: ["Arricam LT", "ARRI Alexa 35", "ARRI Alexa 65", "ARRIFLEX 435", "IMAX Film Camera", "IMAX Keighley", "Panavision DXL2", "Sony Venice", "RED V-Raptor"],
+    options: [
+      "Arricam LT",
+      "ARRI Alexa 35",
+      "ARRI Alexa 65",
+      "ARRIFLEX 435",
+      "IMAX Film Camera",
+      "IMAX Keighley",
+      "Panavision DXL2",
+      "Sony Venice",
+      "RED V-Raptor",
+    ],
   },
   {
     key: "lens",
     icon: Circle,
-    options: ["Hawk Class X", "Cooke S4", "Cooke SF 1.8x", "Cooke Speed Panchro", "ARRI Signature Prime", "Canon K35", "Helios", "Panavision C-Series", "Panavision Primo", "Zeiss Ultra Prime"],
+    options: [
+      "Hawk Class X",
+      "Cooke S4",
+      "Cooke SF 1.8x",
+      "Cooke Speed Panchro",
+      "ARRI Signature Prime",
+      "Canon K35",
+      "Helios",
+      "Panavision C-Series",
+      "Panavision Primo",
+      "Zeiss Ultra Prime",
+    ],
   },
-  { key: "focal", icon: Circle, options: ["8mm", "14mm", "24mm", "35mm", "50mm", "75mm", "125mm"] },
+  {
+    key: "focal",
+    icon: Circle,
+    options: ["8mm", "14mm", "24mm", "35mm", "50mm", "75mm", "125mm"],
+  },
   { key: "aperture", icon: Aperture, options: ["f/1.4", "f/4", "f/11"] },
 ];
 
-const DEFAULT: CameraValue = { camera: "Arricam LT", lens: "Hawk Class X", focal: "125mm", aperture: "f/1.4" };
+const DEFAULT: CameraValue = {
+  camera: "Arricam LT",
+  lens: "Hawk Class X",
+  focal: "125mm",
+  aperture: "f/1.4",
+};
 
-export const cameraSummary = (v: CameraValue) => `${v.lens} / ${v.focal} / ${v.aperture}`;
+export const cameraSummary = (v: CameraValue) =>
+  `${v.lens} / ${v.focal} / ${v.aperture}`;
 
-export function CameraChip({ value, onChange }: { value?: CameraValue; onChange: (v: unknown) => void }) {
+export function CameraChip({
+  value,
+  onChange,
+}: {
+  value?: CameraValue;
+  onChange: (v: unknown) => void;
+}) {
   return (
     <Popover
       anchorClass="kit-pop-wide"
@@ -65,7 +114,13 @@ export function CameraChip({ value, onChange }: { value?: CameraValue; onChange:
   );
 }
 
-function CameraPanel({ value, onSave }: { value?: CameraValue; onSave: (v: CameraValue | undefined) => void }) {
+function CameraPanel({
+  value,
+  onSave,
+}: {
+  value?: CameraValue;
+  onSave: (v: CameraValue | undefined) => void;
+}) {
   const [on, setOn] = useState(!!value);
   const [draft, setDraft] = useState<CameraValue>(value ?? DEFAULT);
   return (
@@ -74,10 +129,18 @@ function CameraPanel({ value, onSave }: { value?: CameraValue; onSave: (v: Camer
         Camera Control
         <span className="kit-camera-actions">
           <label className="kit-camera-switch">
-            <input type="checkbox" className="kit-switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
+            <input
+              type="checkbox"
+              className="kit-switch"
+              checked={on}
+              onChange={(e) => setOn(e.target.checked)}
+            />
             {on ? "open" : "close"}
           </label>
-          <button className="kit-btn" onClick={() => onSave(on ? draft : undefined)}>
+          <button
+            className="kit-btn"
+            onClick={() => onSave(on ? draft : undefined)}
+          >
             Save
           </button>
         </span>
@@ -85,23 +148,49 @@ function CameraPanel({ value, onSave }: { value?: CameraValue; onSave: (v: Camer
       <div className={`kit-camera-cols ${on ? "" : "off"}`}>
         {COLUMNS.map((col) => {
           const i = col.options.indexOf(draft[col.key]);
-          const step = (d: number) => setDraft({ ...draft, [col.key]: col.options[(i + d + col.options.length) % col.options.length] });
+          const step = (d: number) =>
+            setDraft({
+              ...draft,
+              [col.key]:
+                col.options[(i + d + col.options.length) % col.options.length],
+            });
           const Icon = col.icon;
-          const prev = col.options[(i - 1 + col.options.length) % col.options.length];
+          const prev =
+            col.options[(i - 1 + col.options.length) % col.options.length];
           const next = col.options[(i + 1) % col.options.length];
           return (
             <div key={col.key} className="kit-camera-col">
-              <span className="kit-camera-ghost">{col.key === "focal" ? prev : <Icon size={14} />}</span>
+              <span className="kit-camera-ghost">
+                {col.key === "focal" ? prev : <Icon size={14} />}
+              </span>
               <div className="kit-camera-row">
-                <button className="kit-icon" disabled={!on} onClick={() => step(-1)} aria-label="Previous">
+                <button
+                  className="kit-icon"
+                  disabled={!on}
+                  onClick={() => step(-1)}
+                  aria-label="Previous"
+                >
                   <ChevronLeft size={16} />
                 </button>
-                <span className="kit-camera-item">{col.key === "focal" ? <b>{draft.focal}</b> : <Icon size={40} strokeWidth={1.2} />}</span>
-                <button className="kit-icon" disabled={!on} onClick={() => step(1)} aria-label="Next">
+                <span className="kit-camera-item">
+                  {col.key === "focal" ? (
+                    <b>{draft.focal}</b>
+                  ) : (
+                    <Icon size={40} strokeWidth={1.2} />
+                  )}
+                </span>
+                <button
+                  className="kit-icon"
+                  disabled={!on}
+                  onClick={() => step(1)}
+                  aria-label="Next"
+                >
                   <ChevronRight size={16} />
                 </button>
               </div>
-              <span className="kit-camera-ghost">{col.key === "focal" ? next : <Icon size={14} />}</span>
+              <span className="kit-camera-ghost">
+                {col.key === "focal" ? next : <Icon size={14} />}
+              </span>
               <span className="kit-camera-name">{draft[col.key]}</span>
             </div>
           );

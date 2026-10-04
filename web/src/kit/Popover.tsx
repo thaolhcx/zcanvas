@@ -26,7 +26,8 @@ export function Popover({
 }) {
   const [inner, setInner] = useState(false);
   const open = controlled ?? inner;
-  const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setInner(v));
+  const setOpen = (v: boolean) =>
+    onOpenChange ? onOpenChange(v) : setInner(v);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;

@@ -10,7 +10,15 @@ export interface Option {
 export interface FieldSpec {
   key: string;
   label: string;
-  type: "enum" | "number" | "boolean" | "string" | "size" | "duration" | "voice" | "camera";
+  type:
+    | "enum"
+    | "number"
+    | "boolean"
+    | "string"
+    | "size"
+    | "duration"
+    | "voice"
+    | "camera";
   options?: Option[];
   min?: number;
   max?: number;

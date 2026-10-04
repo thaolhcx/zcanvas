@@ -2,8 +2,21 @@
 // sent, every setting), a filmstrip to flip through the other runs. Opened from a feed card or
 // from the History dock. Keep / Download act on the shown result; Clone & try fills a Studio page.
 import { useContext, useEffect, useState } from "react";
-import { Bookmark, BookmarkCheck, ChevronDown, ChevronUp, Download, Sparkles, X } from "lucide-react";
-import { STUDIO_NODE_TYPES, type Asset, type HistoryEntry, type StudioKind } from "../../../contracts/index.ts";
+import {
+  Bookmark,
+  BookmarkCheck,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Sparkles,
+  X,
+} from "lucide-react";
+import {
+  STUDIO_NODE_TYPES,
+  type Asset,
+  type HistoryEntry,
+  type StudioKind,
+} from "../../../contracts/index.ts";
 import { KIND_ICON } from "../kit/Composer.tsx";
 import { KitContext } from "../kit/fields.tsx";
 import { MediaViewer, PromptText, runParams, stamp } from "../kit/results.tsx";
@@ -13,20 +26,37 @@ import { entryOf, fillFrom, kitModel, nodeSpec } from "./source.ts";
 import { assetFileUrl, useStudio } from "./store.ts";
 
 const kindOfType = (type: string) =>
-  (Object.entries(STUDIO_NODE_TYPES).find(([, t]) => t === type)?.[0] as StudioKind | undefined);
+  Object.entries(STUDIO_NODE_TYPES).find(([, t]) => t === type)?.[0] as
+    | StudioKind
+    | undefined;
 
 /** Small square for the filmstrip and the History grid. */
-export function Thumb({ asset, entry }: { asset?: Asset; entry?: HistoryEntry }) {
+export function Thumb({
+  asset,
+  entry,
+}: {
+  asset?: Asset;
+  entry?: HistoryEntry;
+}) {
   const a = asset ?? entry?.outputs[0];
   const src = a?.thumbUrl ?? (a?.kind === "image" ? a.url : undefined);
   const [broken, setBroken] = useState(false);
-  if (src && !broken) return <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} />;
-  const kind = (a?.kind ?? (entry?.text !== undefined ? "text" : "image")) as MediaKind;
+  if (src && !broken)
+    return (
+      <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} />
+    );
+  const kind = (a?.kind ??
+    (entry?.text !== undefined ? "text" : "image")) as MediaKind;
   const Icon = KIND_ICON[kind];
   return (
     <span className={`studio-thumb-${kind}`}>
       <Icon size={16} />
-      <small>{a?.generation?.intent ?? a?.generation?.prompt ?? entry?.intent ?? String(entry?.node.params.prompt ?? "").slice(0, 40)}</small>
+      <small>
+        {a?.generation?.intent ??
+          a?.generation?.prompt ??
+          entry?.intent ??
+          String(entry?.node.params.prompt ?? "").slice(0, 40)}
+      </small>
     </span>
   );
 }
@@ -55,15 +85,31 @@ export function RunDetail() {
   const h = item?.entry;
   const type = h && registry.get(h.node.type);
   const spec = type && nodeSpec(type, models);
-  const kitModels = spec ? models.filter((m) => m.kind === spec.modelKind).map((m) => kitModel(m, spec)) : [];
+  const kitModels = spec
+    ? models
+        .filter((m) => m.kind === spec.modelKind)
+        .map((m) => kitModel(m, spec))
+    : [];
   const entry = h && spec ? entryOf(h, spec.defaultModel) : undefined;
-  const params = entry && spec ? runParams(spec, kitModels, entry.value, voices) : undefined;
-  const index = output >= 0 ? output : Math.max(0, entry?.outputs.findIndex((o) => o.assetId === item?.asset?.id) ?? 0);
+  const params =
+    entry && spec ? runParams(spec, kitModels, entry.value, voices) : undefined;
+  const index =
+    output >= 0
+      ? output
+      : Math.max(
+          0,
+          entry?.outputs.findIndex((o) => o.assetId === item?.asset?.id) ?? 0,
+        );
   const out = entry?.outputs[index] ?? entry?.outputs[0];
   const asset = h?.outputs.find((a) => a.id === out?.assetId);
   const media = entry?.refs.filter((r) => r.kind !== "text") ?? [];
   const studioKind = h && kindOfType(h.node.type);
-  const where = item && h ? (item.nodeId === "studio" && studioKind ? `Studio · ${spec?.title ?? h.node.type}` : `canvas · ${h.node.label ?? spec?.title ?? h.node.type}`) : "";
+  const where =
+    item && h
+      ? item.nodeId === "studio" && studioKind
+        ? `Studio · ${spec?.title ?? h.node.type}`
+        : `canvas · ${h.node.label ?? spec?.title ?? h.node.type}`
+      : "";
   const keep = async (value: boolean) => {
     if (!asset) return;
     await useStudio.getState().keep([asset.id], value);
@@ -79,23 +125,47 @@ export function RunDetail() {
     fillFrom(studioKind, h);
   };
   return (
-    <div className="studio-detail" onMouseDown={close} role="dialog" aria-label="Run detail">
-      <div className="studio-detail-card" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="studio-detail"
+      onMouseDown={close}
+      role="dialog"
+      aria-label="Run detail"
+    >
+      <div
+        className="studio-detail-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <section className="studio-detail-view">
-          <button className="studio-detail-x" onClick={close} aria-label="Close">
+          <button
+            className="studio-detail-x"
+            onClick={close}
+            aria-label="Close"
+          >
             <X size={16} />
           </button>
           <div className="studio-detail-media">
             {out ? (
               <MediaViewer output={out} />
             ) : (
-              <p className="kit-cancelled">{error ?? (h ? (h.status === "failed" ? `failed: ${h.error?.message ?? ""}` : h.status) : "Loading…")}</p>
+              <p className="kit-cancelled">
+                {error ??
+                  (h
+                    ? h.status === "failed"
+                      ? `failed: ${h.error?.message ?? ""}`
+                      : h.status
+                    : "Loading…")}
+              </p>
             )}
           </div>
           {entry && entry.outputs.length > 1 && (
             <div className="studio-detail-outputs">
               {entry.outputs.map((o, i) => (
-                <button key={i} className={i === index ? "active" : ""} onClick={() => pick(i)} aria-label={`Result ${i + 1}`}>
+                <button
+                  key={i}
+                  className={i === index ? "active" : ""}
+                  onClick={() => pick(i)}
+                  aria-label={`Result ${i + 1}`}
+                >
                   <img src={o.poster ?? o.url} alt="" />
                 </button>
               ))}
@@ -112,19 +182,30 @@ export function RunDetail() {
               </div>
               <h4>Prompt</h4>
               <p className="kit-feed-prompt">
-                <PromptText text={entry.intent ?? entry.value.prompt} refs={entry.refs} />
+                <PromptText
+                  text={entry.intent ?? entry.value.prompt}
+                  refs={entry.refs}
+                />
               </p>
-              {entry.finalPrompt !== undefined && entry.finalPrompt !== (entry.intent ?? entry.value.prompt) && (
-                <>
-                  <h4>Sent to the model</h4>
-                  <p className="kit-feed-prompt studio-final-prompt">
-                    <PromptText text={entry.finalPrompt} refs={entry.refs} />
-                  </p>
-                </>
-              )}
+              {entry.finalPrompt !== undefined &&
+                entry.finalPrompt !== (entry.intent ?? entry.value.prompt) && (
+                  <>
+                    <h4>Sent to the model</h4>
+                    <p className="kit-feed-prompt studio-final-prompt">
+                      <PromptText text={entry.finalPrompt} refs={entry.refs} />
+                    </p>
+                  </>
+                )}
               <h4>Parameter</h4>
               <div className="studio-detail-chips">
-                {spec.modes && entry.value.mode && <span>{spec.modes.find((m) => m.value === entry.value.mode)?.label}</span>}
+                {spec.modes && entry.value.mode && (
+                  <span>
+                    {
+                      spec.modes.find((m) => m.value === entry.value.mode)
+                        ?.label
+                    }
+                  </span>
+                )}
                 {params.inline.map((r) => (
                   <span key={r.key} title={r.label}>
                     {r.text}
@@ -132,8 +213,15 @@ export function RunDetail() {
                 ))}
                 {media.length > 0 && (
                   <span title={media.map((r) => r.label).join(", ")}>
-                    {media.slice(0, 3).map((r) => r.thumb && <img key={r.id} src={r.thumb} alt="" />)}
-                    {media.length === 1 ? media[0].label : `${media.length} references`}
+                    {media
+                      .slice(0, 3)
+                      .map(
+                        (r) =>
+                          r.thumb && <img key={r.id} src={r.thumb} alt="" />,
+                      )}
+                    {media.length === 1
+                      ? media[0].label
+                      : `${media.length} references`}
                   </span>
                 )}
               </div>
@@ -150,11 +238,25 @@ export function RunDetail() {
               </small>
               {asset && (
                 <div className="studio-detail-actions">
-                  <button onClick={() => void keep(!asset.kept)} aria-pressed={asset.kept}>
-                    {asset.kept ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+                  <button
+                    onClick={() => void keep(!asset.kept)}
+                    aria-pressed={asset.kept}
+                  >
+                    {asset.kept ? (
+                      <BookmarkCheck size={14} />
+                    ) : (
+                      <Bookmark size={14} />
+                    )}
                     {asset.kept ? "Kept" : "Keep"}
                   </button>
-                  <a className="button" href={assetFileUrl(asset, true)} download onClick={() => setTimeout(() => void useDetail.getState().reload(), 800)}>
+                  <a
+                    className="button"
+                    href={assetFileUrl(asset, true)}
+                    download
+                    onClick={() =>
+                      setTimeout(() => void useDetail.getState().reload(), 800)
+                    }
+                  >
                     <Download size={14} /> Download
                   </a>
                 </div>
@@ -171,7 +273,11 @@ export function RunDetail() {
         </aside>
         {items.length > 1 && (
           <nav className="studio-detail-strip" aria-label="Other runs">
-            <button onClick={() => go(at - 1)} disabled={at === 0} aria-label="Previous">
+            <button
+              onClick={() => go(at - 1)}
+              disabled={at === 0}
+              aria-label="Previous"
+            >
               <ChevronUp size={14} />
             </button>
             <div>
@@ -188,7 +294,11 @@ export function RunDetail() {
                 </button>
               ))}
             </div>
-            <button onClick={() => go(at + 1)} disabled={at === items.length - 1} aria-label="Next">
+            <button
+              onClick={() => go(at + 1)}
+              disabled={at === items.length - 1}
+              aria-label="Next"
+            >
               <ChevronDown size={14} />
             </button>
           </nav>

@@ -199,12 +199,25 @@ export function Preview({ id }: { id: string }) {
       </div>
     );
   if (node.type === "input.prompt") return null;
+  // Image and video nodes outline the frame of their ratio (the model field; 1:1 by default).
+  const ratio =
+    node.params.ratio ??
+    (node.type === "image.generate"
+      ? "1:1"
+      : node.type === "video.generate"
+        ? "16:9"
+        : undefined);
+  const aspect =
+    typeof ratio === "string" && /^\d+:\d+$/.test(ratio) ? ratio : undefined;
   return (
     <div
       className="preview empty"
-      data-aspect={
-        node.type === "image.generate"
-          ? String(node.params.aspect ?? "9:16")
+      data-aspect={aspect}
+      style={
+        aspect
+          ? ({
+              "--preview-ar": aspect.replace(":", " / "),
+            } as React.CSSProperties)
           : undefined
       }
     >

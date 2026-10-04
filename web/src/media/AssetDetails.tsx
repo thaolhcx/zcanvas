@@ -181,7 +181,13 @@ export function AssetDetails({
             onClick={() => {
               // A download keeps the result (D5).
               if (asset.kept === false)
-                setTimeout(() => void getAsset(asset.id).then((a) => (setAsset(a), onRenamed(a))).catch(() => {}), 800);
+                setTimeout(
+                  () =>
+                    void getAsset(asset.id)
+                      .then((a) => (setAsset(a), onRenamed(a)))
+                      .catch(() => {}),
+                  800,
+                );
             }}
           >
             <Download size={15} />
@@ -191,14 +197,22 @@ export function AssetDetails({
             <button
               className="button keep"
               aria-pressed={asset.kept !== false}
-              title={asset.kept === false ? "Keep this result in the library" : "Hide it again unless results not kept are shown"}
+              title={
+                asset.kept === false
+                  ? "Keep this result in the library"
+                  : "Hide it again unless results not kept are shown"
+              }
               onClick={async () => {
                 const saved = await keepAsset(asset.id, asset.kept === false);
                 setAsset(saved);
                 onRenamed(saved);
               }}
             >
-              {asset.kept === false ? <Bookmark size={15} /> : <BookmarkCheck size={15} />}
+              {asset.kept === false ? (
+                <Bookmark size={15} />
+              ) : (
+                <BookmarkCheck size={15} />
+              )}
               {asset.kept === false ? "Keep" : "Kept"}
             </button>
           )}

@@ -1,5 +1,10 @@
 export * from "./types.ts";
-export { validate, validateTemplate, checkRegistryEntry, checkModelEntry } from "./validate.mjs";
+export {
+  validate,
+  validateTemplate,
+  checkRegistryEntry,
+  checkModelEntry,
+} from "./validate.mjs";
 export * from "./template.ts";
 export * from "./assets.ts";
 export * from "./models.ts";

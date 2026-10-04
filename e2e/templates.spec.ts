@@ -146,8 +146,9 @@ test("inserts a template, fills its inputs, runs on mock workers and exports", a
   await expect(asset).not.toHaveClass(/template-input/);
   await expect(video).toHaveClass(/template-input/);
   await video.locator("header").click();
-  const duration = inspector.locator('[data-param="durationSec"] input');
-  await duration.fill("3");
+  // Saved as v1 (durationSec); the template was upgraded to the v2 model field.
+  const duration = inspector.locator('[data-param="duration"] input');
+  await duration.fill("6");
   await duration.blur();
   await expect(video).not.toHaveClass(/template-input/);
   await expect
@@ -156,9 +157,9 @@ test("inserts a template, fills its inputs, runs on mock workers and exports", a
       const node = recipe.nodes.find(
         (n: { type: string }) => n.type === "video.generate",
       );
-      return node?.params.durationSec;
+      return node?.params.duration;
     })
-    .toBe(3);
+    .toBe(6);
   await page.getByRole("button", { name: /^Run ·/ }).click();
   await expect(page.locator(".run-summary")).toContainText("Done", {
     timeout: 30000,

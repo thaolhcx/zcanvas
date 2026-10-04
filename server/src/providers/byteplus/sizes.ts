@@ -22,7 +22,11 @@ export interface PixelLimits {
   max?: number;
 }
 /** Scale W×H into the model's pixel area, keeping the ratio. */
-export function fitArea(width: number, height: number, limits: PixelLimits = {}) {
+export function fitArea(
+  width: number,
+  height: number,
+  limits: PixelLimits = {},
+) {
   const min = limits.min ?? SEEDREAM_MIN_PIXELS;
   const max = limits.max ?? SEEDREAM_MAX_PIXELS;
   const area = width * height;
@@ -48,29 +52,51 @@ function base(ratio: string | undefined): [number, number] | undefined {
 }
 /** The `size` Seedream gets: explicit pixels, else ratio at the tier, else the tier preset, else 2K. */
 export function imageSize(
-  params: { ratio?: unknown; resolution?: unknown; width?: unknown; height?: unknown },
+  params: {
+    ratio?: unknown;
+    resolution?: unknown;
+    width?: unknown;
+    height?: unknown;
+  },
   limits: PixelLimits = {},
 ) {
   const w = Number(params.width),
     h = Number(params.height);
   if (w > 0 && h > 0) return fitArea(w, h, limits);
-  const tier = typeof params.resolution === "string" ? params.resolution.toUpperCase() : undefined;
+  const tier =
+    typeof params.resolution === "string"
+      ? params.resolution.toUpperCase()
+      : undefined;
   const scale = tier && TIER[tier] ? TIER[tier] : 1;
   const b = base(typeof params.ratio === "string" ? params.ratio : undefined);
   if (b) return fitArea(b[0] * scale, b[1] * scale, limits);
-  if (tier && TIER[tier]) return (2048 * TIER[tier]) ** 2 > (limits.max ?? SEEDREAM_MAX_PIXELS) ? "2K" : tier;
+  if (tier && TIER[tier])
+    return (2048 * TIER[tier]) ** 2 > (limits.max ?? SEEDREAM_MAX_PIXELS)
+      ? "2K"
+      : tier;
   return "2K";
 }
 /** "image area must be at most N pixels" → the limit, or undefined. */
 export function sizeLimitFromError(message: string) {
   const m = /image area must be at (least|most) (\d+) pixels/i.exec(message);
-  return m ? { bound: m[1].toLowerCase() === "least" ? ("min" as const) : ("max" as const), pixels: Number(m[2]) } : undefined;
+  return m
+    ? {
+        bound:
+          m[1].toLowerCase() === "least" ? ("min" as const) : ("max" as const),
+        pixels: Number(m[2]),
+      }
+    : undefined;
 }
 /** Rescale a W×H size (or a tier preset, taken as square) to a named pixel limit. */
-export function rescaleToLimit(size: string, limit: { bound: "min" | "max"; pixels: number }) {
+export function rescaleToLimit(
+  size: string,
+  limit: { bound: "min" | "max"; pixels: number },
+) {
   const px = /^(\d+)x(\d+)$/.exec(size);
   const side = 2048 * (TIER[size.toUpperCase()] ?? 1);
   const [w, h] = px ? [Number(px[1]), Number(px[2])] : [side, side];
   const k = Math.sqrt(limit.pixels / (w * h));
-  return limit.bound === "min" ? `${Math.ceil(w * k)}x${Math.ceil(h * k)}` : `${Math.floor(w * k)}x${Math.floor(h * k)}`;
+  return limit.bound === "min"
+    ? `${Math.ceil(w * k)}x${Math.ceil(h * k)}`
+    : `${Math.floor(w * k)}x${Math.floor(h * k)}`;
 }

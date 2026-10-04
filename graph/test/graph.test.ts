@@ -76,12 +76,31 @@ describe("Graph API using real Yjs documents", () => {
     // The first input on a mode's port picks that mode.
     const asset = g.addNode("input.asset", { params: { asset: "ast_x" } });
     const other = g.addNode("video.generate");
-    g.connect({ source: asset, sourcePort: "asset", target: other, targetPort: "first" });
-    expect(g.toRecipe().nodes.find((n) => n.id === other)?.params.mode).toBe("frames");
+    g.connect({
+      source: asset,
+      sourcePort: "asset",
+      target: other,
+      targetPort: "first",
+    });
+    expect(g.toRecipe().nodes.find((n) => n.id === other)?.params.mode).toBe(
+      "frames",
+    );
     // Once placed, inputs keep their mode: a role the mode lacks is allowed while drafting; it only blocks a run.
-    g.connect({ source: asset, sourcePort: "asset", target: video, targetPort: "first" });
-    g.connect({ source: asset, sourcePort: "asset", target: video, targetPort: "reference" });
-    expect(g.toRecipe().nodes.find((n) => n.id === video)?.params.mode).toBe("frames");
+    g.connect({
+      source: asset,
+      sourcePort: "asset",
+      target: video,
+      targetPort: "first",
+    });
+    g.connect({
+      source: asset,
+      sourcePort: "asset",
+      target: video,
+      targetPort: "reference",
+    });
+    expect(g.toRecipe().nodes.find((n) => n.id === video)?.params.mode).toBe(
+      "frames",
+    );
     expect(g.validate().map((i) => i.code)).toContain("MODE");
   });
   it("paste remaps ids and groups, remove cleans edges, ungroup retains nodes", () => {
@@ -163,5 +182,7 @@ it("migrates v1 generate nodes in place and on import", () => {
   const doc = new Y.Doc();
   const old = new Graph(doc, new Map(registry), v1 as Recipe);
   expect(old.migrate()).toBe(true);
-  expect(old.toRecipe().edges.find((e) => e.id === "e_4")?.targetPort).toBe("first");
+  expect(old.toRecipe().edges.find((e) => e.id === "e_4")?.targetPort).toBe(
+    "first",
+  );
 });

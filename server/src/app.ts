@@ -114,7 +114,7 @@ export async function createApp(options: { actorId?: string } = {}) {
     async () =>
       (
         await db.query(
-          "SELECT id, name, version, updated_at, space_id AS \"spaceId\", project_id AS \"projectId\" FROM canvases WHERE space_id = ANY($1) AND kind='canvas' ORDER BY updated_at DESC",
+          'SELECT id, name, version, updated_at, space_id AS "spaceId", project_id AS "projectId" FROM canvases WHERE space_id = ANY($1) AND kind=\'canvas\' ORDER BY updated_at DESC',
           [await readableSpaceIds(actor)],
         )
       ).rows,
@@ -264,7 +264,11 @@ export async function createApp(options: { actorId?: string } = {}) {
       const { task, sig } = request.query;
       if (!task || !sig || !callbackValid(task, sig))
         return reply.code(403).send({ error: "Invalid callback" });
-      await boss.send("gen-fetch", { taskId: task }, { singletonKey: `${task}:callback` });
+      await boss.send(
+        "gen-fetch",
+        { taskId: task },
+        { singletonKey: `${task}:callback` },
+      );
       return { ok: true };
     },
   );
@@ -282,8 +286,13 @@ export async function createApp(options: { actorId?: string } = {}) {
       recipe = migrateRecipe(recipe);
     if (target !== undefined) {
       // Run one node: that node and the upstream work it needs (cached work is reused).
-      if (typeof target !== "string" || !recipe?.nodes?.some((n) => n.id === target))
-        return reply.code(400).send({ error: "target is not a node of this recipe" });
+      if (
+        typeof target !== "string" ||
+        !recipe?.nodes?.some((n) => n.id === target)
+      )
+        return reply
+          .code(400)
+          .send({ error: "target is not a node of this recipe" });
       const keep = new Set([target]);
       for (let grew = true; grew; ) {
         grew = false;
@@ -293,11 +302,15 @@ export async function createApp(options: { actorId?: string } = {}) {
             grew = true;
           }
       }
-      const groups = new Set(recipe.nodes.filter((n) => keep.has(n.id)).map((n) => n.groupId));
+      const groups = new Set(
+        recipe.nodes.filter((n) => keep.has(n.id)).map((n) => n.groupId),
+      );
       recipe = {
         ...recipe,
         nodes: recipe.nodes.filter((n) => keep.has(n.id)),
-        edges: recipe.edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
+        edges: recipe.edges.filter(
+          (e) => keep.has(e.source) && keep.has(e.target),
+        ),
         groups: recipe.groups.filter((g) => groups.has(g.id)),
       };
     }

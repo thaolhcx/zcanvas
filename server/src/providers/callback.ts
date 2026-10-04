@@ -7,7 +7,9 @@ import { config } from "../config.ts";
  */
 const secret = () =>
   process.env.CALLBACK_SECRET ||
-  createHmac("sha256", "zcanvas-callback").update(config.databaseUrl).digest("hex");
+  createHmac("sha256", "zcanvas-callback")
+    .update(config.databaseUrl)
+    .digest("hex");
 export const callbackSig = (taskId: string) =>
   createHmac("sha256", secret()).update(taskId).digest("hex").slice(0, 32);
 export function callbackValid(taskId: string, sig: string) {

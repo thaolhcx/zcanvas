@@ -212,13 +212,13 @@ test("reloads offline edits, merges another tab and preserves graph JSON", async
   await other.getByTestId("node-audio.generate").locator("header").click();
   await other
     .getByRole("complementary", { name: "Node inspector" })
-    .getByLabel("voice", { exact: true })
-    .selectOption("echo");
+    .getByLabel("Model", { exact: true })
+    .selectOption("seed-audio-1");
   await expect(
     page
       .getByTestId("node-audio.generate")
-      .getByLabel("voice", { exact: true }),
-  ).toHaveValue("echo");
+      .getByLabel("Model", { exact: true }),
+  ).toHaveValue("seed-audio-1");
   await expect
     .poll(
       async () =>

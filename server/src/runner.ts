@@ -344,11 +344,18 @@ async function executeRun(runId: string) {
         ) {
           if (isGenNode(node.type)) {
             // A model job keeps its history: the old one is replaced by a new one.
-            await db.query("UPDATE jobs SET replaced_at=now() WHERE id=$1", [previous.jobId]);
+            await db.query("UPDATE jobs SET replaced_at=now() WHERE id=$1", [
+              previous.jobId,
+            ]);
             previous = undefined;
-          } else previous = { ...previous, status: "queued", outputs: undefined };
+          } else
+            previous = { ...previous, status: "queued", outputs: undefined };
         }
-        if (isGenNode(node.type) && previous && ["queued", "running"].includes(previous.status)) {
+        if (
+          isGenNode(node.type) &&
+          previous &&
+          ["queued", "running"].includes(previous.status)
+        ) {
           // In the model queue. Re-send its submit if nothing holds it (a walk
           // stopped between creating the job and queueing it); the singleton
           // key makes this a no-op otherwise.
@@ -357,7 +364,11 @@ async function executeRun(runId: string) {
             [previous.jobId],
           );
           if (!rowCount)
-            await boss.send("gen-submit", { jobId: previous.jobId }, { singletonKey: previous.jobId });
+            await boss.send(
+              "gen-submit",
+              { jobId: previous.jobId },
+              { singletonKey: previous.jobId },
+            );
           pending.add(node.id);
           return;
         }
@@ -437,7 +448,12 @@ async function executeRun(runId: string) {
             const takeItem =
               lists.get(`${edge.source}.${edge.sourcePort}`) &&
               (fanEdges.includes(edge) || branchList);
-            return { edge, values: (takeItem ? [list[index]] : list).filter((v): v is Output => v !== undefined) };
+            return {
+              edge,
+              values: (takeItem ? [list[index]] : list).filter(
+                (v): v is Output => v !== undefined,
+              ),
+            };
           });
           let request: StoredRequest;
           try {
@@ -446,16 +462,29 @@ async function executeRun(runId: string) {
             checkValues(entry.inputs, inputs, false, modeOf(node, entry));
             request = buildRequest(node, entry, incoming, recipe, run.canvasId);
           } catch (error) {
-            return fail("MODEL", error instanceof Error ? error.message : String(error));
+            return fail(
+              "MODEL",
+              error instanceof Error ? error.message : String(error),
+            );
           }
           const problem = requestProblem(request);
           if (problem) return fail("PARAM_VALUE", problem);
           const key = cacheKey(node, inputs, spaceId);
-          const cacheable = entry.runner.kind === "job" && entry.runner.cacheable !== false;
+          const cacheable =
+            entry.runner.kind === "job" && entry.runner.cacheable !== false;
           // The node a run targets always makes something new; upstream work is reused.
           if (cacheable && target !== node.id) {
-            const cached = (await db.query("SELECT outputs FROM output_cache WHERE key=$1", [key])).rows[0];
-            if (cached && !(await unavailableAssets(outputAssetIds(cached.outputs), spaceId)).length) {
+            const cached = (
+              await db.query("SELECT outputs FROM output_cache WHERE key=$1", [
+                key,
+              ])
+            ).rows[0];
+            if (
+              cached &&
+              !(
+                await unavailableAssets(outputAssetIds(cached.outputs), spaceId)
+              ).length
+            ) {
               job.outputs = cached.outputs;
               job.status = "done";
               job.progress = 1;
@@ -468,8 +497,15 @@ async function executeRun(runId: string) {
           job.model = request.model;
           if (request.intent) job.intent = request.intent;
           await save(job);
-          await db.query("UPDATE jobs SET request=$2 WHERE id=$1", [job.jobId, request]);
-          await boss.send("gen-submit", { jobId: job.jobId }, { singletonKey: job.jobId });
+          await db.query("UPDATE jobs SET request=$2 WHERE id=$1", [
+            job.jobId,
+            request,
+          ]);
+          await boss.send(
+            "gen-submit",
+            { jobId: job.jobId },
+            { singletonKey: job.jobId },
+          );
           pending.add(node.id);
           return;
         }

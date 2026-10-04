@@ -47,7 +47,12 @@ import {
   type GenRef,
   type GenRequest,
 } from "./providers/types.ts";
-import { assetBytes, failJobAssets, publishJobAssets, putAsset } from "./assets.ts";
+import {
+  assetBytes,
+  failJobAssets,
+  publishJobAssets,
+  putAsset,
+} from "./assets.ts";
 import { checkValues } from "./values.ts";
 import { advance, emit } from "./run-store.ts";
 import { callbackUrl } from "./providers/callback.ts";
@@ -72,7 +77,8 @@ const settings = {
   /** Running tasks one user may have at once, across models. */
   userMax: () => Number(process.env.GEN_USER_MAX ?? 8),
   /** Seconds between two checks of a task that is not done yet (lower bound). */
-  minRefetch: () => Number(process.env.GEN_MIN_REFETCH_SEC ?? (config.mock ? 0.25 : 5)),
+  minRefetch: () =>
+    Number(process.env.GEN_MIN_REFETCH_SEC ?? (config.mock ? 0.25 : 5)),
   maxRefetch: () => Number(process.env.GEN_MAX_REFETCH_SEC ?? 120),
   /** A job waiting for a slot looks again after this many seconds. */
   waitRetry: () => Number(process.env.GEN_WAIT_SEC ?? (config.mock ? 0.5 : 3)),
@@ -108,9 +114,12 @@ export interface StoredRequest {
 /** System prompts behind the Text presets ("What to write"); a node's own system prompt wins. */
 export const PRESET_SYSTEM: Record<string, string> = {
   copy: "You write short, vivid advertising copy: a headline, one or two lines, a call to action. Plain text or light Markdown.",
-  enrich: "You turn a short idea into a detailed image or video generation prompt: subject, setting, lighting, lens, mood and style, one paragraph. Answer with the prompt only.",
-  describe: "You describe the provided media precisely: subject, composition, colours, light and mood. No preamble.",
-  script: "You write a shot-by-shot script or storyboard: numbered shots with timing, framing, action and sound.",
+  enrich:
+    "You turn a short idea into a detailed image or video generation prompt: subject, setting, lighting, lens, mood and style, one paragraph. Answer with the prompt only.",
+  describe:
+    "You describe the provided media precisely: subject, composition, colours, light and mood. No preamble.",
+  script:
+    "You write a shot-by-shot script or storyboard: numbered shots with timing, framing, action and sound.",
 };
 type Incoming = { edge: RecipeEdge; values: Output[] };
 const isAsset = (v: Output): v is Asset => "id" in v && "mime" in v;
@@ -128,10 +137,13 @@ export function buildRequest(
   canvasId: string,
 ): StoredRequest {
   const task = GEN_TASKS[node.type];
-  const intent = typeof node.params.prompt === "string" ? node.params.prompt : "";
+  const intent =
+    typeof node.params.prompt === "string" ? node.params.prompt : "";
   const portOrder = entry.inputs.map((p) => p.key);
   const sorted = [...incoming].sort(
-    (a, b) => portOrder.indexOf(a.edge.targetPort) - portOrder.indexOf(b.edge.targetPort),
+    (a, b) =>
+      portOrder.indexOf(a.edge.targetPort) -
+      portOrder.indexOf(b.edge.targetPort),
   );
   const texts: string[] = [];
   let refs: (GenRef & { source: string })[] = [];
@@ -152,7 +164,9 @@ export function buildRequest(
   // Mentioned references go first, in the order the prompt names them.
   const mentioned = promptRefs(intent);
   const rank = (r: GenRef & { source: string }) => {
-    const i = mentioned.findIndex((m) => (m.scheme === "asset" ? m.id === r.assetId : m.id === r.source));
+    const i = mentioned.findIndex((m) =>
+      m.scheme === "asset" ? m.id === r.assetId : m.id === r.source,
+    );
     return i < 0 ? mentioned.length : i;
   };
   refs = refs
@@ -161,7 +175,9 @@ export function buildRequest(
     .map(({ r }) => r);
   // Seedance reads images, then audio, then video; numbering follows that order.
   if (task === "video")
-    refs.sort((a, b) => MEDIA_ORDER.indexOf(a.kind) - MEDIA_ORDER.indexOf(b.kind));
+    refs.sort(
+      (a, b) => MEDIA_ORDER.indexOf(a.kind) - MEDIA_ORDER.indexOf(b.kind),
+    );
   const counters: Record<string, number> = {};
   const nameOf = new Map<GenRef, string>();
   for (const r of refs) {
@@ -174,19 +190,34 @@ export function buildRequest(
       const r = refs.find((x) => x.assetId === m.id);
       if (r) names[refKey(m)] = nameOf.get(r)!;
     } else {
-      const own = refs.filter((x) => x.source === m.id).map((x) => nameOf.get(x)!);
+      const own = refs
+        .filter((x) => x.source === m.id)
+        .map((x) => nameOf.get(x)!);
       const text = incoming
         .filter((i) => i.edge.source === m.id)
         .flatMap((i) => i.values)
-        .filter((v): v is { value: string } => !isAsset(v) && typeof v.value === "string")
+        .filter(
+          (v): v is { value: string } =>
+            !isAsset(v) && typeof v.value === "string",
+        )
         .map((v) => v.value)
         .join("\n");
       names[refKey(m)] = own.length ? own.join(" and ") : text || m.label;
     }
   }
-  const kinds = [...refs.map((r) => r.kind), ...texts.map(() => "text" as const)];
-  const mode = typeof node.params.mode === "string" ? node.params.mode : entry.params.mode?.type === "enum" ? entry.params.mode.default : undefined;
-  const modelParam = Object.entries(entry.params).find(([, p]) => p.type === "model");
+  const kinds = [
+    ...refs.map((r) => r.kind),
+    ...texts.map(() => "text" as const),
+  ];
+  const mode =
+    typeof node.params.mode === "string"
+      ? node.params.mode
+      : entry.params.mode?.type === "enum"
+        ? entry.params.mode.default
+        : undefined;
+  const modelParam = Object.entries(entry.params).find(
+    ([, p]) => p.type === "model",
+  );
   const model = resolveModel(
     models,
     MODEL_KIND[task],
@@ -194,14 +225,22 @@ export function buildRequest(
     kinds,
     task === "image-edit" ? undefined : mode,
   );
-  if (!model) throw new ProviderError(`No ${MODEL_KIND[task]} model "${String(node.params.model)}" in the catalog`);
+  if (!model)
+    throw new ProviderError(
+      `No ${MODEL_KIND[task]} model "${String(node.params.model)}" in the catalog`,
+    );
   // image.edit has no catalog params of its own: its node params go through as is.
-  const preset = typeof node.params.preset === "string" ? node.params.preset : undefined;
+  const preset =
+    typeof node.params.preset === "string" ? node.params.preset : undefined;
   const params =
     task === "image-edit"
       ? { ...node.params }
-      : { ...modelParams(model, node.params, mode), ...(task === "llm" && preset ? { preset } : {}) };
-  const ownSystem = typeof node.params.system === "string" ? node.params.system.trim() : "";
+      : {
+          ...modelParams(model, node.params, mode),
+          ...(task === "llm" && preset ? { preset } : {}),
+        };
+  const ownSystem =
+    typeof node.params.system === "string" ? node.params.system.trim() : "";
   return {
     task,
     model: model.key,
@@ -214,10 +253,16 @@ export function buildRequest(
     ...(task === "llm"
       ? {
           system: ownSystem || (preset ? PRESET_SYSTEM[preset] : undefined),
-          effort: typeof node.params.effort === "string" ? node.params.effort : undefined,
+          effort:
+            typeof node.params.effort === "string"
+              ? node.params.effort
+              : undefined,
         }
       : {}),
-    autoPrompt: task !== "llm" && task !== "image-edit" && node.params.autoPrompt !== false,
+    autoPrompt:
+      task !== "llm" &&
+      task !== "image-edit" &&
+      node.params.autoPrompt !== false,
     nodeType: node.type,
     typeVersion: node.typeVersion,
     canvasId,
@@ -227,9 +272,15 @@ export function buildRequest(
 export function composePrompt(stored: StoredRequest, raw = stored.intent) {
   const own = renderPrompt(raw, stored.names).trim();
   if (stored.task === "llm") return own;
-  return [own, ...stored.texts.map((t) => t.trim())].filter(Boolean).join("\n\n");
+  return [own, ...stored.texts.map((t) => t.trim())]
+    .filter(Boolean)
+    .join("\n\n");
 }
-function toGenRequest(job: JobRow, stored: StoredRequest, model: ModelSpec): GenRequest {
+function toGenRequest(
+  job: JobRow,
+  stored: StoredRequest,
+  model: ModelSpec,
+): GenRequest {
   return {
     jobId: job.id,
     runId: job.run_id,
@@ -254,9 +305,17 @@ export function requestProblem(stored: StoredRequest): string | undefined {
     return `${model.title} takes at most ${model.limits.promptChars} characters of prompt (got ${prompt.length}).`;
   const d = model.limits?.durationSec;
   const duration = Number(stored.params.duration);
-  if (d && stored.params.duration !== undefined && (duration < d.min || duration > d.max || !Number.isInteger(duration)))
+  if (
+    d &&
+    stored.params.duration !== undefined &&
+    (duration < d.min || duration > d.max || !Number.isInteger(duration))
+  )
     return `${model.title} makes whole-second videos of ${d.min} to ${d.max} s.`;
-  if (stored.task === "video" && stored.mode === "frames" && !stored.refs.some((r) => r.role === "first"))
+  if (
+    stored.task === "video" &&
+    stored.mode === "frames" &&
+    !stored.refs.some((r) => r.role === "first")
+  )
     return "First & last frame needs a first frame.";
   if (stored.task !== "llm" && !prompt && !stored.refs.length)
     return "Write a prompt or connect an input.";
@@ -267,7 +326,11 @@ export function requestProblem(stored: StoredRequest): string | undefined {
 /** Main params that change how long a task takes. */
 export function etaBucket(stored: StoredRequest) {
   const p = stored.params;
-  return [p.resolution, p.duration, p.count].filter((v) => v !== undefined).join(":") || "-";
+  return (
+    [p.resolution, p.duration, p.count]
+      .filter((v) => v !== undefined)
+      .join(":") || "-"
+  );
 }
 function defaultEta(model: ModelSpec, stored: StoredRequest) {
   const e = model.eta;
@@ -294,7 +357,14 @@ interface JobRow {
   id: string;
   run_id: string;
   node_id: string;
-  data: Job & { attempt?: number; retries?: number; phase?: string; waitingSince?: string; submittedAt?: string; prepared?: boolean };
+  data: Job & {
+    attempt?: number;
+    retries?: number;
+    phase?: string;
+    waitingSince?: string;
+    submittedAt?: string;
+    prepared?: boolean;
+  };
   request: StoredRequest;
   replaced_at: Date | null;
   run_status: string;
@@ -312,11 +382,14 @@ async function loadJob(id: string): Promise<JobRow | undefined> {
   );
   return rows[0];
 }
-const current = (job: JobRow) => job.run_status === "running" && !job.replaced_at;
+const current = (job: JobRow) =>
+  job.run_status === "running" && !job.replaced_at;
 /** Saves the job (only while it is current) and tells the run's listeners. */
 async function saveJob(job: JobRow, patch: Partial<JobRow["data"]>) {
   Object.assign(job.data, patch);
-  for (const [k, v] of Object.entries(patch)) if (v === undefined) delete (job.data as unknown as Record<string, unknown>)[k];
+  for (const [k, v] of Object.entries(patch))
+    if (v === undefined)
+      delete (job.data as unknown as Record<string, unknown>)[k];
   // The public stage mirrors the internal phase.
   if ("phase" in patch) {
     if (patch.phase) job.data.stage = patch.phase;
@@ -327,13 +400,34 @@ async function saveJob(job: JobRow, patch: Partial<JobRow["data"]>) {
     [job.id, job.data, job.run_id],
   );
   if (!rowCount) return false;
-  const { attempt: _a, retries: _r, phase: _p, waitingSince: _w, submittedAt: _s, prepared: _pr, ...pub } = job.data;
-  await emit(job.run_id, { type: "job.status", runId: job.run_id, at: new Date().toISOString(), ...pub, ...(_p ? { stage: _p } : {}) });
+  const {
+    attempt: _a,
+    retries: _r,
+    phase: _p,
+    waitingSince: _w,
+    submittedAt: _s,
+    prepared: _pr,
+    ...pub
+  } = job.data;
+  await emit(job.run_id, {
+    type: "job.status",
+    runId: job.run_id,
+    at: new Date().toISOString(),
+    ...pub,
+    ...(_p ? { stage: _p } : {}),
+  });
   return true;
 }
 /** Public job data: the queue's own bookkeeping stays in the row. */
 async function failJob(job: JobRow, code: string, message: string) {
-  await saveJob(job, { status: "failed", error: { code, message }, queuePosition: undefined, outputs: undefined, eta: undefined, finishedAt: new Date().toISOString() });
+  await saveJob(job, {
+    status: "failed",
+    error: { code, message },
+    queuePosition: undefined,
+    outputs: undefined,
+    eta: undefined,
+    finishedAt: new Date().toISOString(),
+  });
   await failJobAssets(job.id, `Job failed: ${message}`);
   await advance(job.run_id);
 }
@@ -353,7 +447,9 @@ async function claim(job: JobRow, model: ModelSpec, attempt: number) {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`gen-slot:${model.key}`]);
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `gen-slot:${model.key}`,
+    ]);
     const waitingSince = job.data.waitingSince ?? new Date().toISOString();
     const { rows } = await client.query(
       `SELECT
@@ -366,7 +462,8 @@ async function claim(job: JobRow, model: ModelSpec, attempt: number) {
     const active = Number(rows[0].active),
       mine = Number(rows[0].mine),
       ahead = Number(rows[0].ahead);
-    const free = active + ahead < (model.slots ?? 4) && mine < settings.userMax();
+    const free =
+      active + ahead < (model.slots ?? 4) && mine < settings.userMax();
     if (!free) {
       await client.query("COMMIT");
       return { waiting: true as const, position: ahead + 1, waitingSince };
@@ -375,7 +472,16 @@ async function claim(job: JobRow, model: ModelSpec, attempt: number) {
     const inserted = await client.query(
       `INSERT INTO gen_tasks(id, job_id, attempt, run_id, node_id, actor_id, provider, model, state)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'submitting') ON CONFLICT (job_id, attempt) DO NOTHING RETURNING id`,
-      [id, job.id, attempt, job.run_id, job.node_id, job.actor_id, adapterFor(model).name, model.key],
+      [
+        id,
+        job.id,
+        attempt,
+        job.run_id,
+        job.node_id,
+        job.actor_id,
+        adapterFor(model).name,
+        model.key,
+      ],
     );
     await client.query("COMMIT");
     return { waiting: false as const, id, claimed: inserted.rowCount === 1 };
@@ -388,15 +494,22 @@ async function claim(job: JobRow, model: ModelSpec, attempt: number) {
 }
 
 const AUTO_PROMPT_SYSTEM: Record<string, string> = {
-  image: "Rewrite the user's image prompt for a text-to-image model: concrete subject, setting, lighting, lens and style, one paragraph. Keep every token of the form @[label](scheme:id) exactly as written; they stand for the user's reference files. Answer with the prompt only.",
-  video: "Rewrite the user's video prompt for a text-to-video model: subject, action, camera movement, lighting and mood, one paragraph. Keep every token of the form @[label](scheme:id) exactly as written; they stand for the user's reference files. Answer with the prompt only.",
-  audio: "Prepare the user's script for text-to-speech: fix punctuation so pauses and emphasis read naturally. Never add, remove or change words. Keep every token of the form @[label](scheme:id) exactly. Answer with the script only.",
+  image:
+    "Rewrite the user's image prompt for a text-to-image model: concrete subject, setting, lighting, lens and style, one paragraph. Keep every token of the form @[label](scheme:id) exactly as written; they stand for the user's reference files. Answer with the prompt only.",
+  video:
+    "Rewrite the user's video prompt for a text-to-video model: subject, action, camera movement, lighting and mood, one paragraph. Keep every token of the form @[label](scheme:id) exactly as written; they stand for the user's reference files. Answer with the prompt only.",
+  audio:
+    "Prepare the user's script for text-to-speech: fix punctuation so pauses and emphasis read naturally. Never add, remove or change words. Keep every token of the form @[label](scheme:id) exactly. Answer with the script only.",
 };
 /**
  * Auto prompt (the first step of the quality loop): an LLM rewrites the intent
  * for the model. Tokens must survive; if one is lost the intent is kept.
  */
-async function autoPrompt(job: JobRow, stored: StoredRequest, signal: AbortSignal) {
+async function autoPrompt(
+  job: JobRow,
+  stored: StoredRequest,
+  signal: AbortSignal,
+) {
   const intent = stored.intent.trim();
   if (!intent) return undefined;
   const kind = MODEL_KIND[stored.task];
@@ -406,20 +519,38 @@ async function autoPrompt(job: JobRow, stored: StoredRequest, signal: AbortSigna
   let text: string;
   if (adapter.name === "mock") {
     // The mock LLM cannot rewrite: it adds a fixed tail and keeps the words.
-    await sleep(Number(process.env.MOCK_DELAY_MS ?? 200) / 2, undefined, { signal });
+    await sleep(Number(process.env.MOCK_DELAY_MS ?? 200) / 2, undefined, {
+      signal,
+    });
     text = mockRewrite(intent, kind);
   } else {
     if (!adapter.available(llm)) return undefined;
     const result = await adapter.submit(
-      { jobId: job.id, runId: job.run_id, nodeId: job.node_id, task: "llm", model: llm, prompt: intent, params: {}, refs: [], system: AUTO_PROMPT_SYSTEM[kind] ?? AUTO_PROMPT_SYSTEM.image, effort: "low" },
+      {
+        jobId: job.id,
+        runId: job.run_id,
+        nodeId: job.node_id,
+        task: "llm",
+        model: llm,
+        prompt: intent,
+        params: {},
+        refs: [],
+        system: AUTO_PROMPT_SYSTEM[kind] ?? AUTO_PROMPT_SYSTEM.image,
+        effort: "low",
+      },
       async () => new Uint8Array(),
       signal,
     );
-    const out = result.type === "done" ? result.outputs.find((o) => o.type === "text") : undefined;
+    const out =
+      result.type === "done"
+        ? result.outputs.find((o) => o.type === "text")
+        : undefined;
     if (!out || out.type !== "text") return undefined;
     text = out.text.trim();
   }
-  const kept = promptRefs(intent).every((r) => text.includes(`(${r.scheme}:${r.id})`));
+  const kept = promptRefs(intent).every((r) =>
+    text.includes(`(${r.scheme}:${r.id})`),
+  );
   return kept && text ? text : undefined;
 }
 
@@ -430,53 +561,128 @@ export async function submitJob(jobId: string) {
   if (!current(job)) return;
   const stored = job.request;
   const model = modelByKey(stored.model);
-  if (!model) return failJob(job, "MODEL", `Model ${stored.model} is not in the catalog`);
+  if (!model)
+    return failJob(job, "MODEL", `Model ${stored.model} is not in the catalog`);
   const adapter = adapterFor(model);
   if (!adapter.available(model))
-    return failJob(job, "PROVIDER_NOT_CONFIGURED", `${model.title} is not available: its provider key is not configured.`);
+    return failJob(
+      job,
+      "PROVIDER_NOT_CONFIGURED",
+      `${model.title} is not available: its provider key is not configured.`,
+    );
   // Before the first submit: the adapter's own preparation, as a separate queue step.
-  if (adapter.prepare && !job.data.prepared && adapter.needsPrepare?.(toGenRequest(job, stored, model))) {
-    await saveJob(job, { status: "running", phase: "preparing", model: model.key });
-    await boss.send("gen-prepare", { jobId }, { singletonKey: `${jobId}:prepare` });
+  if (
+    adapter.prepare &&
+    !job.data.prepared &&
+    adapter.needsPrepare?.(toGenRequest(job, stored, model))
+  ) {
+    await saveJob(job, {
+      status: "running",
+      phase: "preparing",
+      model: model.key,
+    });
+    await boss.send(
+      "gen-prepare",
+      { jobId },
+      { singletonKey: `${jobId}:prepare` },
+    );
     return;
   }
   const attempt = job.data.attempt ?? 1;
-  const { rows: tasks } = await db.query("SELECT * FROM gen_tasks WHERE job_id=$1 AND attempt=$2", [job.id, attempt]);
+  const { rows: tasks } = await db.query(
+    "SELECT * FROM gen_tasks WHERE job_id=$1 AND attempt=$2",
+    [job.id, attempt],
+  );
   const existing = tasks[0];
   if (existing?.state === "submitted" || existing?.state === "dropped") {
     // Already with the provider (a redelivered submit): make sure a fetch is scheduled.
-    await boss.send("gen-fetch", { taskId: existing.id }, { startAfter: existing.eta_at ?? later(1), singletonKey: `${existing.id}:resume` });
+    await boss.send(
+      "gen-fetch",
+      { taskId: existing.id },
+      {
+        startAfter: existing.eta_at ?? later(1),
+        singletonKey: `${existing.id}:resume`,
+      },
+    );
     return;
   }
   if (existing?.state === "submitting") {
     // The process stopped between recording the task and hearing back. The
     // provider may have it: never submit twice; say so instead.
-    await setTask(existing.id, { state: "failed", finished_at: new Date(), error: "Interrupted while submitting" });
-    return failJob(job, "INTERRUPTED", "The server restarted while this was being sent. Run it again.");
+    await setTask(existing.id, {
+      state: "failed",
+      finished_at: new Date(),
+      error: "Interrupted while submitting",
+    });
+    return failJob(
+      job,
+      "INTERRUPTED",
+      "The server restarted while this was being sent. Run it again.",
+    );
   }
   if (existing) return;
   const slot = await claim(job, model, attempt);
   if (slot.waiting) {
-    await saveJob(job, { status: "queued", phase: "waiting", model: model.key, queuePosition: slot.position, waitingSince: slot.waitingSince });
-    await boss.send("gen-submit", { jobId }, { startAfter: later(settings.waitRetry()) });
+    await saveJob(job, {
+      status: "queued",
+      phase: "waiting",
+      model: model.key,
+      queuePosition: slot.position,
+      waitingSince: slot.waitingSince,
+    });
+    await boss.send(
+      "gen-submit",
+      { jobId },
+      { startAfter: later(settings.waitRetry()) },
+    );
     return;
   }
   if (!slot.claimed) return;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error("Timed out")), (model.eta.deadlineSec ?? 600) * 1000);
+  const timer = setTimeout(
+    () => controller.abort(new Error("Timed out")),
+    (model.eta.deadlineSec ?? 600) * 1000,
+  );
   try {
     let finalPrompt = job.data.finalPrompt;
     const intentShown = { intent: stored.intent || undefined };
     if (stored.autoPrompt && finalPrompt === undefined) {
-      await saveJob(job, { status: "running", phase: "auto-prompt", model: model.key, queuePosition: undefined, ...intentShown });
-      finalPrompt = (await autoPrompt(job, stored, controller.signal).catch(() => undefined)) ?? stored.intent;
+      await saveJob(job, {
+        status: "running",
+        phase: "auto-prompt",
+        model: model.key,
+        queuePosition: undefined,
+        ...intentShown,
+      });
+      finalPrompt =
+        (await autoPrompt(job, stored, controller.signal).catch(
+          () => undefined,
+        )) ?? stored.intent;
     }
-    await saveJob(job, { status: "running", phase: "submitting", model: model.key, queuePosition: undefined, waitingSince: undefined, ...intentShown, ...(finalPrompt !== undefined && stored.autoPrompt ? { finalPrompt } : {}), submittedAt: new Date().toISOString() });
-    const request = { ...toGenRequest(job, stored, model), ...(model.sync ? {} : { callbackUrl: callbackUrl(slot.id) }) };
+    await saveJob(job, {
+      status: "running",
+      phase: "submitting",
+      model: model.key,
+      queuePosition: undefined,
+      waitingSince: undefined,
+      ...intentShown,
+      ...(finalPrompt !== undefined && stored.autoPrompt
+        ? { finalPrompt }
+        : {}),
+      submittedAt: new Date().toISOString(),
+    });
+    const request = {
+      ...toGenRequest(job, stored, model),
+      ...(model.sync ? {} : { callbackUrl: callbackUrl(slot.id) }),
+    };
     const read = readRef;
     const result = await adapter.submit(request, read, controller.signal);
     if (result.type === "done") {
-      await setTask(slot.id, { state: "done", submitted_at: new Date(), finished_at: new Date() });
+      await setTask(slot.id, {
+        state: "done",
+        submitted_at: new Date(),
+        finished_at: new Date(),
+      });
       await complete(job, model, result.outputs, result.credits ?? 0, slot.id);
       return;
     }
@@ -491,96 +697,190 @@ export async function submitJob(jobId: string) {
       deadline_at: later(model.eta.deadlineSec ?? 3600),
     });
     // A new task waits at the provider until a check says it started.
-    await saveJob(job, { status: "running", phase: "provider-queued", eta: etaAt.toISOString(), progress: 0 });
+    await saveJob(job, {
+      status: "running",
+      phase: "provider-queued",
+      eta: etaAt.toISOString(),
+      progress: 0,
+    });
     void p90;
-    await boss.send("gen-fetch", { taskId: slot.id }, { startAfter: etaAt, singletonKey: `${slot.id}:${0}` });
+    await boss.send(
+      "gen-fetch",
+      { taskId: slot.id },
+      { startAfter: etaAt, singletonKey: `${slot.id}:${0}` },
+    );
   } catch (error) {
-    const transient = error instanceof ProviderError ? error.transient : isNetworkError(error);
-    await setTask(slot.id, { state: "failed", finished_at: new Date(), error: String((error as Error)?.message ?? error).slice(0, 500) });
+    const transient =
+      error instanceof ProviderError ? error.transient : isNetworkError(error);
+    await setTask(slot.id, {
+      state: "failed",
+      finished_at: new Date(),
+      error: String((error as Error)?.message ?? error).slice(0, 500),
+    });
     const retries = job.data.retries ?? 0;
     if (transient && retries < settings.transientRetries) {
       const wait = Math.min(60, 2 ** retries * 2);
-      await saveJob(job, { status: "queued", phase: "retry", attempt: attempt + 1, retries: retries + 1 });
-      await boss.send("gen-submit", { jobId }, { startAfter: later(config.mock ? 0.2 : wait) });
+      await saveJob(job, {
+        status: "queued",
+        phase: "retry",
+        attempt: attempt + 1,
+        retries: retries + 1,
+      });
+      await boss.send(
+        "gen-submit",
+        { jobId },
+        { startAfter: later(config.mock ? 0.2 : wait) },
+      );
       return;
     }
-    const code = error instanceof ProviderError ? error.code : controller.signal.aborted ? "MODEL_TIMEOUT" : "WORKER_ERROR";
+    const code =
+      error instanceof ProviderError
+        ? error.code
+        : controller.signal.aborted
+          ? "MODEL_TIMEOUT"
+          : "WORKER_ERROR";
     await failJob(job, code, (error as Error)?.message ?? String(error));
   } finally {
     clearTimeout(timer);
   }
 }
-const readRef = async (ref: GenRef) => new Uint8Array(await assetBytes(ref.assetId));
+const readRef = async (ref: GenRef) =>
+  new Uint8Array(await assetBytes(ref.assetId));
 /** gen-prepare: stage references and check them (real person) before the first submit. */
 export async function prepareJob(jobId: string) {
   const job = await loadJob(jobId);
-  if (!job || !current(job) || !["queued", "running"].includes(job.data.status)) return;
+  if (!job || !current(job) || !["queued", "running"].includes(job.data.status))
+    return;
   const model = modelByKey(job.request.model)!;
   const adapter = adapterFor(model);
   try {
-    await adapter.prepare?.(toGenRequest(job, job.request, model), readRef, AbortSignal.timeout(600000));
+    await adapter.prepare?.(
+      toGenRequest(job, job.request, model),
+      readRef,
+      AbortSignal.timeout(600000),
+    );
   } catch (error) {
-    const transient = error instanceof ProviderError ? error.transient : isNetworkError(error);
+    const transient =
+      error instanceof ProviderError ? error.transient : isNetworkError(error);
     const retries = job.data.retries ?? 0;
     if (transient && retries < settings.transientRetries) {
       await saveJob(job, { retries: retries + 1 });
-      await boss.send("gen-prepare", { jobId }, { startAfter: later(Math.min(60, 2 ** retries * 2)), singletonKey: `${jobId}:prepare` });
+      await boss.send(
+        "gen-prepare",
+        { jobId },
+        {
+          startAfter: later(Math.min(60, 2 ** retries * 2)),
+          singletonKey: `${jobId}:prepare`,
+        },
+      );
       return;
     }
-    return failJob(job, error instanceof ProviderError ? error.code : "PROVIDER_ERROR", (error as Error).message);
+    return failJob(
+      job,
+      error instanceof ProviderError ? error.code : "PROVIDER_ERROR",
+      (error as Error).message,
+    );
   }
   await saveJob(job, { prepared: true });
   await boss.send("gen-submit", { jobId }, { singletonKey: jobId });
 }
 const isNetworkError = (error: unknown) =>
-  error instanceof TypeError || /ECONNRESET|ETIMEDOUT|ENOTFOUND|fetch failed|socket/i.test(String((error as Error)?.message));
+  error instanceof TypeError ||
+  /ECONNRESET|ETIMEDOUT|ENOTFOUND|fetch failed|socket/i.test(
+    String((error as Error)?.message),
+  );
 
 // ---------------------------------------------------------------- gen-fetch
 export async function fetchTask(taskId: string) {
-  const { rows } = await db.query("SELECT * FROM gen_tasks WHERE id=$1", [taskId]);
+  const { rows } = await db.query("SELECT * FROM gen_tasks WHERE id=$1", [
+    taskId,
+  ]);
   const task = rows[0];
   if (!task || !["submitted", "dropped"].includes(task.state)) return;
   const job = await loadJob(task.job_id);
   if (!job) return;
   const model = modelByKey(job.request.model)!;
   const adapter = adapterFor(model);
-  const providerTask = { taskId: task.provider_task_id, request: toGenRequest(job, job.request, model) };
+  const providerTask = {
+    taskId: task.provider_task_id,
+    request: toGenRequest(job, job.request, model),
+  };
   const fetches = Number(task.fetches) + 1;
   await setTask(task.id, { fetches });
   const again = async (seconds: number) =>
-    boss.send("gen-fetch", { taskId: task.id }, { startAfter: later(seconds), singletonKey: `${task.id}:${fetches}` });
+    boss.send(
+      "gen-fetch",
+      { taskId: task.id },
+      { startAfter: later(seconds), singletonKey: `${task.id}:${fetches}` },
+    );
   let result: FetchResult;
   try {
     result = await adapter.fetch(providerTask, AbortSignal.timeout(120000));
   } catch (error) {
     const transient = error instanceof ProviderError ? error.transient : true;
-    if (transient && fetches < 200) return again(Math.min(60, 5 * 2 ** Math.min(4, Number(task.fetches))));
-    return failJob(job, error instanceof ProviderError ? error.code : "PROVIDER_ERROR", (error as Error).message);
+    if (transient && fetches < 200)
+      return again(Math.min(60, 5 * 2 ** Math.min(4, Number(task.fetches))));
+    return failJob(
+      job,
+      error instanceof ProviderError ? error.code : "PROVIDER_ERROR",
+      (error as Error).message,
+    );
   }
   if (result.state === "queued" || result.state === "running") {
     if (task.deadline_at && new Date(task.deadline_at) < new Date()) {
-      if (adapter.cancel) await adapter.cancel(providerTask).catch(() => undefined);
-      await setTask(task.id, { state: "failed", finished_at: new Date(), error: "deadline" });
-      return failJob(job, "MODEL_TIMEOUT", `${model.title} did not finish in time.`);
+      if (adapter.cancel)
+        await adapter.cancel(providerTask).catch(() => undefined);
+      await setTask(task.id, {
+        state: "failed",
+        finished_at: new Date(),
+        error: "deadline",
+      });
+      return failJob(
+        job,
+        "MODEL_TIMEOUT",
+        `${model.title} did not finish in time.`,
+      );
     }
     if (fetches >= 500) {
-      await setTask(task.id, { state: "failed", finished_at: new Date(), error: "too many checks" });
+      await setTask(task.id, {
+        state: "failed",
+        finished_at: new Date(),
+        error: "too many checks",
+      });
       return failJob(job, "MODEL_TIMEOUT", `${model.title} did not finish.`);
     }
-    const remaining = result.etaSec ?? (task.eta_at ? (new Date(task.eta_at).getTime() - Date.now()) / 1000 : 15);
+    const remaining =
+      result.etaSec ??
+      (task.eta_at
+        ? (new Date(task.eta_at).getTime() - Date.now()) / 1000
+        : 15);
     if (task.state === "submitted" && current(job))
-      await saveJob(job, { phase: result.state === "queued" ? "provider-queued" : "provider", eta: later(Math.max(remaining, 0)).toISOString() });
-    return again(Math.min(settings.maxRefetch(), Math.max(settings.minRefetch(), remaining)));
+      await saveJob(job, {
+        phase: result.state === "queued" ? "provider-queued" : "provider",
+        eta: later(Math.max(remaining, 0)).toISOString(),
+      });
+    return again(
+      Math.min(
+        settings.maxRefetch(),
+        Math.max(settings.minRefetch(), remaining),
+      ),
+    );
   }
   if (result.state === "failed") {
-    await setTask(task.id, { state: task.state === "dropped" ? "cancelled" : "failed", finished_at: new Date(), error: result.message.slice(0, 500) });
+    await setTask(task.id, {
+      state: task.state === "dropped" ? "cancelled" : "failed",
+      finished_at: new Date(),
+      error: result.message.slice(0, 500),
+    });
     if (task.state === "dropped" || !current(job)) return;
     return failJob(job, result.code ?? "PROVIDER_ERROR", result.message);
   }
   const done = result as Extract<FetchResult, { state: "done" }>;
   if (task.state === "dropped" || !current(job)) {
     // Stopped too late to cancel: the result is paid for, so it is stored, but not shown.
-    await storeOutputs(job, model, done.outputs, { publish: "ready" }).catch((e) => console.error("Dropped result:", e));
+    await storeOutputs(job, model, done.outputs, { publish: "ready" }).catch(
+      (e) => console.error("Dropped result:", e),
+    );
     await setTask(task.id, { state: "cancelled", finished_at: new Date() });
     return;
   }
@@ -590,25 +890,65 @@ export async function fetchTask(taskId: string) {
 
 // ---------------------------------------------------------------- results
 const extension = (mime: string) =>
-  ({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "audio/wav": "wav", "audio/mpeg": "mp3" })[mime] ?? mime.split("/")[1] ?? "bin";
-function generation(job: JobRow, model: ModelSpec, provider?: unknown): GenerationInfo {
+  ({
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "video/mp4": "mp4",
+    "audio/wav": "wav",
+    "audio/mpeg": "mp3",
+  })[mime] ??
+  mime.split("/")[1] ??
+  "bin";
+function generation(
+  job: JobRow,
+  model: ModelSpec,
+  provider?: unknown,
+): GenerationInfo {
   const stored = job.request;
   const final = job.data.finalPrompt ?? stored.intent;
   const prompt = composePrompt(stored, final);
-  const reported = provider && typeof provider === "object" ? (provider as GenerationInfo["provider"]) : undefined;
+  const reported =
+    provider && typeof provider === "object"
+      ? (provider as GenerationInfo["provider"])
+      : undefined;
   return {
     nodeType: stored.nodeType,
     typeVersion: stored.typeVersion,
     ...(prompt ? { prompt: plainPrompt(prompt).slice(0, 4000) } : {}),
     model: model.key,
     ...(stored.intent ? { intent: stored.intent.slice(0, 4000) } : {}),
-    ...(job.data.finalPrompt !== undefined ? { finalPrompt: job.data.finalPrompt.slice(0, 4000) } : {}),
+    ...(job.data.finalPrompt !== undefined
+      ? { finalPrompt: job.data.finalPrompt.slice(0, 4000) }
+      : {}),
     ...(Object.keys(stored.params).length ? { settings: stored.params } : {}),
-    ...(stored.refs.length ? { references: stored.refs.map((r) => ({ name: r.name, id: r.assetId, port: r.role })) } : {}),
-    ...(reported?.name ? { provider: { name: reported.name, ...(reported.model ? { model: reported.model } : {}), ...(reported.seed !== undefined ? { seed: reported.seed } : {}), ...(reported.requestId ? { requestId: reported.requestId } : {}) } } : {}),
+    ...(stored.refs.length
+      ? {
+          references: stored.refs.map((r) => ({
+            name: r.name,
+            id: r.assetId,
+            port: r.role,
+          })),
+        }
+      : {}),
+    ...(reported?.name
+      ? {
+          provider: {
+            name: reported.name,
+            ...(reported.model ? { model: reported.model } : {}),
+            ...(reported.seed !== undefined ? { seed: reported.seed } : {}),
+            ...(reported.requestId ? { requestId: reported.requestId } : {}),
+          },
+        }
+      : {}),
   };
 }
-async function storeOutputs(job: JobRow, model: ModelSpec, outputs: GenOutput[], opts: { publish: "ready" | "processing" }) {
+async function storeOutputs(
+  job: JobRow,
+  model: ModelSpec,
+  outputs: GenOutput[],
+  opts: { publish: "ready" | "processing" },
+) {
   const node = job.recipe.nodes.find((n) => n.id === job.node_id);
   const entry = registry.get(job.request.nodeType);
   const label = node?.label ?? entry?.title ?? "Result";
@@ -629,7 +969,13 @@ async function storeOutputs(job: JobRow, model: ModelSpec, outputs: GenOutput[],
         mime,
         kind: out.meta.kind,
         meta: out.meta.meta,
-        source: { type: "generated", canvasId: job.request.canvasId, runId: job.run_id, nodeId: job.node_id, jobId: job.id },
+        source: {
+          type: "generated",
+          canvasId: job.request.canvasId,
+          runId: job.run_id,
+          nodeId: job.node_id,
+          jobId: job.id,
+        },
         generation: generation(job, model, out.meta.provider),
         publish: opts.publish,
       }),
@@ -644,7 +990,13 @@ function shape(nodeType: string, values: Output[]): Outputs {
   const list = typeof port.kind === "string" && port.kind.startsWith("list<");
   return { [port.key]: list ? values : values[0] };
 }
-async function complete(job: JobRow, model: ModelSpec, outputs: GenOutput[], credits: number, taskId: string) {
+async function complete(
+  job: JobRow,
+  model: ModelSpec,
+  outputs: GenOutput[],
+  credits: number,
+  taskId: string,
+) {
   let values: Output[];
   try {
     values = await storeOutputs(job, model, outputs, { publish: "processing" });
@@ -662,7 +1014,10 @@ async function complete(job: JobRow, model: ModelSpec, outputs: GenOutput[], cre
     "INSERT INTO usage(run_id,job_id,node_id,user_id,credits,model) VALUES($1,$2,$3,$4,$5,$6)",
     [job.run_id, job.id, job.node_id, job.actor_id, credits, model.key],
   );
-  const { rows } = await db.query("SELECT submitted_at FROM gen_tasks WHERE id=$1", [taskId]);
+  const { rows } = await db.query(
+    "SELECT submitted_at FROM gen_tasks WHERE id=$1",
+    [taskId],
+  );
   const started = rows[0]?.submitted_at ?? job.data.submittedAt;
   if (started)
     await db.query("INSERT INTO gen_stats(model,bucket,ms) VALUES($1,$2,$3)", [
@@ -672,7 +1027,10 @@ async function complete(job: JobRow, model: ModelSpec, outputs: GenOutput[], cre
     ]);
   const cacheKey = job.request.cacheKey;
   if (cacheKey)
-    await db.query("INSERT INTO output_cache(key,outputs) VALUES($1,$2) ON CONFLICT(key) DO NOTHING", [cacheKey, shaped]);
+    await db.query(
+      "INSERT INTO output_cache(key,outputs) VALUES($1,$2) ON CONFLICT(key) DO NOTHING",
+      [cacheKey, shaped],
+    );
   const saved = await saveJob(job, {
     status: "done",
     progress: 1,
@@ -691,7 +1049,9 @@ async function complete(job: JobRow, model: ModelSpec, outputs: GenOutput[], cre
 // ---------------------------------------------------------------- cancel
 /** Stop a task: cancel it at the provider while it is queued, else drop it on our side. */
 export async function cancelTask(taskId: string) {
-  const { rows } = await db.query("SELECT * FROM gen_tasks WHERE id=$1", [taskId]);
+  const { rows } = await db.query("SELECT * FROM gen_tasks WHERE id=$1", [
+    taskId,
+  ]);
   const task = rows[0];
   if (!task || task.state !== "submitted") return;
   const job = await loadJob(task.job_id);
@@ -701,9 +1061,17 @@ export async function cancelTask(taskId: string) {
   let outcome: "cancelled" | "running" = "running";
   if (adapter.cancel && model.cancel !== "never")
     outcome = await adapter
-      .cancel({ taskId: task.provider_task_id, request: toGenRequest(job, job.request, model) })
+      .cancel({
+        taskId: task.provider_task_id,
+        request: toGenRequest(job, job.request, model),
+      })
       .catch(() => "running" as const);
-  await setTask(task.id, outcome === "cancelled" ? { state: "cancelled", finished_at: new Date() } : { state: "dropped" });
+  await setTask(
+    task.id,
+    outcome === "cancelled"
+      ? { state: "cancelled", finished_at: new Date() }
+      : { state: "dropped" },
+  );
 }
 /** Every task of these jobs (or of the run) that is still with a provider. */
 export async function cancelTasks(runId: string, jobIds?: string[]) {
@@ -721,8 +1089,24 @@ export async function startGenWorkers() {
     async (jobs: { data: T }[]) => {
       await Promise.all(jobs.map((j) => fn(j.data)));
     };
-  await boss.work<{ jobId: string }>("gen-submit", options, each((d) => submitJob(d.jobId)));
-  await boss.work<{ taskId: string }>("gen-fetch", options, each((d) => fetchTask(d.taskId)));
-  await boss.work<{ taskId: string }>("gen-cancel", options, each((d) => cancelTask(d.taskId)));
-  await boss.work<{ jobId: string }>("gen-prepare", options, each((d) => prepareJob(d.jobId)));
+  await boss.work<{ jobId: string }>(
+    "gen-submit",
+    options,
+    each((d) => submitJob(d.jobId)),
+  );
+  await boss.work<{ taskId: string }>(
+    "gen-fetch",
+    options,
+    each((d) => fetchTask(d.taskId)),
+  );
+  await boss.work<{ taskId: string }>(
+    "gen-cancel",
+    options,
+    each((d) => cancelTask(d.taskId)),
+  );
+  await boss.work<{ jobId: string }>(
+    "gen-prepare",
+    options,
+    each((d) => prepareJob(d.jobId)),
+  );
 }
