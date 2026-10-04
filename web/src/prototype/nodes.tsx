@@ -122,6 +122,8 @@ export const GenNode = memo(function GenNode({ id, selected }: NodeProps) {
   const spec = NODES[type];
   const Icon = node.asset ? (type === "audio" ? FileAudio : type === "video" ? FileVideo : FileImage) : TYPE_ICON[type];
   const entry = activeEntry(node);
+  // Stopped runs stay in history for the space feed; the node only flips through finished ones.
+  const done = node.history.filter((e) => !e.cancelled);
   const busy = source.status.state === "queued" || source.status.state === "running";
   const out: Output | undefined = entry?.outputs[node.active?.index ?? 0];
   const store = useProto.getState();
@@ -248,8 +250,8 @@ export const GenNode = memo(function GenNode({ id, selected }: NodeProps) {
           {!node.asset && <PlusButton id={id} side="target" />}
           <PlusButton id={id} side="source" />
         </div>
-        {node.history.length > 1 && (
-          <RunStrip entries={node.history} activeId={entry?.id} onPick={(e) => store.setActive(id, e)} onReEdit={(e) => store.reEdit(id, e)} />
+        {done.length > 1 && (
+          <RunStrip entries={done} activeId={entry?.id} onPick={(e) => store.setActive(id, e)} onReEdit={(e) => store.reEdit(id, e)} />
         )}
       </div>
       <NodeToolbar isVisible={selected && single && tool === "trim" && !!out} position={Position.Bottom} className="proto-composer-wrap">

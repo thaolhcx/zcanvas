@@ -20,7 +20,7 @@ export function useGenSource(id: string, opts?: { addInput?: () => void }): GenS
     const busy = node.status.state === "queued" || node.status.state === "running";
     const status: GenStatus = busy
       ? node.status
-      : node.history.length
+      : node.history.some((e) => !e.cancelled)
         ? { state: "done" }
         : node.status.state === "cancelled"
           ? node.status
@@ -43,7 +43,8 @@ export function useGenSource(id: string, opts?: { addInput?: () => void }): GenS
       issues: validate(spec, model, node.value, inputs),
       estimate: estimate(spec, model, node.value, inputs),
       run: () => api.run(id),
-      cancel: () => api.cancel(id),
+      cancel: (jobId) => api.cancel(id, jobId),
+      jobs: node.jobs ?? [],
       history: node.history,
       active: node.active,
       setActive: (entryId, index) => api.setActive(id, entryId, index),

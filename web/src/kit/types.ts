@@ -196,6 +196,17 @@ export interface RunEntry {
   credits: number;
   ms: number;
   edited?: boolean;
+  /** Stopped before it finished: kept in the feed (no outputs) so it can be re-edited. */
+  cancelled?: boolean;
+}
+
+/** A run in flight. Carries its own copy of the value, so the composer can change meanwhile. */
+export interface RunJob {
+  id: string;
+  at: number;
+  value: GenValue;
+  refs: RefItem[];
+  status: GenStatus;
 }
 
 export interface Estimate {
@@ -219,7 +230,10 @@ export interface GenSource {
   issues: string[];
   estimate: Estimate;
   run(): void;
-  cancel(): void;
+  /** Stop one job, or every job of this source. */
+  cancel(jobId?: string): void;
+  /** Runs in flight, oldest first. */
+  jobs?: RunJob[];
   history: RunEntry[];
   active?: { entryId: string; index: number };
   setActive(entryId: string, index?: number): void;

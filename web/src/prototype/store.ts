@@ -1,6 +1,6 @@
 // Prototype state: plays the role of the Graph + runner + server. Not product code.
 import { create } from "zustand";
-import type { GenStatus, GenValue, MediaKind, RefItem, RunEntry } from "../kit/types.ts";
+import type { GenStatus, GenValue, MediaKind, RefItem, RunEntry, RunJob } from "../kit/types.ts";
 import {
   assignRoles,
   changeModel as applyModel,
@@ -25,7 +25,10 @@ export interface ProtoNode {
   value: GenValue;
   history: RunEntry[];
   active?: { entryId: string; index: number };
+  /** Aggregate for the canvas node: the latest job's status, else done / empty. */
   status: GenStatus;
+  /** Runs in flight, oldest first. A space shows one card per job. */
+  jobs?: RunJob[];
   /** Space: references picked from files instead of edges. */
   uploads: RefItem[];
   sticky?: { text: string; color: string };
@@ -59,7 +62,8 @@ interface State {
   addUpload(id: string, ref: RefItem): void;
   removeUpload(id: string, refId: string): void;
   run(id: string): void;
-  cancel(id: string): void;
+  /** Stop one job, or all jobs of the node. */
+  cancel(id: string, jobId?: string): void;
   setActive(id: string, entryId: string, index?: number): void;
   reEdit(id: string, entryId: string): void;
   editText(id: string, text: string): void;
@@ -83,7 +87,7 @@ export function outputKind(n: ProtoNode): MediaKind | undefined {
 }
 
 export function activeEntry(n: ProtoNode) {
-  return n.history.find((e) => e.id === n.active?.entryId) ?? n.history[0];
+  return n.history.find((e) => e.id === n.active?.entryId && !e.cancelled) ?? n.history.find((e) => !e.cancelled);
 }
 
 /** What a node receives: one ref per incoming edge (using the source's active output) plus uploads, roles settled. */
@@ -227,55 +231,20 @@ export const useProto = create<State>((set, get) => ({
       inputs = inputsOf(s, id);
     const issues = validate(spec, model, n.value, inputs);
     if (issues.length) return get().toast(issues[0], "warn");
-    // Kept on the entry for a future quota; never shown (internal tool).
-    const cost = estimate(spec, model, n.value, inputs).credits;
-    const value = structuredClone(n.value);
-    const ownText = activeEntry(n)?.outputs[0]?.text;
-    const total = { text: 1800, image: 3200, video: 6000, audio: 2200 }[n.type];
-    const started = Date.now();
-    patchNode(id, { status: { state: "queued" } });
-    const list: ReturnType<typeof setTimeout>[] = [];
-    list.push(
-      setTimeout(() => {
-        let p = 0;
-        const tick = () => {
-          p = Math.min(0.97, p + 100 / total);
-          patchNode(id, { status: { state: "running", progress: p } });
-          list.push(setTimeout(tick, 100));
-        };
-        tick();
-        list.push(
-          setTimeout(() => {
-            clearTimers(id);
-            const entries: RunEntry[] = Array.from({ length: value.times }, (_, k) => {
-              const seed = hashText(value.prompt + id) + Date.now() + k * 101;
-              return {
-                id: nid("run"),
-                at: Date.now(),
-                value,
-                seed: seed % 2147483647,
-                outputs: generateOutputs(spec.output, value, inputs, seed, ownText),
-                credits: cost / value.times,
-                ms: Date.now() - started,
-              };
-            });
-            const cur = get().nodes[id];
-            patchNode(id, {
-              status: { state: "done" },
-              history: [...entries.reverse(), ...cur.history].slice(0, 20),
-              active: { entryId: entries[0].id, index: 0 },
-            });
-            get().toast(`Generated successfully, time-consuming ${((Date.now() - started) / 1000).toFixed(1)} s`, "ok");
-          }, total + 600),
-        );
-      }, 600),
-    );
-    timers.set(id, list);
+    start(id, structuredClone(n.value), inputs);
   },
-  cancel(id) {
-    clearTimers(id);
+  cancel(id, jobId) {
     const n = get().nodes[id];
-    patchNode(id, { status: { state: n.history.length ? "done" : "cancelled" } });
+    const stop = (n.jobs ?? []).filter((j) => !jobId || j.id === jobId);
+    if (!stop.length) return;
+    stop.forEach((j) => clearTimers(j.id));
+    // A stopped run stays in the feed as "cancelled" (Lumina V02), newest first like any entry.
+    const gone: RunEntry[] = stop
+      .map((j) => ({ id: nid("run"), at: j.at, value: j.value, seed: 0, outputs: [], credits: 0, ms: Date.now() - j.at, cancelled: true }))
+      .reverse();
+    const jobs = (n.jobs ?? []).filter((j) => !stop.includes(j));
+    const history = [...gone, ...n.history].slice(0, HISTORY_MAX);
+    patchNode(id, { jobs, history, status: jobs.at(-1)?.status ?? { state: history.some((e) => !e.cancelled) ? "done" : "cancelled" } });
     get().toast("Stopped.", "info");
   },
   setActive(id, entryId, index = 0) {
@@ -299,7 +268,7 @@ export const useProto = create<State>((set, get) => ({
       ms: 0,
       edited: true,
     };
-    patchNode(id, { history: [entry, ...n.history].slice(0, 20), active: { entryId: entry.id, index: 0 }, status: { state: "done" } });
+    patchNode(id, { history: [entry, ...n.history].slice(0, HISTORY_MAX), active: { entryId: entry.id, index: 0 }, status: { state: "done" } });
   },
   setSticky(id, patch) {
     const n = get().nodes[id];
@@ -315,13 +284,76 @@ export const useProto = create<State>((set, get) => ({
   },
 }));
 
+const HISTORY_MAX = 50;
+
+/** Start a fake job from a frozen value + inputs. Several jobs may run on one node at once. */
+function start(id: string, value: GenValue, inputs: RefItem[]) {
+  const get = useProto.getState;
+  const n = get().nodes[id];
+  if (n.type === "sticky") return;
+  const spec = NODES[n.type],
+    model = modelOf(modelsFor(spec), value.model);
+  // Kept on the entry for a future quota; never shown (internal tool).
+  const cost = estimate(spec, model, value, inputs).credits;
+  const ownText = activeEntry(n)?.outputs[0]?.text;
+  const total = { text: 1800, image: 3200, video: 6000, audio: 2200 }[n.type];
+  const started = Date.now();
+  const job: RunJob = { id: nid("job"), at: started, value, refs: inputs, status: { state: "queued" } };
+  const setJob = (status: GenStatus) => {
+    const cur = get().nodes[id];
+    if (!cur?.jobs?.some((j) => j.id === job.id)) return;
+    patchNode(id, { jobs: cur.jobs.map((j) => (j.id === job.id ? { ...j, status } : j)), status });
+  };
+  patchNode(id, { jobs: [...(n.jobs ?? []), job], status: job.status });
+  const list: ReturnType<typeof setTimeout>[] = [];
+  list.push(
+    setTimeout(() => {
+      let p = 0;
+      const tick = () => {
+        p = Math.min(0.97, p + 100 / total);
+        setJob({ state: "running", progress: p });
+        list.push(setTimeout(tick, 100));
+      };
+      tick();
+      list.push(
+        setTimeout(() => {
+          clearTimers(job.id);
+          const entries: RunEntry[] = Array.from({ length: value.times }, (_, k) => {
+            const seed = hashText(value.prompt + id) + Date.now() + k * 101;
+            return {
+              id: nid("run"),
+              at: Date.now(),
+              value,
+              seed: seed % 2147483647,
+              outputs: generateOutputs(spec.output, value, inputs, seed, ownText),
+              credits: cost / value.times,
+              ms: Date.now() - started,
+            };
+          });
+          const cur = get().nodes[id];
+          if (!cur) return;
+          const jobs = (cur.jobs ?? []).filter((j) => j.id !== job.id);
+          patchNode(id, {
+            jobs,
+            status: jobs.at(-1)?.status ?? { state: "done" },
+            history: [...entries.reverse(), ...cur.history].slice(0, HISTORY_MAX),
+            active: { entryId: entries[0].id, index: 0 },
+          });
+          get().toast(`Generated successfully, time-consuming ${((Date.now() - started) / 1000).toFixed(1)} s`, "ok");
+        }, total + 600),
+      );
+    }, 600),
+  );
+  timers.set(job.id, list);
+}
+
 function patchNode(id: string, patch: Partial<ProtoNode>) {
   useProto.setState((s) => (s.nodes[id] ? { nodes: { ...s.nodes, [id]: { ...s.nodes[id], ...patch } } } : s));
 }
 
-function clearTimers(id: string) {
-  timers.get(id)?.forEach(clearTimeout);
-  timers.delete(id);
+function clearTimers(jobId: string) {
+  timers.get(jobId)?.forEach(clearTimeout);
+  timers.delete(jobId);
 }
 
 /** Persist roles per input id onto edges / uploads, so they survive reordering. */

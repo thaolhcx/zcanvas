@@ -73,7 +73,48 @@ function seed() {
   s.setValue("vo", { mode: "t2a", prompt: "Mornings, made slower. Small-batch coffee, roasted this week." });
   // Ran once, so the audio tool bar (Trim · Video Editor · Download) is there to see.
   done("vo", 31);
+  seedSpaces();
   useProto.setState({ toasts: [] });
+}
+
+/** A few past runs per space so the feeds have something to show. */
+function seedSpaces() {
+  const s = useProto.getState();
+  const runs: Record<"image" | "video" | "audio", { prompt: string; value?: Partial<RunEntry["value"]>; params?: Record<string, unknown>; ago: number; cancelled?: boolean }[]> = {
+    image: [
+      { prompt: "A cute 3D clay fox figurine sitting in a coffee cup, studio lighting", ago: 26 * 3600e3, params: { size: { ratio: "1:1", width: 2048, height: 2048 } } },
+      { prompt: "Small-batch coffee bag on a sunrise kitchen counter, soft backlight", ago: 3 * 3600e3, params: { count: 2, size: { ratio: "4:3", width: 2048, height: 1536 } } },
+    ],
+    video: [
+      { prompt: "Slow push-in on a steaming cup, light flares, cozy morning", ago: 5 * 3600e3, params: { duration: 5 } },
+      { prompt: "A small cartoon reward burst VFX on a pure black background", ago: 2 * 3600e3, cancelled: true },
+    ],
+    audio: [{ prompt: "Mornings, made slower. Small-batch coffee, roasted this week.", ago: 40 * 60e3, value: { mode: "t2a" }, params: { voice: "daisy" } }],
+  };
+  for (const kind of ["image", "video", "audio"] as const) {
+    const id = `page:${kind}`;
+    s.addNode(kind, { x: -99999, y: -99999 }, { id });
+    const base = useProto.getState().nodes[id].value;
+    const history: RunEntry[] = runs[kind]
+      .map((r, k) => {
+        const value = { ...base, ...r.value, prompt: r.prompt, params: { ...r.params } };
+        const seedNo = 1000 + k * 37 + kind.length;
+        return {
+          id: `run_seed_${kind}_${k}`,
+          at: Date.now() - r.ago,
+          value,
+          seed: r.cancelled ? 0 : seedNo,
+          outputs: r.cancelled ? [] : generateOutputs(NODES[kind].output, value, [], seedNo),
+          credits: 0,
+          ms: 4200,
+          cancelled: r.cancelled,
+        };
+      })
+      .reverse();
+    useProto.setState((st) => ({
+      nodes: { ...st.nodes, [id]: { ...st.nodes[id], history, active: { entryId: history.find((e) => !e.cancelled)!.id, index: 0 }, status: { state: "done" } } },
+    }));
+  }
 }
 seed();
 (window as unknown as { proto: typeof useProto }).proto = useProto;

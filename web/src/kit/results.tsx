@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ChevronLeft,
+  Ellipsis,
+  Info,
+  Square,
+  Trash2,
   Download,
   ChevronRight,
   History,
@@ -16,8 +20,12 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { GenStatus, MediaKind, Output, RunEntry } from "./types.ts";
+import type { FieldSpec, GenStatus, GenValue, MediaKind, ModelSpec, NodeSpec, Output, RefItem, RunEntry, RunJob } from "./types.ts";
 import { Markdown } from "./markdown.tsx";
+import { aspectOf, fieldValue, modelOf, resolveFields } from "./logic.ts";
+import { KitContext } from "./fields.tsx";
+import { Popover } from "./Popover.tsx";
+import { KIND_ICON } from "./Composer.tsx";
 
 const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -67,10 +75,12 @@ export function ResultView({
   outputs: Output[];
   index?: number;
   onPick?: (i: number) => void;
-  onOpen?: (o: Output) => void;
+  onOpen?: (o: Output, i: number) => void;
   size?: "node" | "card" | "full";
   onTime?: (t: number) => void;
 }) {
+  // In a feed a single click opens the run (Lumina); on a node it picks, double-click opens.
+  const card = size === "card";
   if (kind === "text") return <div className="kit-text">{<Markdown text={outputs[0]?.text ?? ""} />}</div>;
   if (kind === "image")
     return (
@@ -78,17 +88,17 @@ export function ResultView({
         {outputs.map((o, i) => (
           <button
             key={i}
-            className={`kit-img ${outputs.length > 1 && i === index ? "active" : ""}`}
-            onClick={() => outputs.length > 1 && onPick?.(i)}
-            onDoubleClick={() => onOpen?.(o)}
-            title={outputs.length > 1 ? "Click to use this one · double-click to open" : "Open"}
+            className={`kit-img ${!card && outputs.length > 1 && i === index ? "active" : ""}`}
+            onClick={() => (card ? onOpen?.(o, i) : outputs.length > 1 && onPick?.(i))}
+            onDoubleClick={() => !card && onOpen?.(o, i)}
+            title={card ? "Open details" : outputs.length > 1 ? "Click to use this one · double-click to open" : "Open"}
           >
             <img src={o.url} alt="" style={{ aspectRatio: `${o.width}/${o.height}` }} />
           </button>
         ))}
       </div>
     );
-  if (kind === "video") return <VideoPlayer output={outputs[0]} autoPlay={size !== "full"} onOpen={onOpen} onTime={onTime} />;
+  if (kind === "video") return <VideoPlayer output={outputs[0]} autoPlay={size !== "full"} onOpen={onOpen && ((o) => onOpen(o, 0))} onTime={onTime} />;
   return <AudioWave output={outputs[0]} />;
 }
 
@@ -269,56 +279,227 @@ export function RunStrip({
   );
 }
 
-/** Feed card used in a space: one per run. */
-export function RunCard({
-  entry,
-  kind,
-  active,
-  onUse,
-  onReEdit,
-  onRerun,
-  onOpen,
-}: {
-  entry: RunEntry;
-  kind: MediaKind;
-  active?: boolean;
-  onUse: () => void;
-  onReEdit: () => void;
-  onRerun: () => void;
-  onOpen: (o: Output) => void;
-}) {
+const pad = (n: number) => String(n).padStart(2, "0");
+/** Lumina feed stamp: 2026-10-02 10:46:24. */
+export function stamp(at: number) {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** Read-only prompt: "@label" tokens of the run's references become chips with their thumbnail. */
+export function PromptText({ text, refs = [] }: { text: string; refs?: RefItem[] }) {
+  if (!text.trim()) return <em className="kit-muted">(from inputs)</em>;
+  const known = refs.map((r) => "@" + r.label).sort((a, b) => b.length - a.length);
+  if (!known.length) return <>{text}</>;
+  const re = new RegExp(`(${known.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
   return (
-    <article className={`kit-card ${active ? "active" : ""}`}>
-      <header>
-        <time>{new Date(entry.at).toLocaleTimeString()}</time>
-        <p>{entry.value.prompt || <em>(from inputs)</em>}</p>
-        <div className="kit-meta">
-          <span>{entry.value.model}</span>
-          {entry.value.mode && <span>{entry.value.mode}</span>}
-          {Object.entries(entry.value.params)
-            .filter(([k, v]) => v !== undefined && typeof v !== "object" && k !== "system")
-            .slice(0, 4)
-            .map(([k, v]) => (
-              <span key={k}>
-                {k} {String(v)}
+    <>
+      {text.split(re).map((part, i) => {
+        const ref = refs.find((r) => "@" + r.label === part);
+        if (!ref) return part;
+        const Icon = KIND_ICON[ref.kind];
+        return (
+          <span key={i} className="kit-token kit-token-ref">
+            {ref.thumb ? <img src={ref.thumb} alt="" /> : <Icon size={11} />}
+            {ref.label}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+type Voices = { id: string; name: string }[];
+
+/** Human text for one parameter value, as a meta chip or a table cell shows it. */
+export function paramText(f: FieldSpec, v: unknown, voices: Voices = []): string {
+  if (v === undefined || v === null || v === "") return "";
+  if (f.type === "enum") return f.options?.find((o) => o.value === v)?.label ?? String(v);
+  if (f.type === "boolean") return v ? "on" : "off";
+  if (f.type === "duration") return `${v}${f.unit ?? "s"}`;
+  if (f.type === "voice") return voices.find((x) => x.id === v)?.name ?? String(v);
+  if (f.type === "size") {
+    const z = v as { ratio?: string; width?: number; height?: number; area?: string };
+    return z.area ?? (z.ratio && z.ratio !== "free" ? z.ratio : `${z.width ?? 2048}×${z.height ?? 2048}`);
+  }
+  if (f.type === "camera") {
+    const c = v as { camera?: string; lens?: string };
+    return [c.camera, c.lens].filter(Boolean).join(" · ");
+  }
+  if (typeof v === "object") return JSON.stringify(v);
+  return `${v}${f.unit ?? ""}`;
+}
+
+/** A run's parameters split like the composer: inline chips (and the voice) vs. the advanced rest. */
+export function runParams(node: NodeSpec, models: ModelSpec[], value: GenValue, voices: Voices = []) {
+  const model = modelOf(models, value.model);
+  const fields = resolveFields(node, model, value.mode);
+  const row = (f: FieldSpec) => ({ key: f.key, label: f.label, text: paramText(f, fieldValue(f, value.params), voices) });
+  const skip = (f: FieldSpec) => f.key === "system" || f.key === "vibe";
+  const inline = [...fields.inline, ...fields.advanced.filter((f) => f.type === "voice")]
+    .filter((f) => !skip(f) && !(f.type === "boolean" && !fieldValue(f, value.params)))
+    .map((f) => {
+      const r = row(f);
+      if (f.type === "boolean") return { ...r, text: f.label };
+      if (f.type === "voice") return { ...r, text: `Voice: ${r.text}` };
+      return r;
+    })
+    .filter((r) => r.text);
+  const advanced = fields.advanced.filter((f) => f.type !== "voice")
+    .filter((f) => !skip(f))
+    .map(row)
+    .filter((r) => r.text);
+  return { model, inline, advanced };
+}
+
+/** Line 3 of a feed card: Auto · model | mode | inline values | reference thumbnails | Advanced ⓘ. */
+export function RunMeta({ node, models, value, refs }: { node: NodeSpec; models: ModelSpec[]; value: GenValue; refs: RefItem[] }) {
+  const { voices } = useContext(KitContext);
+  const { model, inline, advanced } = runParams(node, models, value, voices);
+  const media = refs.filter((r) => r.kind !== "text");
+  return (
+    <div className="kit-meta kit-runmeta">
+      <span title={value.auto ? "Picked by the system" : "Pinned by hand"}>
+        {value.auto && <em>Auto · </em>}
+        {model.title}
+      </span>
+      {node.modes && value.mode && <span>{node.modes.find((m) => m.value === value.mode)?.label ?? value.mode}</span>}
+      {inline.map((r) => (
+        <span key={r.key} title={r.label}>
+          {r.text}
+        </span>
+      ))}
+      {media.length > 0 && (
+        <span className="kit-meta-refs" title={media.map((r) => r.label).join(", ")}>
+          {media.slice(0, 3).map((r) => {
+            const Icon = KIND_ICON[r.kind];
+            return r.thumb ? <img key={r.id} src={r.thumb} alt="" /> : <Icon key={r.id} size={12} />;
+          })}
+          {media.length > 3 && <b>+{media.length - 3}</b>}
+          References
+        </span>
+      )}
+      {advanced.length > 0 && (
+        <span className="kit-meta-adv" tabIndex={0}>
+          Advanced <Info size={11} />
+          <span className="kit-meta-table" role="tooltip">
+            {advanced.map((r) => (
+              <span key={r.key}>
+                <span>{r.label}</span>
+                <b>{r.text}</b>
               </span>
             ))}
-          <span>seed {entry.seed}</span>
-        </div>
-      </header>
+          </span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Feed card in a space, line by line like Lumina (I02, V02): timestamp · prompt with reference
+ * chips · meta · result · Re-edit / Regenerate / 🗑. A job in flight shows its progress and Stop;
+ * a stopped run keeps its card with a quiet "cancelled". No billing.
+ */
+export function FeedCard({
+  node,
+  models,
+  entry,
+  job,
+  canStop = true,
+  onReEdit,
+  onRerun,
+  onDelete,
+  onStop,
+  onOpen,
+  onDownload,
+  onOpenInCanvas,
+}: {
+  node: NodeSpec;
+  models: ModelSpec[];
+  entry?: RunEntry;
+  job?: RunJob;
+  /** Some models can't be stopped once started; Stop is then disabled. */
+  canStop?: boolean;
+  onReEdit?: () => void;
+  onRerun?: () => void;
+  onDelete?: () => void;
+  onStop?: () => void;
+  onOpen?: (index: number) => void;
+  onDownload?: (o: Output) => void;
+  onOpenInCanvas?: () => void;
+}) {
+  const run = (entry ?? job)!;
+  const kind = node.output;
+  const refs = (entry as { refs?: RefItem[] } | undefined)?.refs ?? job?.refs ?? [];
+  return (
+    <article className={`kit-feedcard ${job ? "running" : ""} ${entry?.cancelled ? "cancelled" : ""}`} data-run={run.id}>
+      <time>{stamp(run.at)}</time>
+      <p className="kit-feed-prompt">
+        <PromptText text={run.value.prompt} refs={refs} />
+      </p>
+      <RunMeta node={node} models={models} value={run.value} refs={refs} />
       <div className="kit-card-body">
-        <ResultView kind={kind} outputs={entry.outputs} onOpen={onOpen} size="card" />
+        {job ? (
+          <StatusOverlay status={job.status} kind={kind} aspect={aspectOf(job.value, kind === "video" ? 16 / 9 : 1)} />
+        ) : entry?.cancelled ? (
+          <span className="kit-cancelled">cancelled</span>
+        ) : (
+          entry && (
+            <div className="kit-feed-result">
+              <ResultView kind={kind} outputs={entry.outputs} onOpen={(_, i) => onOpen?.(i)} size="card" />
+              <Popover
+                width={170}
+                align="end"
+                trigger={(open, toggle) => (
+                  <button className={`kit-feed-more ${open ? "open" : ""}`} onClick={toggle} aria-label="More">
+                    <Ellipsis size={15} />
+                  </button>
+                )}
+              >
+                {(close) => (
+                  <div className="kit-menu kit-menu-icons">
+                    {onOpen && (
+                      <button onClick={() => (close(), onOpen(0))}>
+                        <Info size={13} /> Details
+                      </button>
+                    )}
+                    {kind !== "text" && entry.outputs[0] && (
+                      <button onClick={() => (close(), onDownload?.(entry.outputs[0]))}>
+                        <Download size={13} /> Download
+                      </button>
+                    )}
+                    <button onClick={() => (close(), onOpenInCanvas?.())}>
+                      <ChevronRight size={13} /> Open in canvas
+                    </button>
+                    <button className="danger" onClick={() => (close(), onDelete?.())}>
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  </div>
+                )}
+              </Popover>
+            </div>
+          )
+        )}
       </div>
       <footer>
-        <button onClick={onReEdit}>
-          <Pencil size={12} /> Re-edit
-        </button>
-        <button onClick={onRerun}>
-          <RotateCcw size={12} /> Regenerate
-        </button>
-        <button onClick={onUse} className={active ? "on" : ""}>
-          {active ? "In use" : "Use this"}
-        </button>
+        {job ? (
+          <button onClick={onStop} disabled={!canStop} title={canStop ? "Terminate generation" : "Generating, cannot cancel"}>
+            <Square size={10} fill="currentColor" /> Stop
+          </button>
+        ) : (
+          <>
+            <button onClick={onReEdit}>
+              <Pencil size={12} /> Re-edit
+            </button>
+            <button onClick={onRerun}>
+              <RotateCcw size={12} /> Regenerate
+            </button>
+            <button onClick={onDelete} aria-label="Delete" title="Delete">
+              <Trash2 size={12} />
+            </button>
+          </>
+        )}
       </footer>
     </article>
   );

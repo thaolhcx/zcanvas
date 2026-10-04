@@ -2,8 +2,9 @@
 // Each space is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
 import { useCallback, useEffect, useState } from "react";
 import { Composer } from "../kit/Composer.tsx";
-import { RunCard, StatusOverlay } from "../kit/results.tsx";
-import { aspectOf } from "../kit/logic.ts";
+import { FeedCard } from "../kit/results.tsx";
+import { modelOf } from "../kit/logic.ts";
+import type { Output } from "../kit/types.ts";
 import { useGenSource } from "./adapter.ts";
 import { NODES } from "./catalog.ts";
 import { useProto } from "./store.ts";
@@ -64,37 +65,46 @@ function GenFeed({ id }: { id: string }) {
   const open = useLightbox((s) => s.open);
   if (!source) return null;
   const api = useProto.getState();
-  const busy = source.status.state === "queued" || source.status.state === "running";
-  const kind = source.node.output;
+  const model = modelOf(source.models, source.value.model);
+  // Lumina: oldest at the top, newest just above the composer; runs in flight come last.
+  const entries = [...source.history].reverse();
+  const jobs = source.jobs ?? [];
+  const download = (o: Output) => {
+    const a = document.createElement("a");
+    a.href = o.url ?? "";
+    a.download = `${source.node.output}-${Date.now()}`;
+    a.click();
+  };
   return (
     <main className="proto-gen-main">
       <section className="proto-feed">
-        {busy && (
-          <article className="kit-card">
-            <header>
-              <p>{source.value.prompt || <em>(from inputs)</em>}</p>
-            </header>
-            <div className="kit-card-body">
-              <StatusOverlay status={source.status} kind={kind} aspect={aspectOf(source.value, kind === "video" ? 16 / 9 : 1)} />
-            </div>
-          </article>
-        )}
-        {source.history.map((e) => (
-          <RunCard
+        {entries.map((e) => (
+          <FeedCard
             key={e.id}
+            node={source.node}
+            models={source.models}
             entry={e}
-            kind={kind}
-            active={(source.active?.entryId ?? source.history[0]?.id) === e.id}
-            onUse={() => source.setActive(e.id)}
             onReEdit={() => source.reEdit(e.id)}
             onRerun={() => {
               source.reEdit(e.id);
               setTimeout(() => api.run(id), 0);
             }}
-            onOpen={open}
+            onOpen={(i) => e.outputs[i] && open(e.outputs[i])}
+            onDownload={download}
+            onOpenInCanvas={() => api.toast("Open in canvas is not in this prototype.", "info")}
           />
         ))}
-        {!busy && !source.history.length && (
+        {jobs.map((j) => (
+          <FeedCard
+            key={j.id}
+            node={source.node}
+            models={source.models}
+            job={j}
+            canStop={model.cancel !== "never" && !(model.cancel === "queued" && j.status.state === "running")}
+            onStop={() => source.cancel(j.id)}
+          />
+        ))}
+        {!jobs.length && !entries.length && (
           <div className="proto-feed-empty">
             <h2>Light up your creation</h2>
           </div>

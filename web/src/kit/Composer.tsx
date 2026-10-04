@@ -192,7 +192,7 @@ export function RunButton({ source, busy, cancel = "always" }: { source: GenSour
     );
   if (busy)
     return (
-      <button className="kit-runbtn stop" onClick={source.cancel} title="Stop">
+      <button className="kit-runbtn stop" onClick={() => source.cancel()} title="Stop">
         <Square size={11} fill="currentColor" />
       </button>
     );
