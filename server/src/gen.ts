@@ -105,6 +105,13 @@ export interface StoredRequest {
 }
 
 // ---------------------------------------------------------------- requests
+/** System prompts behind the Text presets ("What to write"); a node's own system prompt wins. */
+export const PRESET_SYSTEM: Record<string, string> = {
+  copy: "You write short, vivid advertising copy: a headline, one or two lines, a call to action. Plain text or light Markdown.",
+  enrich: "You turn a short idea into a detailed image or video generation prompt: subject, setting, lighting, lens, mood and style, one paragraph. Answer with the prompt only.",
+  describe: "You describe the provided media precisely: subject, composition, colours, light and mood. No preamble.",
+  script: "You write a shot-by-shot script or storyboard: numbered shots with timing, framing, action and sound.",
+};
 type Incoming = { edge: RecipeEdge; values: Output[] };
 const isAsset = (v: Output): v is Asset => "id" in v && "mime" in v;
 const MEDIA_ORDER = ["image", "audio", "video"] as const;
@@ -189,7 +196,12 @@ export function buildRequest(
   );
   if (!model) throw new ProviderError(`No ${MODEL_KIND[task]} model "${String(node.params.model)}" in the catalog`);
   // image.edit has no catalog params of its own: its node params go through as is.
-  const params = task === "image-edit" ? { ...node.params } : modelParams(model, node.params, mode);
+  const preset = typeof node.params.preset === "string" ? node.params.preset : undefined;
+  const params =
+    task === "image-edit"
+      ? { ...node.params }
+      : { ...modelParams(model, node.params, mode), ...(task === "llm" && preset ? { preset } : {}) };
+  const ownSystem = typeof node.params.system === "string" ? node.params.system.trim() : "";
   return {
     task,
     model: model.key,
@@ -201,7 +213,7 @@ export function buildRequest(
     refs: refs.map(({ source: _source, ...r }) => r),
     ...(task === "llm"
       ? {
-          system: typeof node.params.system === "string" ? node.params.system : undefined,
+          system: ownSystem || (preset ? PRESET_SYSTEM[preset] : undefined),
           effort: typeof node.params.effort === "string" ? node.params.effort : undefined,
         }
       : {}),
@@ -388,14 +400,17 @@ async function autoPrompt(job: JobRow, stored: StoredRequest, signal: AbortSigna
   const intent = stored.intent.trim();
   if (!intent) return undefined;
   const kind = MODEL_KIND[stored.task];
+  const llm = resolveModel(models, "llm", "auto");
+  if (!llm) return undefined;
+  const adapter = adapterFor(llm);
   let text: string;
-  if (config.mock) {
+  if (adapter.name === "mock") {
+    // The mock LLM cannot rewrite: it adds a fixed tail and keeps the words.
     await sleep(Number(process.env.MOCK_DELAY_MS ?? 200) / 2, undefined, { signal });
     text = mockRewrite(intent, kind);
   } else {
-    const llm = resolveModel(models, "llm", "auto");
-    if (!llm || !adapterFor(llm).available(llm)) return undefined;
-    const result = await adapterFor(llm).submit(
+    if (!adapter.available(llm)) return undefined;
+    const result = await adapter.submit(
       { jobId: job.id, runId: job.run_id, nodeId: job.node_id, task: "llm", model: llm, prompt: intent, params: {}, refs: [], system: AUTO_PROMPT_SYSTEM[kind] ?? AUTO_PROMPT_SYSTEM.image, effort: "low" },
       async () => new Uint8Array(),
       signal,

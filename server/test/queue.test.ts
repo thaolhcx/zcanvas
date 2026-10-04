@@ -299,6 +299,30 @@ describe("references, Auto prompt and keep", () => {
   });
 });
 
+describe("Text", () => {
+  it("writes text through the queue with the preset's system prompt and image context", async () => {
+    const asset = (await upload(app, await png("bag.png"))).json<Asset>();
+    const r = recipe(
+      [
+        node("a", "input.asset", { asset: asset.id }, 1),
+        node("t", "text.generate", { model: "auto", preset: "enrich", prompt: `coffee bag ${crypto.randomUUID()}` }, 1),
+      ],
+      [{ id: "e", source: "a", sourcePort: "asset", target: "t", targetPort: "context" }],
+    );
+    const done = await finished((await start(r, "t")).runId);
+    expect(done.status).toBe("done");
+    const job = done.jobs.find((j) => j.nodeId === "t")!;
+    expect(job.model).toBe("seed-2-0-pro");
+    expect((job.outputs!.text as { value: string }).value).toMatch(/^coffee bag .*warm soft backlight/);
+    expect(job.finalPrompt).toBeUndefined();
+    const stored = (await db.query("SELECT request FROM jobs WHERE id=$1", [job.jobId])).rows[0].request;
+    expect(stored.system).toMatch(/detailed image or video generation prompt/);
+    expect(stored.refs).toEqual([expect.objectContaining({ assetId: asset.id, role: "context", kind: "image" })]);
+    const history = (await app.inject(`/canvases/${canvasId}/nodes/t/history`)).json<HistoryResponse>();
+    expect(history.items[0].text).toMatch(/warm soft backlight/);
+  });
+});
+
 describe("Studio pages and node history", () => {
   it("gives each user one hidden canvas per kind, kept out of the canvas list", async () => {
     const a = (await app.inject("/studio/video")).json<StudioCanvas>();

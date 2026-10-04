@@ -355,4 +355,45 @@ describe("through the queue", () => {
     expect(clip.generation?.provider).toEqual({ name: "byteplus", model: "dreamina-seedance-2-5-260628", requestId: "cgt-q" });
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
   });
+  it("Auto prompt rewrites with the LLM, keeps @ tokens, and the model gets image 1", async () => {
+    setAdapterForTests(new BytePlusAdapter(() => env()));
+    const { upload: up, png: image } = await import("./helpers.ts");
+    const asset = (await up(app, await image("logo.png"))).json<Asset>();
+    const token = `@[Logo](asset:${asset.id})`;
+    let rewrite = `${token} printed on a matte coffee bag, soft morning light, 50mm`;
+    on("POST", /chat\/completions$/, () => ok({ choices: [{ message: { content: rewrite } }] }));
+    on("POST", /images\/generations$/, () => ok({ data: [{ b64_json: imageBytes.toString("base64") }] }));
+    const canvasId = (await app.inject({ method: "POST", url: "/canvases", payload: { name: "Auto prompt" } })).json().canvasId;
+    const make = (intent: string): Recipe => ({
+      schema: "recipe/v1",
+      meta: { id: canvasId, name: "a", version: 1, registryVersion: "x" },
+      nodes: [
+        { id: "a", type: "input.asset", typeVersion: 1, position: { x: 0, y: 0 }, params: { asset: asset.id } },
+        { id: "i", type: "image.generate", typeVersion: 2, position: { x: 0, y: 0 }, params: { model: "auto", prompt: intent } },
+      ],
+      edges: [{ id: "e", source: "a", sourcePort: "asset", target: "i", targetPort: "reference" }],
+      groups: [],
+    });
+    const runOnce = async (intent: string) => {
+      const run = (await app.inject({ method: "POST", url: "/runs", payload: { recipe: make(intent), canvasId, graphVersion: 1, target: "i" } })).json<Run>();
+      return until(async () => {
+        const r = (await app.inject(`/runs/${run.runId}`)).json<Run>();
+        return r.status !== "running" && r;
+      }, 20000);
+    };
+    const intent = `${token} on a bag ${crypto.randomUUID()}`;
+    const done = await runOnce(intent);
+    const job = done.jobs.find((j) => j.nodeId === "i")!;
+    expect(job).toMatchObject({ intent, finalPrompt: rewrite });
+    const chat = calls.find((c) => /chat\/completions/.test(c.url))!;
+    expect(chat.body.messages[0].content).toMatch(/Keep every token/);
+    expect(chat.body.messages[1].content[0].text).toBe(intent);
+    const seedream = calls.find((c) => /images\/generations/.test(c.url))!;
+    expect(seedream.body.prompt).toBe("image 1 printed on a matte coffee bag, soft morning light, 50mm");
+    // A rewrite that loses a token is not used: the intent goes through as typed.
+    calls = [];
+    rewrite = "a matte coffee bag, soft light";
+    const second = (await runOnce(`${token} again ${crypto.randomUUID()}`)).jobs.find((j) => j.nodeId === "i")!;
+    expect(second.finalPrompt).toBe(second.intent);
+  });
 });
