@@ -58,6 +58,8 @@ Mô hình mới: **gửi, ghi lại, hỏi lại sau**.
 
 Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ chế: mỗi bước là một job, trạng thái nằm trong Postgres, chờ media thì ngủ và được đánh thức khi job xong. Không cần thư viện durable workflow nào.
 
+**Mẫu tham khảo:** harness của AI SDK 6 (`Agent` là interface, `ToolLoopAgent` là bản mặc định): chỉ dẫn + tool + điều kiện dừng, móc trước và sau mỗi bước, tin nhắn chia phần (chữ, gọi tool, kết quả tool), tool cần người duyệt. Vòng lặp của mình theo đúng hình dạng đó để sau này có thể cài interface `Agent` lên hàng đợi của mình, dùng lại thư viện và UI của họ mà không phụ thuộc hạ tầng Vercel.
+
 ## 4. Các bước
 
 | Bước | Nội dung | Xong khi |
@@ -88,4 +90,4 @@ P1 và P2 làm song song được sau P0. P4 và P5 dùng chung `GenSource` th�
 ## Nguồn
 
 - [BytePlus ModelArk SDK overview](https://docs.byteplus.com/en/docs/ModelArk/1302007) · [OpenAI compatibility](https://docs.byteplus.com/api/docs/ModelArk/1330626) · [Video Generation API](https://docs.byteplus.com/en/docs/ModelArk/Video_Generation_API)
-- [@ai-sdk/bytedance](https://www.npmjs.com/package/@ai-sdk/bytedance)
+- [AI SDK 6](https://vercel.com/blog/ai-sdk-6) · [@ai-sdk/bytedance](https://www.npmjs.com/package/@ai-sdk/bytedance)
