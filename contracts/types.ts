@@ -8,12 +8,28 @@ export type WH = { w: number; h: number };
 export type AssetKind = "image" | "video" | "audio";
 export type ValueKind = AssetKind | "text" | "json";
 export type Kind = ValueKind | "any" | `list<${ValueKind}>`;
+/**
+ * An input port is a **role** (`first`, `last`, `reference`, `source`, `voice`…):
+ * `RecipeEdge.targetPort` names the role the input fills.
+ */
 export interface Port {
   key: string;
   kind: Kind | Kind[];
+  /** With `modes`: required only in those modes. */
   required?: boolean;
   multiple?: boolean;
   label?: string;
+  /** How many inputs this role takes (e.g. one first frame). */
+  max?: number;
+  /** The role only exists in these modes of the node. */
+  modes?: string[];
+}
+/** An explicit mode tab of a node (Text to video, First & last frame…). */
+export interface NodeMode {
+  value: string;
+  label: string;
+  /** Input kind the mode cannot run without. */
+  needs?: ValueKind;
 }
 interface ParamCommon {
   label?: string;
@@ -47,6 +63,8 @@ export type Param = ParamCommon &
     | { type: "asset"; kind: AssetKind }
     | { type: "color"; default?: string }
     | { type: "json"; schema: Record<string, unknown> }
+    /** A model from the catalog (`GET /models`) of this kind, or "auto". */
+    | { type: "model"; kind: import("./models.ts").ModelKind; default?: string }
   );
 export interface NodeType {
   type: string;
@@ -58,6 +76,7 @@ export interface NodeType {
   inputs: Port[];
   outputs: Port[];
   params: Record<string, Param>;
+  modes?: NodeMode[];
   runner:
     | { kind: "flow" }
     | {
@@ -148,7 +167,13 @@ export type IssueCode =
   | "PARAM_VALUE"
   | "PARAM_REQUIRED"
   | "INPUT_REQUIRED"
-  | "GROUP";
+  | "GROUP"
+  /** An input is connected to a role the current mode does not have. */
+  | "MODE"
+  /** The model cannot take these inputs (too many, wrong kind). */
+  | "MODEL"
+  /** An `@` token in a prompt points to nothing connected. */
+  | "REFERENCE";
 export interface Issue {
   code: IssueCode;
   severity: "error" | "warning";
@@ -208,6 +233,11 @@ export interface Asset {
   /** Source run/node of a generated asset. Kept for older clients; see `source`. */
   createdBy?: { runId: string; nodeId: string };
   createdAt: string;
+  /**
+   * Shown in the media library. Uploads are kept; generated results are kept
+   * once used (added to a canvas, downloaded, used as a reference) or kept by hand.
+   */
+  kept?: boolean;
   // Catalog fields. Optional so assets saved before the catalog stay valid.
   name?: string;
   spaceId?: string;
@@ -241,10 +271,21 @@ export interface Job {
   outputs?: Outputs;
   error?: { code: string; message: string };
   credits?: number;
+  /** Model jobs: the catalog model that runs (Auto resolved). */
+  model?: string;
+  /** Waiting for a free provider slot: position in that model's line (1 = next). */
+  queuePosition?: number;
+  /** When the provider is expected to finish (ISO), from past run times. */
+  eta?: string;
+  /** What the user typed and what was sent after Auto prompt. */
+  intent?: string;
+  finalPrompt?: string;
 }
 export interface Run {
   runId: string;
   canvasId: string;
+  /** Run one node (and the upstream work it still needs). */
+  target?: NodeId;
   graphVersion: number;
   status: RunStatus;
   credits: number;

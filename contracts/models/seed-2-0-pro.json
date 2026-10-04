@@ -1,0 +1,16 @@
+{
+  "key": "seed-2-0-pro",
+  "title": "Seed 2.0 Pro",
+  "description": "Writes, rewrites and describes. Reads images.",
+  "kind": "llm",
+  "provider": "byteplus",
+  "providerModel": "seed-2-0-pro-260328",
+  "vendor": "bytedance",
+  "default": true,
+  "accepts": { "text": { "max": 20 }, "image": { "max": 8 } },
+  "fields": [],
+  "cancel": "always",
+  "sync": true,
+  "eta": { "baseSec": 8, "deadlineSec": 180 },
+  "slots": 8
+}

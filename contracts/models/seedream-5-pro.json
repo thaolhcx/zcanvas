@@ -1,0 +1,32 @@
+{
+  "key": "seedream-5-pro",
+  "title": "Seedream 5.0 Pro",
+  "description": "Images from a prompt and up to 10 references.",
+  "kind": "image",
+  "provider": "byteplus",
+  "providerModel": "dola-seedream-5-0-pro-260628",
+  "vendor": "bytedance",
+  "default": true,
+  "accepts": { "text": { "max": 20 }, "image": { "max": 10 } },
+  "fields": [
+    {
+      "key": "ratio", "label": "Aspect ratio", "type": "enum", "placement": "inline", "group": "frame", "display": "tiles", "default": "1:1",
+      "options": [
+        { "value": "1:1", "label": "1:1" }, { "value": "4:3", "label": "4:3" }, { "value": "3:4", "label": "3:4" },
+        { "value": "16:9", "label": "16:9" }, { "value": "9:16", "label": "9:16" }, { "value": "3:2", "label": "3:2" },
+        { "value": "2:3", "label": "2:3" }, { "value": "21:9", "label": "21:9" }
+      ]
+    },
+    {
+      "key": "resolution", "label": "Resolution", "type": "enum", "placement": "inline", "group": "frame", "display": "segment", "default": "2K",
+      "help": "Seedream 5.0 Pro has no 4K preset",
+      "options": [{ "value": "1K", "label": "1K" }, { "value": "2K", "label": "2K" }]
+    },
+    { "key": "count", "label": "Images", "type": "number", "placement": "inline", "min": 1, "max": 4, "step": 1, "default": 1 }
+  ],
+  "cancel": "never",
+  "sync": true,
+  "limits": { "pixels": { "min": 921600, "max": 4624220 }, "promptChars": 4000 },
+  "eta": { "baseSec": 12, "perOutputSec": 14, "deadlineSec": 600 },
+  "slots": 6
+}

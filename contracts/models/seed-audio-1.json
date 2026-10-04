@@ -1,0 +1,23 @@
+{
+  "key": "seed-audio-1",
+  "title": "Seed Audio 1.0",
+  "description": "Speech from text. Needs the BytePlus Voice key.",
+  "kind": "audio",
+  "provider": "byteplus",
+  "providerModel": "seed-audio-1.0",
+  "vendor": "bytedance",
+  "default": true,
+  "accepts": { "text": { "max": 20 } },
+  "fields": [
+    { "key": "voice", "label": "Voice", "type": "string", "placement": "advanced", "help": "Speaker id from the BytePlus Voice console; empty = the model's default voice", "placeholder": "Default voice" },
+    {
+      "key": "format", "label": "Format", "type": "enum", "placement": "more", "default": "mp3",
+      "options": [{ "value": "mp3", "label": "mp3" }, { "value": "wav", "label": "wav" }]
+    }
+  ],
+  "cancel": "always",
+  "sync": true,
+  "limits": { "promptChars": 2048 },
+  "eta": { "baseSec": 6, "deadlineSec": 180 },
+  "slots": 4
+}

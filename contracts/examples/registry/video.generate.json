@@ -1,16 +1,26 @@
 {
-  "type": "video.generate", "version": 1, "title": "Generate video", "category": "video",
-  "description": "Image-to-video. Long job.",
+  "type": "video.generate", "version": 2, "title": "Generate video", "category": "video",
+  "description": "Video from text, first and last frames, or references. Long job.",
+  "modes": [
+    { "value": "text", "label": "Text to video" },
+    { "value": "frames", "label": "First & last frame", "needs": "image" },
+    { "value": "reference", "label": "Omni reference" }
+  ],
   "inputs": [
-    { "key": "image", "kind": "image", "required": true },
-    { "key": "prompt", "kind": "text", "required": false }
+    { "key": "prompt", "kind": "text", "multiple": true, "label": "Prompt" },
+    { "key": "first", "kind": "image", "label": "First frame", "modes": ["frames"], "required": true },
+    { "key": "last", "kind": "image", "label": "Last frame", "modes": ["frames"] },
+    { "key": "reference", "kind": ["image", "video", "audio"], "multiple": true, "label": "Reference", "modes": ["reference"] }
   ],
   "outputs": [{ "key": "video", "kind": "video" }],
   "params": {
-    "model": { "type": "enum", "options": ["seedance-1.5", "kling-2"], "default": "seedance-1.5" },
-    "durationSec": { "type": "number", "min": 3, "max": 15, "step": 1, "default": 5, "unit": "s" }
+    "model": { "type": "model", "kind": "video", "default": "auto", "label": "Model" },
+    "mode": { "type": "enum", "options": ["text", "frames", "reference"], "default": "text", "label": "Mode" },
+    "prompt": { "type": "string", "multiline": true, "label": "Prompt", "placeholder": "Describe the shot. Type @ to use an input" },
+    "autoPrompt": { "type": "boolean", "default": true, "label": "Auto prompt", "help": "An LLM rewrites the prompt for the model before generating", "advanced": true }
   },
-  "runner": { "kind": "job", "worker": "video-gen", "timeoutSec": 900, "concurrency": 2 },
+  "runner": { "kind": "job", "worker": "video-gen", "timeoutSec": 3600, "concurrency": 2 },
   "cost": { "unit": "credit_per_second", "estimate": 2 },
-  "ui": { "previewPort": "video" }
+  "ui": { "previewPort": "video" },
+  "migrate": "contracts/migrate.ts"
 }

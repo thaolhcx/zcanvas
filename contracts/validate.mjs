@@ -4,11 +4,15 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import registryDefinition from './schemas/registry.schema.json' with { type: 'json' };
 import recipeDefinition from './schemas/recipe.schema.json' with { type: 'json' };
+import modelDefinition from './schemas/model.schema.json' with { type: 'json' };
+import { resolveModel, inputProblems, fieldProblem } from './models.ts';
+import { promptRefs } from './prompt.ts';
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
 const registrySchema = ajv.compile(registryDefinition);
 const recipeSchema = ajv.compile(recipeDefinition);
+const modelSchema = ajv.compile(modelDefinition);
 
 // --- kinds ---------------------------------------------------------------
 const isList = k => typeof k === 'string' && k.startsWith('list<');
@@ -20,8 +24,22 @@ const accepts = (declared, actual) => {
   return opts.some(d => d === 'any' || kinds.some(k => k === 'any' || d === k));
 };
 
-/** Returns Issue[]: { code, severity, nodeId?, edgeId?, paramKey?, message } */
-export function validate(recipe, registry) {
+const strip = k => (isList(k) ? inner(k) : k);
+/** The node's current mode: its `mode` param, else the param's default, else the first mode. */
+export function modeOf(node, type) {
+  if (!type?.modes) return undefined;
+  const v = node.params.mode ?? type.params.mode?.default;
+  return typeof v === 'string' ? v : type.modes[0].value;
+}
+const inMode = (port, mode) => !port.modes || mode === undefined || port.modes.includes(mode);
+
+/**
+ * Returns Issue[]: { code, severity, nodeId?, edgeId?, paramKey?, message }.
+ * With `models` (the catalog), model params are checked against the model a node
+ * runs; without it, params a node keeps for its model are not judged.
+ * `assetKinds` (asset id → kind) tells what an input.asset node holds.
+ */
+export function validate(recipe, registry, models, assetKinds) {
   const issues = [];
   const err = (code, message, where = {}) => issues.push({ code, severity: 'error', message, ...where });
 
@@ -43,7 +61,7 @@ export function validate(recipe, registry) {
   for (const n of recipe.nodes) {
     const t = registry.get(n.type);
     if (!t) { err('UNKNOWN_TYPE', `unknown type ${n.type}`, { nodeId: n.id }); continue; }
-    if (n.typeVersion !== t.version && !t.migrate)
+    if (n.typeVersion > t.version || (n.typeVersion !== t.version && !t.migrate))
       err('VERSION', `${n.type} v${n.typeVersion} has no migrate path to v${t.version}`, { nodeId: n.id });
   }
 
@@ -103,9 +121,40 @@ export function validate(recipe, registry) {
   // 7. params valid, required set;  required inputs connected
   for (const n of recipe.nodes) {
     const t = registry.get(n.type); if (!t) continue;
+    const modelParam = Object.entries(t.params).find(([, p]) => p.type === 'model');
+    const mode = modeOf(n, t);
+    // Kinds arriving at this node (lists count as their items).
+    const kinds = recipe.edges.filter(e => e.target === n.id).map(e => {
+      const actual = effOut.get(e.source)?.get(e.sourcePort);
+      const port = t.inputs.find(p => p.key === e.targetPort);
+      if (!actual || !port) return undefined;
+      const src = nodes.get(e.source);
+      if (src?.type === 'input.asset' && assetKinds?.[src.params.asset]) return assetKinds[src.params.asset];
+      // A source that may be several kinds (input.asset) counts as the one kind the role takes.
+      const options = (Array.isArray(actual) ? actual : [actual]).map(strip);
+      const allowed = Array.isArray(port.kind) ? port.kind.map(strip) : [strip(port.kind)];
+      const both = options.filter(k => allowed.includes(k) || allowed.includes('any'));
+      return both.length === 1 ? both[0] : options.length === 1 ? options[0] : undefined;
+    }).filter(k => k && k !== 'any' && k !== 'json');
+    const model = modelParam && models ? resolveModel(models, modelParam[1].kind, n.params[modelParam[0]] ?? modelParam[1].default, kinds, mode) : undefined;
     for (const [k, v] of Object.entries(n.params)) {
       const p = t.params[k];
+      if (!p && modelParam) {
+        // Params a node keeps for its model: judged against the catalog when it is given.
+        if (!models) continue;
+        const field = models.filter(m => m.kind === modelParam[1].kind).flatMap(m => m.fields).find(f => f.key === k);
+        if (!field) { err('PARAM_UNKNOWN', `${n.type} has no param ${k}`, { nodeId: n.id, paramKey: k }); continue; }
+        const own = model?.fields.find(f => f.key === k);
+        const problem = own && fieldProblem(own, v);
+        if (problem) err('PARAM_VALUE', problem, { nodeId: n.id, paramKey: k });
+        continue;
+      }
       if (!p) { err('PARAM_UNKNOWN', `${n.type} has no param ${k}`, { nodeId: n.id, paramKey: k }); continue; }
+      if (p.type === 'model') {
+        const ok = typeof v === 'string' && (!models || v === 'auto' || models.some(m => m.key === v && m.kind === p.kind));
+        if (!ok) err('PARAM_VALUE', `${n.type}.${k}: ${JSON.stringify(v)} is not a ${p.kind} model`, { nodeId: n.id, paramKey: k });
+        continue;
+      }
       const bad = (
         (p.type === 'enum'    && !p.options.map(o => typeof o === 'string' ? o : o.value).includes(v)) ||
         (p.type === 'number'  && (typeof v !== 'number' || !Number.isFinite(v) || (p.step != null && Math.abs((v - (p.min ?? 0)) / p.step - Math.round((v - (p.min ?? 0)) / p.step)) > 1e-8) || (p.min != null && v < p.min) || (p.max != null && v > p.max))) ||
@@ -119,9 +168,33 @@ export function validate(recipe, registry) {
     }
     for (const [k, p] of Object.entries(t.params))
       if (p.required && n.params[k] == null && p.default == null) err('PARAM_REQUIRED', `${n.type}.${k} is required`, { nodeId: n.id, paramKey: k });
-    for (const p of t.inputs)
-      if (p.required && !recipe.edges.some(e => e.target === n.id && e.targetPort === p.key))
-        err('INPUT_REQUIRED', `${n.id}: input ${p.key} is not connected`, { nodeId: n.id });
+    for (const p of t.inputs) {
+      const incoming = recipe.edges.filter(e => e.target === n.id && e.targetPort === p.key);
+      if (p.required && inMode(p, mode) && !incoming.length)
+        err('INPUT_REQUIRED', `${n.id}: input ${p.label ?? p.key} is not connected`, { nodeId: n.id });
+      if (incoming.length && !inMode(p, mode))
+        for (const e of incoming) err('MODE', `${p.label ?? p.key} is not used in this mode`, { nodeId: n.id, edgeId: e.id });
+      if (p.max && incoming.length > p.max)
+        err('FAN_IN', `${p.label ?? p.key} takes at most ${p.max} input${p.max === 1 ? '' : 's'}`, { nodeId: n.id });
+    }
+    const modeSpec = t.modes?.find(m => m.value === mode);
+    if (t.modes && !modeSpec) err('MODE', `${n.type} has no mode ${mode}`, { nodeId: n.id, paramKey: 'mode' });
+    if (modeSpec?.needs && !kinds.includes(modeSpec.needs))
+      err('MODE', `${modeSpec.label} needs a ${modeSpec.needs} input`, { nodeId: n.id, paramKey: 'mode' });
+    if (model) {
+      if (mode && model.modes && !model.modes.includes(mode))
+        err('MODEL', `${model.title} can't do ${modeSpec?.label ?? mode}`, { nodeId: n.id, paramKey: modelParam[0] });
+      for (const problem of inputProblems(model, kinds)) err('MODEL', problem, { nodeId: n.id, paramKey: modelParam[0] });
+    } else if (modelParam && models)
+      err('MODEL', `No ${modelParam[1].kind} model is available`, { nodeId: n.id, paramKey: modelParam[0] });
+    // @ tokens must point to something connected to this node.
+    if (typeof n.params.prompt === 'string')
+      for (const ref of promptRefs(n.params.prompt)) {
+        const linked = recipe.edges.some(e => e.target === n.id && (ref.scheme === 'node'
+          ? e.source === ref.id
+          : nodes.get(e.source)?.type === 'input.asset' && nodes.get(e.source)?.params.asset === ref.id));
+        if (!linked) err('REFERENCE', `@${ref.label} is not connected any more`, { nodeId: n.id, paramKey: 'prompt' });
+      }
   }
 
   // 8. groupId points to an existing group
@@ -154,6 +227,10 @@ export function validateTemplate(recipe, registry) {
     seen.add(key);
   });
   return issues;
+}
+
+export function checkModelEntry(entry) {
+  return modelSchema(entry) ? [] : modelSchema.errors.map(e => `${e.instancePath} ${e.message}`);
 }
 
 export function checkRegistryEntry(entry) {

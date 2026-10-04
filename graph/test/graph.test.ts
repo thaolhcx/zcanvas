@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { Graph, GraphError, Y, emptyRecipe } from "../src/index.ts";
-import { loadRegistry } from "../../contracts/node.mjs";
+import { loadModels, loadRegistry } from "../../contracts/node.mjs";
 import pilot from "../../contracts/examples/pilot.recipe.json" with { type: "json" };
 import type { Recipe } from "../../contracts/index.ts";
 const registry = loadRegistry(
   new URL("../../contracts/examples/registry/", import.meta.url).pathname,
 );
-const create = () => new Graph(new Y.Doc(), registry, emptyRecipe());
+const models = loadModels(
+  new URL("../../contracts/models/", import.meta.url).pathname,
+);
+const create = () => new Graph(new Y.Doc(), registry, emptyRecipe(), models);
 const content = (r: Recipe) => ({
   nodes: r.nodes,
   edges: r.edges,
@@ -64,10 +67,16 @@ describe("Graph API using real Yjs documents", () => {
   });
   it("allows incomplete drafts, rejects fractional count and non-finite values", () => {
     const g = create();
-    const id = g.addNode("image.generate");
+    const video = g.addNode("video.generate", { params: { mode: "frames" } });
     expect(g.validate().map((i) => i.code)).toContain("INPUT_REQUIRED");
+    const id = g.addNode("image.generate");
     expect(() => g.setParam(id, "count", 1.5)).toThrow();
-    expect(() => g.setParam(id, "seed", NaN)).toThrow();
+    expect(() => g.setParam(id, "count", NaN)).toThrow();
+    expect(() => g.setParam(id, "seed", 7)).toThrow();
+    // A role the mode lacks is allowed while drafting; it only blocks a run.
+    const asset = g.addNode("input.asset", { params: { asset: "ast_x" } });
+    g.connect({ source: asset, sourcePort: "asset", target: video, targetPort: "reference" });
+    expect(g.validate().map((i) => i.code)).toContain("MODE");
   });
   it("paste remaps ids and groups, remove cleans edges, ungroup retains nodes", () => {
     const g = create();
@@ -95,13 +104,13 @@ describe("Graph API using real Yjs documents", () => {
     const changes: string[][] = [];
     g.subscribe((c) => changes.push(c.nodeIds));
     g.setParam("n_img", "count", 3);
-    h.setParam("n_img", "aspect", "1:1");
+    h.setParam("n_img", "ratio", "1:1");
     Y.applyUpdate(g.doc, Y.encodeStateAsUpdate(d));
     Y.applyUpdate(d, Y.encodeStateAsUpdate(g.doc));
     expect(content(g.toRecipe())).toEqual(content(h.toRecipe()));
     expect(
       g.toRecipe().nodes.find((n) => n.id === "n_img")?.params,
-    ).toMatchObject({ count: 3, aspect: "1:1" });
+    ).toMatchObject({ count: 3, ratio: "1:1" });
     expect(changes.every((ids) => ids.every((id) => id === "n_img"))).toBe(
       true,
     );
@@ -127,4 +136,26 @@ it("nested transactions roll back to their savepoint even when the caller catche
   });
   g.undo();
   expect(g.toRecipe().nodes[0].label).toBeUndefined();
+});
+it("migrates v1 generate nodes in place and on import", () => {
+  const v1 = structuredClone(pilot) as Recipe;
+  const img = v1.nodes.find((n) => n.id === "n_img")!;
+  img.typeVersion = 1;
+  img.params = { model: "seedream-4", aspect: "9:16", count: 2, seed: 7 };
+  const vid = v1.nodes.find((n) => n.id === "n_vid")!;
+  vid.typeVersion = 1;
+  vid.params = { model: "seedance-1.5", durationSec: 5 };
+  v1.edges.find((e) => e.id === "e_4")!.targetPort = "image";
+  const g = create();
+  g.fromRecipe(v1, "replace");
+  expect(g.toRecipe().nodes.find((n) => n.id === "n_img")).toMatchObject({
+    typeVersion: 2,
+    params: { model: "auto", ratio: "9:16", count: 2 },
+  });
+  expect(g.migrate()).toBe(false);
+  // An old document opened as is (no import) is upgraded by migrate().
+  const doc = new Y.Doc();
+  const old = new Graph(doc, new Map(registry), v1 as Recipe);
+  expect(old.migrate()).toBe(true);
+  expect(old.toRecipe().edges.find((e) => e.id === "e_4")?.targetPort).toBe("first");
 });

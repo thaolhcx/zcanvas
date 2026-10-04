@@ -74,7 +74,7 @@ describe("single-handle port resolution", () => {
     expect(kinds.get("n_vid.video")).toBe("list<video>");
     recipe.edges = recipe.edges.filter((edge) => edge.target !== "n_vid");
     const ports = resolvePorts(recipe, registry, kinds, "n_if", "n_vid")!;
-    expect(ports).toEqual({ sourcePort: "then", targetPort: "image" });
+    expect(ports).toEqual({ sourcePort: "then", targetPort: "first" });
     recipe.edges.push({
       id: "resolved",
       source: "n_if",

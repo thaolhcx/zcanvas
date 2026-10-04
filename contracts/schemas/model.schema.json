@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "model/v1",
+  "title": "Model catalog entry (model/v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "title", "kind", "provider", "providerModel", "accepts", "fields", "cancel", "eta"],
+  "properties": {
+    "key": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{1,60}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "description": { "type": "string", "maxLength": 200 },
+    "kind": { "enum": ["llm", "image", "video", "audio"] },
+    "provider": { "enum": ["byteplus"] },
+    "providerModel": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "vendor": { "enum": ["bytedance", "openai", "google"] },
+    "default": { "type": "boolean", "description": "The model Auto picks for its kind when the inputs fit" },
+    "hidden": { "type": "boolean" },
+    "modes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "accepts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": { "$ref": "#/$defs/limit" },
+        "image": { "$ref": "#/$defs/limit" },
+        "video": { "$ref": "#/$defs/limit" },
+        "audio": { "$ref": "#/$defs/limit" }
+      }
+    },
+    "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "cancel": { "enum": ["always", "queued", "never"] },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "durationSec": { "$ref": "#/$defs/range" },
+        "pixels": { "$ref": "#/$defs/range" },
+        "promptChars": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "eta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseSec"],
+      "properties": {
+        "baseSec": { "type": "number", "minimum": 0 },
+        "perOutputSec": { "type": "number", "minimum": 0 },
+        "perSecondSec": { "type": "number", "minimum": 0 },
+        "deadlineSec": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "slots": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "sync": { "type": "boolean", "description": "The provider answers inside the submit call (no task to fetch)" }
+  },
+  "$defs": {
+    "limit": { "type": "object", "additionalProperties": false, "required": ["max"], "properties": { "max": { "type": "integer", "minimum": 0 } } },
+    "range": { "type": "object", "additionalProperties": false, "required": ["min", "max"], "properties": { "min": { "type": "number" }, "max": { "type": "number" } } },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "placement"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9]*$" },
+        "label": { "type": "string" },
+        "type": { "enum": ["enum", "number", "boolean", "string", "duration", "voice"] },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object", "additionalProperties": false, "required": ["value", "label"], "properties": { "value": { "type": "string" }, "label": { "type": "string" } } }
+        },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "type": "string" },
+        "default": {},
+        "placement": { "enum": ["inline", "advanced", "more"] },
+        "group": { "type": "string" },
+        "display": { "enum": ["tiles", "segment", "slider", "chip"] },
+        "icon": { "enum": ["panorama", "size"] },
+        "modes": { "type": "array", "items": { "type": "string" } },
+        "help": { "type": "string" },
+        "placeholder": { "type": "string" }
+      }
+    }
+  }
+}

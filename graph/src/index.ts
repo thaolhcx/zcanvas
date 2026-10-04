@@ -1,6 +1,9 @@
 import * as Y from "yjs";
 import {
+  migrateRecipe,
+  needsMigration,
   validate,
+  type ModelSpec,
   type GraphApi,
   type GraphChange,
   type Issue,
@@ -21,7 +24,14 @@ const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
 const newId = (prefix: string) =>
   `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
-const incomplete = new Set(["PARAM_REQUIRED", "INPUT_REQUIRED"]);
+/** Allowed while drafting; they only block a run. */
+const incomplete = new Set([
+  "PARAM_REQUIRED",
+  "INPUT_REQUIRED",
+  "MODE",
+  "MODEL",
+  "REFERENCE",
+]);
 export const emptyRecipe = (
   id = newId("canvas"),
   name = "Untitled canvas",
@@ -87,6 +97,8 @@ export class Graph implements GraphApi {
     readonly doc: Y.Doc,
     readonly registry: Registry,
     initial?: Recipe,
+    /** The model catalog; with it, model params and inputs are checked too. */
+    public models?: ModelSpec[],
   ) {
     if (doc.getMap("meta").size === 0 && initial)
       doc.transact(() => writeRecipe(doc, initial), "init");
@@ -143,7 +155,7 @@ export class Graph implements GraphApi {
     return this.origins.get(name)!;
   }
   private assert(recipe: Recipe) {
-    const issues = validate(recipe, this.registry).filter(
+    const issues = validate(recipe, this.registry, this.models).filter(
       (i) => !incomplete.has(i.code),
     );
     if (issues.length) throw new GraphError(issues);
@@ -355,12 +367,21 @@ export class Graph implements GraphApi {
     });
   }
   validate() {
-    return validate(this.toRecipe(), this.registry);
+    return validate(this.toRecipe(), this.registry, this.models);
+  }
+  /** Upgrade v1 generate nodes in place (one "migrate" transaction); no-op when current. */
+  migrate() {
+    const recipe = this.toRecipe();
+    if (!needsMigration(recipe)) return false;
+    const next = migrateRecipe(recipe);
+    this.transaction("migrate", () => this.edit((r) => Object.assign(r, next)));
+    return true;
   }
   toRecipe() {
     return structuredClone(this.draft ?? readRecipe(this.doc));
   }
-  fromRecipe(recipe: Recipe, mode: "replace" | "insert") {
+  fromRecipe(input: Recipe, mode: "replace" | "insert") {
+    const recipe = migrateRecipe(input);
     this.assert(recipe);
     this.transaction("import", () =>
       this.edit((r) => {

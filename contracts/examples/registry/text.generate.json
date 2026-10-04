@@ -1,0 +1,25 @@
+{
+  "type": "text.generate", "version": 1, "title": "Text", "category": "text",
+  "description": "Writes text with an LLM: ad copy, prompts, descriptions, scripts.",
+  "inputs": [{ "key": "context", "kind": "any", "multiple": true, "label": "Context" }],
+  "outputs": [{ "key": "text", "kind": "text" }],
+  "params": {
+    "model": { "type": "model", "kind": "llm", "default": "auto", "label": "Model" },
+    "prompt": { "type": "string", "multiline": true, "label": "Prompt", "placeholder": "What should it write? Type @ to use an input" },
+    "preset": {
+      "type": "enum", "label": "What to write", "default": "custom",
+      "options": [
+        { "value": "custom", "label": "Custom" }, { "value": "copy", "label": "Ad copy" },
+        { "value": "enrich", "label": "Enrich prompt" }, { "value": "describe", "label": "Describe media" },
+        { "value": "script", "label": "Script / storyboard" }
+      ]
+    },
+    "system": { "type": "string", "multiline": true, "label": "System prompt", "advanced": true },
+    "effort": { "type": "enum", "options": ["low", "medium", "high"], "default": "medium", "label": "Effort" },
+    "useOwnText": { "type": "boolean", "default": true, "label": "Use this node's text as context", "advanced": true }
+  },
+  "runner": { "kind": "job", "worker": "text-gen", "timeoutSec": 300, "concurrency": 8, "cacheable": true },
+  "cost": { "unit": "credit_per_1k_chars", "estimate": 0.1 },
+  "ui": { "previewPort": "text" },
+  "agentHints": "Writes or rewrites text. Feed it images to describe them."
+}

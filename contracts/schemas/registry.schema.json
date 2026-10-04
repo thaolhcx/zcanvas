@@ -38,6 +38,18 @@
         "previewPort": { "type": "string" }
       }
     },
+    "modes": {
+      "type": "array", "minItems": 1,
+      "description": "Explicit mode tabs. A port with `modes` only takes inputs in those modes",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["value", "label"],
+        "properties": {
+          "value": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "label": { "type": "string" },
+          "needs": { "enum": ["image", "video", "audio", "text"] }
+        }
+      }
+    },
     "migrate": { "type": "string", "description": "Module path exporting (params, fromVersion) => params" },
     "agentHints": { "type": "string", "maxLength": 200 }
   },
@@ -60,7 +72,9 @@
         },
         "required": { "type": "boolean", "default": false },
         "multiple": { "type": "boolean", "default": false },
-        "label": { "type": "string" }
+        "label": { "type": "string" },
+        "max": { "type": "integer", "minimum": 1, "description": "How many inputs this role takes" },
+        "modes": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Only in these modes; required only there" }
       }
     },
     "paramCommon": {
@@ -118,7 +132,8 @@
         { "type": "object", "required": ["type"], "properties": { "type": { "const": "boolean" }, "default": { "type": "boolean" } } },
         { "type": "object", "required": ["type", "kind"], "properties": { "type": { "const": "asset" }, "kind": { "enum": ["image", "video", "audio"] } } },
         { "type": "object", "required": ["type"], "properties": { "type": { "const": "color" }, "default": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } } },
-        { "type": "object", "required": ["type", "schema"], "properties": { "type": { "const": "json" }, "schema": { "type": "object" } } }
+        { "type": "object", "required": ["type", "schema"], "properties": { "type": { "const": "json" }, "schema": { "type": "object" } } },
+        { "type": "object", "required": ["type", "kind"], "properties": { "type": { "const": "model" }, "kind": { "enum": ["llm", "image", "video", "audio"] }, "default": { "type": "string" } } }
       ]
     },
     "runner": {

@@ -60,7 +60,7 @@ export interface GenerationReference {
    * deleted. Absent on assets recorded before IDs were saved.
    */
   id?: string;
-  /** Input port the file was connected to. */
+  /** Input port (role) the file was connected to. */
   port?: string;
 }
 /** What the model provider reported for this output, when it reports it. */
@@ -79,8 +79,12 @@ export interface GenerationInfo {
   prompt?: string;
   /** Text inputs by input port; `prompt` when the text came from the node param. */
   prompts?: Record<string, string>;
-  /** The model the node asked for. */
+  /** The model that ran (Auto resolved to a catalog key). */
   model?: string;
+  /** What the user typed, before Auto prompt. */
+  intent?: string;
+  /** The prompt sent to the model (after Auto prompt and `@` rendering). */
+  finalPrompt?: string;
   /** Node params other than the prompt and model, as JSON. */
   settings?: Record<string, unknown>;
   references?: GenerationReference[];
@@ -96,6 +100,8 @@ export interface AssetListQuery {
   kind?: AssetKind;
   source?: AssetSourceType;
   sort?: AssetSort;
+  /** "true" (default): kept assets and uploads only. "all": every result too. */
+  kept?: "true" | "all";
   /** Opaque value from a previous `nextCursor`. Only valid with the same filters and sort. */
   cursor?: string;
   /** 1–100, default 50. */
