@@ -340,7 +340,7 @@ describe("through the queue", () => {
     const recipe: Recipe = {
       schema: "recipe/v1",
       meta: { id: canvasId, name: "b", version: 1, registryVersion: "x" },
-      nodes: [{ id: "v", type: "video.generate", typeVersion: 2, position: { x: 0, y: 0 }, params: { model: "auto", mode: "text", prompt: "waves", autoPrompt: false } }],
+      nodes: [{ id: "v", type: "video.generate", typeVersion: 2, position: { x: 0, y: 0 }, params: { model: "auto", mode: "text", prompt: `waves ${crypto.randomUUID()}`, autoPrompt: false } }],
       edges: [],
       groups: [],
     };
