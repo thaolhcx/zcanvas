@@ -431,7 +431,7 @@ export function FeedCard({
 }) {
   const run = (entry ?? job)!;
   const kind = node.output;
-  const refs = (entry as { refs?: RefItem[] } | undefined)?.refs ?? job?.refs ?? [];
+  const refs = entry?.refs ?? job?.refs ?? [];
   return (
     <article className={`kit-feedcard ${job ? "running" : ""} ${entry?.cancelled ? "cancelled" : ""}`} data-run={run.id}>
       <time>{stamp(run.at)}</time>

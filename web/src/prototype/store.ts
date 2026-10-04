@@ -243,7 +243,7 @@ export const useProto = create<State>((set, get) => ({
     stop.forEach((j) => clearTimers(j.id));
     // A stopped run stays in the feed as "cancelled" (Lumina V02), newest first like any entry.
     const gone: RunEntry[] = stop
-      .map((j) => ({ id: nid("run"), at: j.at, value: j.value, seed: 0, outputs: [], credits: 0, ms: Date.now() - j.at, cancelled: true }))
+      .map((j) => ({ id: nid("run"), at: j.at, value: j.value, refs: j.refs, seed: 0, outputs: [], credits: 0, ms: Date.now() - j.at, cancelled: true }))
       .reverse();
     const jobs = (n.jobs ?? []).filter((j) => !stop.includes(j));
     const history = [...gone, ...n.history].slice(0, HISTORY_MAX);
@@ -257,7 +257,10 @@ export const useProto = create<State>((set, get) => ({
     const n = get().nodes[id];
     const entry = n.history.find((e) => e.id === entryId);
     if (!entry) return;
-    patchNode(id, { value: structuredClone(entry.value) });
+    // References come back as uploads; those that came over an edge (ids from nid("e")) stay wired on the canvas.
+    const uploads = entry.refs.filter((r) => !r.id.startsWith("e_"));
+    patchNode(id, { value: structuredClone(entry.value), uploads });
+    afterInputsChanged(id);
     get().toast("Filled in parameters", "info");
   },
   rerun(id, entryId) {
@@ -266,11 +269,10 @@ export const useProto = create<State>((set, get) => ({
     const entry = n?.history.find((e) => e.id === entryId);
     if (!entry || n.type === "sticky") return;
     const spec = NODES[n.type],
-      model = modelOf(modelsFor(spec), entry.value.model),
-      inputs = inputsOf(s, id);
-    const issues = validate(spec, model, entry.value, inputs);
+      model = modelOf(modelsFor(spec), entry.value.model);
+    const issues = validate(spec, model, entry.value, entry.refs);
     if (issues.length) return get().toast(issues[0], "warn");
-    start(id, structuredClone(entry.value), inputs);
+    start(id, structuredClone(entry.value), entry.refs);
   },
   removeEntry(id, entryId) {
     const n = get().nodes[id];
@@ -288,6 +290,7 @@ export const useProto = create<State>((set, get) => ({
       id: nid("edit"),
       at: Date.now(),
       value: n.value,
+      refs: [],
       seed: 0,
       outputs: [{ kind: "text", text }],
       credits: 0,
@@ -350,6 +353,7 @@ function start(id: string, value: GenValue, inputs: RefItem[]) {
               id: nid("run"),
               at: Date.now(),
               value,
+              refs: inputs,
               seed: seed % 2147483647,
               outputs: generateOutputs(spec.output, value, inputs, seed, ownText),
               credits: cost / value.times,

@@ -191,6 +191,8 @@ export interface RunEntry {
   id: string;
   at: number;
   value: GenValue;
+  /** Snapshot of the references the run used: drawn as chips on its card, refilled on Re-edit. */
+  refs: RefItem[];
   seed: number;
   outputs: Output[];
   credits: number;

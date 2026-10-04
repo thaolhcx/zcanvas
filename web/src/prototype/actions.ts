@@ -93,7 +93,7 @@ export async function applyCrop(id: string, r: { x: number; y: number; w: number
   const out = entry?.outputs[n.active?.index ?? 0];
   if (!out?.url) return;
   const cut = await cropImage(out.url, r);
-  const next: RunEntry = { id: `crop_${uploadSeq++}`, at: Date.now(), value: n.value, seed: 0, outputs: [{ kind: "image", ...cut }], credits: 0, ms: 0, edited: true };
+  const next: RunEntry = { id: `crop_${uploadSeq++}`, at: Date.now(), value: n.value, refs: [], seed: 0, outputs: [{ kind: "image", ...cut }], credits: 0, ms: 0, edited: true };
   useProto.setState((st) => ({
     nodes: { ...st.nodes, [id]: { ...st.nodes[id], history: [next, ...st.nodes[id].history], active: { entryId: next.id, index: 0 } } },
   }));
@@ -114,7 +114,7 @@ export async function splitGrid(id: string, rows: number, cols: number) {
     for (let c = 0; c < cols; c++) {
       const cut = await cropImage(out.url, { x: c / cols, y: r / rows, w: 1 / cols, h: 1 / rows });
       const nid = s.addNode("image", { x: n.position.x + 420 + c * w, y: n.position.y + r * h }, { label: `Grid slice ${r * cols + c + 1}`, asset: true });
-      const e: RunEntry = { id: `slice_${uploadSeq++}`, at: Date.now(), value: n.value, seed: 0, outputs: [{ kind: "image", ...cut }], credits: 0, ms: 0, edited: true };
+      const e: RunEntry = { id: `slice_${uploadSeq++}`, at: Date.now(), value: n.value, refs: [], seed: 0, outputs: [{ kind: "image", ...cut }], credits: 0, ms: 0, edited: true };
       useProto.setState((st) => ({ nodes: { ...st.nodes, [nid]: { ...st.nodes[nid], history: [e], active: { entryId: e.id, index: 0 }, status: { state: "done" } } } }));
       ids.push(nid);
     }
@@ -127,7 +127,7 @@ export async function splitGrid(id: string, rows: number, cols: number) {
  */
 function uploaded(id: string, outputs: RunEntry["outputs"], label: string) {
   const s = useProto.getState();
-  const entry: RunEntry = { id: `upload_${uploadSeq++}`, at: Date.now(), value: s.nodes[id].value, seed: 0, outputs, credits: 0, ms: 0, edited: true };
+  const entry: RunEntry = { id: `upload_${uploadSeq++}`, at: Date.now(), value: s.nodes[id].value, refs: [], seed: 0, outputs, credits: 0, ms: 0, edited: true };
   s.setLabel(id, label);
   useProto.setState((st) => ({
     nodes: { ...st.nodes, [id]: { ...st.nodes[id], asset: true, uploads: [], history: [entry], active: { entryId: entry.id, index: 0 }, status: { state: "done" } } },
@@ -228,7 +228,7 @@ type ProtoNodeStatus = ReturnType<typeof useProto.getState>["nodes"][string]["st
 
 function setEntry(id: string, outputs: RunEntry["outputs"], extra: Partial<RunEntry> = {}) {
   const n = useProto.getState().nodes[id];
-  const e: RunEntry = { id: `e_${uploadSeq++}`, at: Date.now(), value: n.value, seed: 0, outputs, credits: 0, ms: 0, edited: true, ...extra };
+  const e: RunEntry = { id: `e_${uploadSeq++}`, at: Date.now(), value: n.value, refs: [], seed: 0, outputs, credits: 0, ms: 0, edited: true, ...extra };
   useProto.setState((st) => ({
     nodes: { ...st.nodes, [id]: { ...st.nodes[id], history: [e, ...st.nodes[id].history], active: { entryId: e.id, index: 0 }, status: { state: "done" } } },
   }));

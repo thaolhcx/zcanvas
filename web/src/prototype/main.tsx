@@ -12,6 +12,8 @@ import { NODES, VOICE_SCENES, VOICES } from "./catalog.ts";
 import { audioClip, generateOutputs, imageUrl } from "./generate.ts";
 import { inputsOf, useProto, type ProtoType } from "./store.ts";
 import { useLightbox } from "./lightbox.ts";
+import { SAMPLES, upload } from "./actions.ts";
+import { assignRoles } from "../kit/logic.ts";
 import "@xyflow/react/dist/style.css";
 import "../style.css";
 import "../kit/kit.css";
@@ -26,6 +28,7 @@ function seed() {
       id: `run_seed_${id}`,
       at: Date.now() - 60000,
       value: structuredClone(n.value),
+      refs: inputsOf(useProto.getState(), id),
       seed: seedNo,
       outputs: generateOutputs(NODES[type].output, n.value, inputsOf(useProto.getState(), id), seedNo),
       credits: type === "image" ? 8 : 1,
@@ -53,7 +56,7 @@ function seed() {
   useProto.setState((st) => ({
     nodes: {
       ...st.nodes,
-      logo: { ...st.nodes.logo, history: [{ id: "up_logo", at: Date.now(), value: st.nodes.logo.value, seed: 0, outputs: [{ kind: "image", ...logo }], credits: 0, ms: 0, edited: true }], active: { entryId: "up_logo", index: 0 }, status: { state: "done" } },
+      logo: { ...st.nodes.logo, history: [{ id: "up_logo", at: Date.now(), value: st.nodes.logo.value, refs: [], seed: 0, outputs: [{ kind: "image", ...logo }], credits: 0, ms: 0, edited: true }], active: { entryId: "up_logo", index: 0 }, status: { state: "done" } },
     },
   }));
 
@@ -80,10 +83,10 @@ function seed() {
 /** A few past runs per space so the feeds have something to show. */
 function seedSpaces() {
   const s = useProto.getState();
-  const runs: Record<"image" | "video" | "audio", { prompt: string; value?: Partial<RunEntry["value"]>; params?: Record<string, unknown>; ago: number; cancelled?: boolean }[]> = {
+  const runs: Record<"image" | "video" | "audio", { prompt: string; value?: Partial<RunEntry["value"]>; params?: Record<string, unknown>; refs?: number[]; ago: number; cancelled?: boolean }[]> = {
     image: [
       { prompt: "A cute 3D clay fox figurine sitting in a coffee cup, studio lighting", ago: 26 * 3600e3, params: { size: { ratio: "1:1", width: 2048, height: 2048 } } },
-      { prompt: "Small-batch coffee bag on a sunrise kitchen counter, soft backlight", ago: 3 * 3600e3, params: { count: 2, size: { ratio: "4:3", width: 2048, height: 1536 } } },
+      { prompt: "@Logo printed on a small-batch coffee bag like @Packaging, sunrise kitchen counter, soft backlight", refs: [3, 5], ago: 3 * 3600e3, params: { count: 2, size: { ratio: "4:3", width: 2048, height: 1536 } } },
     ],
     video: [
       { prompt: "Slow push-in on a steaming cup, light flares, cozy morning", ago: 5 * 3600e3, params: { duration: 5 } },
@@ -99,12 +102,14 @@ function seedSpaces() {
       .map((r, k) => {
         const value = { ...base, ...r.value, prompt: r.prompt, params: { ...r.params } };
         const seedNo = 1000 + k * 37 + kind.length;
+        const refs = assignRoles(NODES[kind], value.mode, (r.refs ?? []).map((i) => upload(SAMPLES[i])));
         return {
           id: `run_seed_${kind}_${k}`,
           at: Date.now() - r.ago,
           value,
+          refs,
           seed: r.cancelled ? 0 : seedNo,
-          outputs: r.cancelled ? [] : generateOutputs(NODES[kind].output, value, [], seedNo),
+          outputs: r.cancelled ? [] : generateOutputs(NODES[kind].output, value, refs, seedNo),
           credits: 0,
           ms: 4200,
           cancelled: r.cancelled,
