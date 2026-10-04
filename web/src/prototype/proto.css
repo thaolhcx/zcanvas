@@ -96,7 +96,21 @@ html, body, #root { height: 100%; }
 .proto-gen-tabs { width: 92px; border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; gap: 4px; padding: 10px 8px; }
 .proto-gen-tabs button { flex-direction: column; gap: 3px; border: 0; padding: 10px 4px; font-size: 12px; color: var(--muted); }
 .proto-gen-tabs button.active { background: #e8eefc; color: var(--accent); font-weight: 600; }
-.proto-gen-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.proto-gen-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+.proto-history-btn { position: absolute; top: 12px; right: 16px; z-index: 5; height: 30px; padding: 0 12px; gap: 6px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.06); font-size: 12.5px; }
+.proto-history-btn:hover { background: var(--hover); }
+/* ---------- History dock (Lumina A06) ---------- */
+.proto-dock, .proto-dock * { box-sizing: border-box; }
+.proto-dock { width: 300px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 0; min-height: 0; }
+.proto-dock header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.proto-dock-search { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-subtle); color: var(--muted); }
+.proto-dock-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 12.5px; }
+.proto-dock-filters { display: flex; gap: 6px; }
+.proto-dock-filters select { flex: 1; min-width: 0; height: 28px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); padding: 0 8px; font-size: 12px; }
+.proto-dock-grid { flex: 1; overflow: auto; columns: 2; column-gap: 6px; padding-bottom: 12px; }
+.proto-dock-grid button { display: block; width: 100%; margin: 0 0 6px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; break-inside: avoid; background: var(--surface-subtle); }
+.proto-dock-grid button:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+.proto-dock-empty { column-span: all; color: var(--muted); font-size: 12px; text-align: center; margin-top: 24px; }
 .proto-feed { flex: 1; overflow: auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 48px; align-items: center; }
 .proto-feed > * { width: min(880px, 100%); }
 .proto-feed-empty { text-align: center; color: var(--muted); margin: auto 0; }

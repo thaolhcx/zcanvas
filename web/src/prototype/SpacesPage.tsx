@@ -10,13 +10,16 @@ import { NODES } from "./catalog.ts";
 import { useProto } from "./store.ts";
 import { TYPE_ICON } from "./nodes.tsx";
 import { MEDIA_LIBRARY, SAMPLES, upload } from "./actions.ts";
-import { Clapperboard, FolderOpen, Upload, UserSquare } from "lucide-react";
+import { Clapperboard, FolderOpen, History, Upload, UserSquare } from "lucide-react";
+import { HistoryDock } from "./HistoryDock.tsx";
 import { TABS, useDetail, useSpace } from "./spaces.ts";
 
 const TAB_LABEL = { image: "Image", video: "Video", audio: "Audio", text: "Text" };
 
 export function SpacesPage() {
   const { tab, setTab } = useSpace();
+  // Lumina: the dock is closed until "History" is clicked; it stays open across spaces.
+  const [dock, setDock] = useState(false);
   const id = `page:${tab}`;
   const exists = useProto((s) => !!s.nodes[id]);
   useEffect(() => {
@@ -35,7 +38,8 @@ export function SpacesPage() {
           );
         })}
       </nav>
-      {exists && <GenFeed key={id} id={id} />}
+      {exists && <GenFeed key={id} id={id} history={dock} onHistory={() => setDock(!dock)} />}
+      {dock && <HistoryDock onClose={() => setDock(false)} />}
     </div>
   );
 }
@@ -54,7 +58,7 @@ function library(kinds: MediaKind[]): RefItem[] {
   return [...SAMPLES, ...media].filter((r) => kinds.includes(r.kind));
 }
 
-function GenFeed({ id }: { id: string }) {
+function GenFeed({ id, history, onHistory }: { id: string; history: boolean; onHistory: () => void }) {
   const [picking, setPicking] = useState(false);
   const composer = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -93,6 +97,11 @@ function GenFeed({ id }: { id: string }) {
   };
   return (
     <main className="proto-gen-main">
+      {!history && (
+        <button className="proto-history-btn" onClick={onHistory}>
+          <History size={14} /> History
+        </button>
+      )}
       <section className="proto-feed">
         {entries.map((e) => (
           <FeedCard
