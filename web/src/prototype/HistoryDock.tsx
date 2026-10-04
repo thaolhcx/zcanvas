@@ -1,11 +1,11 @@
-// History dock (Lumina A06, I02 right column): every run of every space and canvas node, newest first,
+// History dock (Lumina A06, I02 right column): every run of every Studio page and canvas node, newest first,
 // filtered by prompt words, time and type. A click opens the detail modal over the filtered list.
-// Media only: text runs live in the Text space feed and on their canvas nodes, not in a thumbnail grid.
+// Media only: text runs live in the Text Studio feed and on their canvas nodes, not in a thumbnail grid.
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useProto } from "./store.ts";
 import { RunThumb } from "./RunDetail.tsx";
-import { useDetail } from "./spaces.ts";
+import { useDetail } from "./studio.ts";
 
 const DAY = 24 * 3600e3;
 const TIME = { all: "All time", today: "Today", week: "Last 7 days" } as const;

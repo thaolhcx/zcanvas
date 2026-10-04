@@ -399,7 +399,7 @@ export function RunMeta({ node, models, value, refs }: { node: NodeSpec; models:
 }
 
 /**
- * Feed card in a space, line by line like Lumina (I02, V02): timestamp · prompt with reference
+ * Feed card in a Studio page, line by line like Lumina (I02, V02): timestamp · prompt with reference
  * chips · meta · result · Re-edit / Regenerate / 🗑. A job in flight shows its progress and Stop;
  * a stopped run keeps its card with a quiet "cancelled". No billing.
  */

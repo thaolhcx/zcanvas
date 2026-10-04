@@ -1,4 +1,4 @@
-// Small UI state shared by the Spaces page, the detail modal and the History dock.
+// Small UI state shared by the Studio page, the detail modal and the History dock.
 import { create } from "zustand";
 
 export const TABS = ["text", "image", "video", "audio"] as const;
@@ -6,20 +6,20 @@ export type Tab = (typeof TABS)[number];
 
 const readTab = (): Tab => {
   try {
-    const t = localStorage.getItem("proto.space");
+    const t = localStorage.getItem("proto.studio");
     return TABS.includes(t as Tab) ? (t as Tab) : "image";
   } catch {
     return "image";
   }
 };
 
-/** The open space; remembered across reloads. */
-export const useSpace = create<{ tab: Tab; setTab(t: Tab): void }>((set) => ({
+/** The open Studio page; remembered across reloads. */
+export const useStudio = create<{ tab: Tab; setTab(t: Tab): void }>((set) => ({
   tab: readTab(),
   setTab(tab) {
     set({ tab });
     try {
-      localStorage.setItem("proto.space", tab);
+      localStorage.setItem("proto.studio", tab);
     } catch {
       /* private mode: the tab is just not remembered */
     }

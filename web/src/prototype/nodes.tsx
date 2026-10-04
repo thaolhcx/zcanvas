@@ -122,7 +122,7 @@ export const GenNode = memo(function GenNode({ id, selected }: NodeProps) {
   const spec = NODES[type];
   const Icon = node.asset ? (type === "audio" ? FileAudio : type === "video" ? FileVideo : FileImage) : TYPE_ICON[type];
   const entry = activeEntry(node);
-  // Stopped runs stay in history for the space feed; the node only flips through finished ones.
+  // Stopped runs stay in history for the Studio page feed; the node only flips through finished ones.
   const done = node.history.filter((e) => !e.cancelled);
   const busy = source.status.state === "queued" || source.status.state === "running";
   const out: Output | undefined = entry?.outputs[node.active?.index ?? 0];

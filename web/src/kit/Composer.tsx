@@ -36,7 +36,7 @@ export interface SlotSpec {
 
 /**
  * The prompt panel. Same component under a canvas node ("compact"), at the bottom
- * of a space ("wide") and in an app form ("form"); only the GenSource differs.
+ * of a Studio page ("wide") and in an app form ("form"); only the GenSource differs.
  * Layout follows Lumina: mode tabs · input chips · prompt · chips + settings + model · 1× · ▶.
  * Unlike Lumina there is no billing anywhere: this is an internal tool (quotas may come later).
  */
@@ -50,7 +50,7 @@ export function Composer({
   layout?: "compact" | "wide" | "form";
   /** Wide layout: references live in a square slot left of the prompt instead of a chip row. */
   slot?: SlotSpec;
-  /** Runs don't block the composer: each run has its own card with Stop (space feed), so ▶ stays ▶. */
+  /** Runs don't block the composer: each run has its own card with Stop (Studio feed), so ▶ stays ▶. */
   parallel?: boolean;
 }) {
   const { node, value, models } = source;
@@ -481,7 +481,7 @@ export function RefTray({
   onRole?: (id: string, role: string) => void;
   onAdd?: () => void;
   model?: ModelSpec;
-  /** chips = a row of input chips (node); slot = one square box left of the prompt (space). */
+  /** chips = a row of input chips (node); slot = one square box left of the prompt (Studio). */
   variant?: "chips" | "slot";
   slot?: SlotSpec;
   /** Slot shows the voice instead of media (TTS). */

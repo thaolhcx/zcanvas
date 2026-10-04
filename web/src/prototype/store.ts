@@ -27,9 +27,9 @@ export interface ProtoNode {
   active?: { entryId: string; index: number };
   /** Aggregate for the canvas node: the latest job's status, else done / empty. */
   status: GenStatus;
-  /** Runs in flight, oldest first. A space shows one card per job. */
+  /** Runs in flight, oldest first. A Studio page shows one card per job. */
   jobs?: RunJob[];
-  /** Space: references picked from files instead of edges. */
+  /** Studio: references picked from files instead of edges. */
   uploads: RefItem[];
   sticky?: { text: string; color: string };
   /** Result-only media node (Lumina BAFileLoad: uploads, grid slices). No prompt panel. */
@@ -262,7 +262,7 @@ export const useProto = create<State>((set, get) => ({
   },
   fillFrom(id, entry) {
     // References come back as uploads. On the canvas, those that came over an edge (ids from nid("e"))
-    // are still wired; in a space there are no edges, so every reference becomes an upload.
+    // are still wired; in a Studio page there are no edges, so every reference becomes an upload.
     const uploads = onCanvasNode(id) ? entry.refs.filter((r) => !r.id.startsWith("e_")) : entry.refs;
     patchNode(id, { value: structuredClone(entry.value), uploads });
     afterInputsChanged(id);
@@ -329,7 +329,7 @@ function start(id: string, value: GenValue, inputs: RefItem[]) {
     model = modelOf(modelsFor(spec), value.model);
   // Kept on the entry for a future quota; never shown (internal tool).
   const cost = estimate(spec, model, value, inputs).credits;
-  // Spaces have no "own text": the last feed result is not something the user asked to rewrite.
+  // Studio pages have no "own text": the last feed result is not something the user asked to rewrite.
   const ownText = id.startsWith("page:") ? undefined : activeEntry(n)?.outputs[0]?.text;
   const total = { text: 1800, image: 3200, video: 6000, audio: 2200 }[n.type];
   const started = Date.now();

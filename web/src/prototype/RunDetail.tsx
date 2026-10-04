@@ -8,7 +8,7 @@ import { MediaViewer, PromptText, runParams, stamp } from "../kit/results.tsx";
 import type { RunEntry } from "../kit/types.ts";
 import { NODES, modelsFor } from "./catalog.ts";
 import { useProto, type ProtoNode } from "./store.ts";
-import { useDetail, useSpace, type DetailItem, type Tab } from "./spaces.ts";
+import { useDetail, useStudio, type DetailItem, type Tab } from "./studio.ts";
 
 function lookup(nodes: Record<string, ProtoNode>, item?: DetailItem) {
   const node = item && nodes[item.nodeId];
@@ -52,19 +52,19 @@ export function RunDetail() {
   if (!open || !cur) return null;
   const { node, entry, type } = cur;
   const base = NODES[type];
-  // Same rule as the composer: a space run never had the canvas-only fields.
+  // Same rule as the composer: a Studio run never had the canvas-only fields.
   const spec = node.id.startsWith("page:") ? { ...base, fields: base.fields.filter((f) => !f.canvasOnly) } : base;
   const { model, inline, advanced } = runParams(spec, modelsFor(spec), entry.value, voices);
   const out = entry.outputs[output] ?? entry.outputs[0];
   const media = entry.refs.filter((r) => r.kind !== "text");
-  const where = node.id.startsWith("page:") ? `${spec.title} space` : `canvas · ${node.label || spec.title}`;
+  const where = node.id.startsWith("page:") ? `Studio · ${spec.title}` : `canvas · ${node.label || spec.title}`;
   const clone = () => {
-    // Clone & try: open the space of this run's kind and fill its composer, whatever space we came from.
+    // Clone & try: open the Studio page of this run's kind and fill its composer, wherever we came from.
     const target = `page:${type}`;
     const api = useProto.getState();
     if (!api.nodes[target]) api.addNode(type, { x: -99999, y: -99999 }, { id: target });
     api.fillFrom(target, entry);
-    useSpace.getState().setTab(type);
+    useStudio.getState().setTab(type);
     close();
   };
   return (

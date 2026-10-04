@@ -1,5 +1,5 @@
-// Spaces: one generation page per media kind (Lumina /model/image, /video, /audio), plus Text.
-// Each space is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
+// Studio: one generation page per media kind (Lumina /model/image, /video, /audio), plus Text.
+// Each Studio page is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer, KIND_ICON, type SlotSpec } from "../kit/Composer.tsx";
 import { FeedCard } from "../kit/results.tsx";
@@ -12,13 +12,13 @@ import { TYPE_ICON } from "./nodes.tsx";
 import { MEDIA_LIBRARY, SAMPLES, upload } from "./actions.ts";
 import { Clapperboard, FolderOpen, History, Upload, UserSquare } from "lucide-react";
 import { HistoryDock } from "./HistoryDock.tsx";
-import { TABS, useDetail, useSpace } from "./spaces.ts";
+import { TABS, useDetail, useStudio } from "./studio.ts";
 
 const TAB_LABEL = { image: "Image", video: "Video", audio: "Audio", text: "Text" };
 
-export function SpacesPage() {
-  const { tab, setTab } = useSpace();
-  // Lumina: the dock is closed until "History" is clicked; it stays open across spaces.
+export function StudioPage() {
+  const { tab, setTab } = useStudio();
+  // Lumina: the dock is closed until "History" is clicked; it stays open across Studio pages.
   const [dock, setDock] = useState(false);
   const id = `page:${tab}`;
   const exists = useProto((s) => !!s.nodes[id]);
@@ -171,7 +171,7 @@ function GenFeed({ id, history, onHistory }: { id: string; history: boolean; onH
           for (const f of e.target.files ?? []) {
             const kind = accepts.find((k) => f.type.startsWith(k));
             if (!kind) {
-              api.toast(`${f.name}: this space doesn't take that file.`, "warn");
+              api.toast(`${f.name}: the Studio doesn't take that file.`, "warn");
               continue;
             }
             const url = URL.createObjectURL(f);

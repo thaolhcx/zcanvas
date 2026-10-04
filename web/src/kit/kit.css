@@ -259,7 +259,7 @@
 .kit-strip button:hover { background: var(--hover) !important; }
 .kit-strip button:disabled { opacity: .3; }
 
-/* ---------- Space feed (Lumina I02 / V02) ---------- */
+/* ---------- Studio feed (Lumina I02 / V02) ---------- */
 .kit-feedcard { display: flex; flex-direction: column; gap: 6px; }
 .kit-feedcard > time { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .kit-feed-prompt { margin: 0; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }

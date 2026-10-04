@@ -7,7 +7,7 @@ import { KitContext } from "../kit/fields.tsx";
 import { Lightbox } from "../kit/results.tsx";
 import type { RunEntry } from "../kit/types.ts";
 import { CanvasProto } from "./CanvasProto.tsx";
-import { SpacesPage } from "./SpacesPage.tsx";
+import { StudioPage } from "./StudioPage.tsx";
 import { RunDetail } from "./RunDetail.tsx";
 import { NODES, VOICE_SCENES, VOICES } from "./catalog.ts";
 import { audioClip, generateOutputs, imageUrl } from "./generate.ts";
@@ -76,12 +76,12 @@ function seed() {
   s.setValue("vo", { mode: "t2a", prompt: "Mornings, made slower. Small-batch coffee, roasted this week." });
   // Ran once, so the audio tool bar (Trim · Video Editor · Download) is there to see.
   done("vo", 31);
-  seedSpaces();
+  seedStudio();
   useProto.setState({ toasts: [] });
 }
 
-/** A few past runs per space so the feeds have something to show. */
-function seedSpaces() {
+/** A few past runs per Studio page so the feeds have something to show. */
+function seedStudio() {
   const s = useProto.getState();
   const runs: Record<"image" | "video" | "audio", { prompt: string; value?: Partial<RunEntry["value"]>; params?: Record<string, unknown>; refs?: number[]; ago: number; cancelled?: boolean }[]> = {
     image: [
@@ -180,11 +180,11 @@ function RunningPill() {
 }
 
 function App() {
-  const [view, setView] = useState<"canvas" | "spaces">(() => (location.hash === "#spaces" ? "spaces" : "canvas"));
+  const [view, setView] = useState<"canvas" | "studio">(() => (location.hash === "#studio" ? "studio" : "canvas"));
   const lightbox = useLightbox();
-  const go = (v: "canvas" | "spaces") => {
+  const go = (v: "canvas" | "studio") => {
     setView(v);
-    history.replaceState(null, "", v === "spaces" ? "#spaces" : location.pathname);
+    history.replaceState(null, "", v === "studio" ? "#studio" : location.pathname);
   };
   return (
     <KitContext.Provider value={{ voices: VOICES, scenes: VOICE_SCENES, previewVoice }}>
@@ -194,8 +194,8 @@ function App() {
           <button className={view === "canvas" ? "active" : ""} onClick={() => go("canvas")}>
             <LayoutGrid size={14} /> Canvas
           </button>
-          <button className={view === "spaces" ? "active" : ""} onClick={() => go("spaces")}>
-            <Sparkles size={14} /> Spaces
+          <button className={view === "studio" ? "active" : ""} onClick={() => go("studio")}>
+            <Sparkles size={14} /> Studio
           </button>
         </div>
         <RunningPill />
@@ -203,7 +203,7 @@ function App() {
           <RotateCcw size={13} /> Reset
         </button>
       </header>
-      <ReactFlowProvider>{view === "canvas" ? <CanvasProto /> : <SpacesPage />}</ReactFlowProvider>
+      <ReactFlowProvider>{view === "canvas" ? <CanvasProto /> : <StudioPage />}</ReactFlowProvider>
       <Toasts />
       <RunDetail />
       <Lightbox output={lightbox.output} onClose={lightbox.close} />
