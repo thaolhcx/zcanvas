@@ -33,6 +33,8 @@ export interface FieldSpec {
   /** Only shown in these modes. */
   modes?: string[];
   help?: string;
+  /** Hint inside an empty text box (string fields). */
+  placeholder?: string;
   /** No default: the chip shows a warning and Run is blocked until the user picks a value. */
   required?: string;
 }
@@ -112,6 +114,11 @@ export interface NodeSpec {
   fields: FieldSpec[];
   defaultModel: string;
   promptPlaceholder: string;
+  /**
+   * single = one prompt box. vibe+text = TTS: a one-line "Vibe Prompt" (the model's `vibe` field,
+   * how to speak) above the "Text" box (what to say). Falls back to single when the model has no vibe.
+   */
+  promptLayout?: "single" | "vibe+text";
   /** The prompt may be empty when an input carries the content. */
   promptOptional?: boolean;
   /** Label of the settings popover chip; default "Advanced Parameters". */

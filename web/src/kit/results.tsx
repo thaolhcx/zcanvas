@@ -335,16 +335,18 @@ export function runParams(node: NodeSpec, models: ModelSpec[], value: GenValue, 
   const model = modelOf(models, value.model);
   const fields = resolveFields(node, model, value.mode);
   const row = (f: FieldSpec) => ({ key: f.key, label: f.label, text: paramText(f, fieldValue(f, value.params), voices) });
-  const skip = (f: FieldSpec) => f.key === "system" || f.key === "vibe";
+  const skip = (f: FieldSpec) => f.key === "system";
   const inline = [...fields.inline, ...fields.advanced.filter((f) => f.type === "voice")]
     .filter((f) => !skip(f) && !(f.type === "boolean" && !fieldValue(f, value.params)))
-    .map((f) => {
-      const r = row(f);
+    .map(row)
+    .filter((r) => r.text)
+    .map((r) => {
+      const f = fields.all.find((x) => x.key === r.key)!;
       if (f.type === "boolean") return { ...r, text: f.label };
       if (f.type === "voice") return { ...r, text: `Voice: ${r.text}` };
+      if (f.key === "vibe") return { ...r, text: `Vibe: ${r.text}` };
       return r;
-    })
-    .filter((r) => r.text);
+    });
   const advanced = fields.advanced.filter((f) => f.type !== "voice")
     .filter((f) => !skip(f))
     .map(row)

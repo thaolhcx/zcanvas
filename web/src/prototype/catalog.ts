@@ -135,6 +135,7 @@ export const NODES: Record<string, NodeSpec> = {
     defaultModel: "seed-tts",
     promptPlaceholder: "Input text and convert it into realistic speech.",
     settingsLabel: "Tone Settings",
+    promptLayout: "vibe+text",
     // Audio: only the script and reference audio make sense.
     mentions: { kinds: ["text", "audio"] },
     modes: [
@@ -756,7 +757,14 @@ export const MODELS: ModelSpec[] = [
           { value: "es", label: "Spanish" },
         ],
       },
-      { key: "vibe", label: "Vibe Prompt", type: "string", placement: "more", help: "e.g. extremely happy" },
+      {
+        key: "vibe",
+        label: "Vibe Prompt",
+        type: "string",
+        placement: "inline",
+        placeholder: "(Optional) Input your preferred speech style, for example: extremely happy",
+        help: "How to speak; the Text box holds what to say",
+      },
       { key: "pitch", label: "Pitch", type: "number", display: "slider", placement: "more", min: -12, max: 12, step: 1, default: 0 },
       { key: "emotion", label: "Emotion scale", type: "number", display: "slider", placement: "more", min: 1, max: 5, step: 1, default: 4 },
       { key: "ttsModel", label: "Model", type: "enum", placement: "more", default: "seed-tts-1.1", options: [{ value: "seed-tts-1.1", label: "seed-tts-1.1" }] },

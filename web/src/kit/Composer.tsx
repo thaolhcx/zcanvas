@@ -64,6 +64,8 @@ export function Composer({
   const useSlot = layout === "wide" && !!slot;
   // Seed TTS takes no media: its slot is the voice (Lumina A07 "Voice").
   const voiceField = fields.all.find((f) => f.type === "voice");
+  // TTS: "Vibe Prompt" (how to speak) gets its own line above the text instead of a chip.
+  const vibeField = node.promptLayout === "vibe+text" ? fields.inline.find((f) => f.key === "vibe") : undefined;
   return (
     <div className={`kit-composer kit-${layout} nodrag nopan nowheel`} onKeyDown={(e) => e.stopPropagation()}>
       <button className="kit-icon kit-expand" onClick={() => setFull(!full)} title={full ? "Collapse" : "Expand"}>
@@ -108,16 +110,32 @@ export function Composer({
             voice={voiceField && !Object.keys(model.accepts).length ? { value: String(values(voiceField) ?? ""), onChange: (v) => source.setParam(voiceField.key, v) } : undefined}
           />
         )}
-        <PromptEditor
-          value={value.prompt}
-          placeholder={node.promptPlaceholder}
-          refs={source.inputs}
-          mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
-          full={full}
-          onFull={setFull}
-          onChange={(prompt) => source.setValue({ prompt })}
-          onSubmit={() => !busy && !source.issues.length && source.run()}
-        />
+        <div className={`kit-prompts ${vibeField ? "vibe" : ""}`}>
+          {vibeField && (
+            <label className="kit-vibe">
+              <span>{vibeField.label}</span>
+              <input
+                value={String(value.params[vibeField.key] ?? "")}
+                placeholder={vibeField.placeholder}
+                onChange={(e) => source.setParam(vibeField.key, e.target.value || undefined)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !busy && !source.issues.length) source.run();
+                }}
+              />
+            </label>
+          )}
+          {vibeField && <span className="kit-text-label">Text</span>}
+          <PromptEditor
+            value={value.prompt}
+            placeholder={vibeField ? "Input the text to generate." : node.promptPlaceholder}
+            refs={source.inputs}
+            mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
+            full={full}
+            onFull={setFull}
+            onChange={(prompt) => source.setValue({ prompt })}
+            onSubmit={() => !busy && !source.issues.length && source.run()}
+          />
+        </div>
       </div>
       <div className="kit-footer">
         <div className="kit-chips">
@@ -132,6 +150,7 @@ export function Composer({
             />
           )}
           {fields.inline.map((f) => {
+            if (f === vibeField) return null;
             if (f.group) {
               if (seen.has(f.group)) return null;
               seen.add(f.group);
@@ -183,6 +202,16 @@ export function Composer({
           )}
         </div>
         <div className="kit-run">
+          {vibeField && (
+            <button
+              className="kit-chip"
+              disabled={!value.prompt.trim()}
+              title="Automatically create matched vibe prompts"
+              onClick={() => source.setParam(vibeField.key, autoVibe(value.prompt))}
+            >
+              <Sparkle size={13} /> Auto prompt
+            </button>
+          )}
           {layout !== "form" && (
             <Popover
               width={90}
@@ -217,6 +246,12 @@ export function Composer({
       </div>
     </div>
   );
+}
+
+/** Prototype stand-in for the vibe writer: the first words of the text, read as a tone. */
+export function autoVibe(text: string) {
+  const words = text.replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 3);
+  return words.length ? `${words.join(" ").toLowerCase()} tone, warm and natural` : "";
 }
 
 export function RunButton({ source, busy, cancel = "always" }: { source: GenSource; busy: boolean; cancel?: ModelSpec["cancel"] }) {
