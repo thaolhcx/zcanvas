@@ -53,7 +53,7 @@ Mọi tính năng mới của node phải trả lời được: nó thuộc đ�
 | Seed | **Bỏ hẳn** (ô Seed trong Advanced, "· seed N" trong lịch sử node, dòng Seed ở chi tiết run, `RunEntry.seed`). Mỗi run là một vòng lặp agent tự viết lại prompt và chọn model, nên seed không tái tạo được kết quả; làm lại thì dùng công thức cuối đã lưu của run. Chỉ còn ý nghĩa với workflow kiểu ComfyUI | Đã sửa |
 | Trang generate | Tên **Studio** (không phải Spaces: "Space" là không gian sở hữu asset) | Đã sửa |
 | History | Chỉ media (Image, Video, Audio); text nằm ở feed Text và trên node | Đã sửa |
-| Làm thật | Adapter BytePlus + Vercel AI SDK; `@` link thật tới asset, upload, node; lưu mọi output nhưng thư viện chỉ hiện cái được giữ. Xem [real-build-plan.md](real-build-plan.md) | Plan |
+| Làm thật | Adapter BytePlus + LLM tương thích OpenAI, mọi lần gọi model qua hàng đợi của mình, không dùng hạ tầng Vercel; `@` link thật tới asset, upload, node; lưu mọi output nhưng thư viện chỉ hiện cái được giữ. Xem [real-build-plan.md](real-build-plan.md) | Plan |
 | `@` trong prompt | Autocomplete như code editor; **danh sách theo loại node**: Text gọi mọi input; Image gọi ảnh/text + màu; Video gọi ảnh/video/audio; Audio gọi text/audio | Đã sửa |
 | Text node | **Preset ý định** là hàng đầu (Custom · Ad copy · Enrich prompt · Describe media · Script); model/effort xuống mục "Model" bên dưới | Đã sửa |
 | Tab mode (Video/Audio) | **Giữ tường minh.** Model quá phức tạp, nhiều loại tham chiếu, không đoán được | Giữ nguyên |
