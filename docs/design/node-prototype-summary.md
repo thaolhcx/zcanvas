@@ -41,7 +41,7 @@ Thứ tự từ trên xuống:
 1. Tab mode (Video, Audio): mode model không hỗ trợ thì ẩn, mode thiếu input thì mờ.
 2. Chip input đang nối, mỗi chip ghi **vai trò** của input đó: *Prompt · Idea → prompt*, *First frame · Key visual 1*, *Source · Clip.mp4*. Vai trò tuỳ loại node và mode (Video: First frame / Last frame ở mode khung đầu-cuối, Source ở mode sửa/nối dài, Reference ở mode tham chiếu; Image: Prompt / Reference / Source (nhiều ảnh được, giới hạn theo model); Audio: Script / Voice reference; Text: tất cả là Context). Hệ thống tự xếp khi nối dây và xếp lại khi đổi mode; bấm vào vai trò để đổi (chọn slot đã có người thì hai bên hoán đổi). Input không có chỗ trong mode hiện tại thì chip đỏ "No slot" và khoá Run. Bấm × là xoá dây.
 3. Ô prompt: gõ `@` là **autocomplete** như trong code editor: gõ tiếp để lọc các node đang nối, ↑↓ chọn, Enter/Tab chèn, Esc đóng; mục "Color selection" nằm cùng danh sách. Token đã chèn hiện thành chip dưới ô. Nút ⤢ mở to.
-4. Hàng dưới, theo thứ tự **ý định trước, model sau**: các chip kết quả (kích thước, thời lượng, số lượng…) → "Advanced Parameters" hoặc "Tone Settings" → chip model **"Auto · <tên model>"** (Auto = hệ thống chọn; chọn tay thì ghim) → "1×" (chạy nhiều lần) → nút chạy. Không có billing.
+4. Hàng dưới: chip model **"Auto · <tên model>"** (Auto = hệ thống chọn; chọn tay thì ghim) → các chip kết quả (kích thước, thời lượng, số lượng…) → "Advanced Parameters" hoặc "Tone Settings" → "1×" (chạy nhiều lần) → nút chạy. Không có billing. (Thứ tự chip model đứng đầu chốt ở feedback #30.)
 
 Phím tắt: ⌘Enter chạy node đang chọn.
 
