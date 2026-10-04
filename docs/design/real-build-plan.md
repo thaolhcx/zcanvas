@@ -26,20 +26,23 @@ Trạng thái: **plan, chưa làm**. Thay prototype ([node-prototype-summary.md]
 | Asset | Output tự thành asset `generated` có `generation` (prompt, model, settings, references); media browser có lọc Uploaded/Generated | Không có cờ `kept` |
 | Web | Canvas đồng bộ Yjs (Hocuspocus); `BaseNode` + `ParamForm`; chọn run trong "Run history" | Kit chưa dùng ở app thật |
 
-## 3. Contract cần chốt trước khi code (P0)
+## 3. Contract cần chốt trước khi code
 
-1. **Catalog model** phía server: `GET /models` trả `ModelSpec` (id, kind, fields, accepts, cancel). Kit vẽ tham số từ đây. Node chỉ giữ `model` (hoặc `auto`), `mode`, `prompt` và `params` của model. Xem lại phần "hai hệ type" trong [node-architecture-review.md](node-architecture-review.md).
-2. **Prompt có tham chiếu.** Param `prompt` là chuỗi có token, ví dụ `@[Logo](asset:ast_123)` và `@[Key visual](node:n_abc)`. Tên chỉ để hiển thị; đổi tên node hay asset không làm hỏng link. Runner đổi token thành danh sách tham chiếu có thứ tự và viết lại theo quy ước của model (ví dụ "image 1").
+Mỗi mục ghi giai đoạn cần nó: **A** = provider + Studio (làm trước), **B** = canvas (làm sau).
+
+1. **(A) Catalog model** phía server: `GET /models` trả `ModelSpec` (id, kind, fields, accepts, cancel). Kit vẽ tham số từ đây. Node chỉ giữ `model` (hoặc `auto`), `mode`, `prompt` và `params` của model. Xem lại phần "hai hệ type" trong [node-architecture-review.md](node-architecture-review.md).
+2. **(A: `asset:`, B: `node:`) Prompt có tham chiếu.** Param `prompt` là chuỗi có token, ví dụ `@[Logo](asset:ast_123)` và `@[Key visual](node:n_abc)`. Tên chỉ để hiển thị; đổi tên node hay asset không làm hỏng link. Runner đổi token thành danh sách tham chiếu có thứ tự và viết lại theo quy ước của model (ví dụ "image 1").
    - `node:` phải có edge thật tới node đó. Gõ `@` chọn một node chưa nối thì **tự tạo edge** (kèm vai trò), để canvas luôn thể hiện đúng flow.
-   - `asset:` trên canvas: tạo node `input.asset` và edge, để thấy được trên canvas. Trong Studio không có canvas nên lưu thẳng id asset.
+   - `asset:` **luôn đi kèm node `input.asset` + edge** (đã chốt). Trên canvas, người dùng thấy node đó. Canvas ẩn của Studio cũng làm y như vậy, chỉ là không hiện ra, nên runner chỉ có một đường đọc tham chiếu.
    - Upload: tải lên thành asset trước (`POST /assets`), rồi thành `asset:`.
    - Tham chiếu hỏng (asset đã xoá, node đã xoá) là lỗi kiểm tra trước khi chạy, giống `INPUT_REQUIRED`.
-3. **Vai trò trên edge.** `RecipeEdge.targetPort` mang vai trò (`first`, `last`, `source`, `reference`, `voice`…), khớp `RoleSpec` của kit.
-4. **Node `text.generate`.** Input `context` (nhiều, mọi kind), param `preset`, `system`, `model`, `effort`, `useOwnText` (chỉ trên canvas).
-5. **Asset `kept`.** Cột `assets.kept boolean`, upload = `true`, generated = `false`. `GET /assets` mặc định `kept=true`, có `kept=all`. `POST /assets/:id/keep` và `/unkeep`. Kéo một kết quả vào canvas, tải xuống hoặc dùng làm tham chiếu thì tự `keep`.
-6. **Lịch sử theo node.** `GET /canvases/:id/nodes/:nodeId/history`: các lần chạy của node qua mọi run (job + output + snapshot giá trị). Retry **không xoá** job cũ nữa mà đánh dấu thay thế.
-7. **Chạy một node.** `POST /runs` nhận `target: nodeId`: chạy node đó và phần phía trên còn thiếu (dùng `output_cache`). Chi tiết ngữ nghĩa Run vẫn là scope riêng của bạn; đây chỉ là mức tối thiểu để Composer và Studio chạy được.
-8. **Bỏ seed** khỏi registry (`image.generate`). `GenerationProvider.seed` vẫn giữ nếu nhà cung cấp trả về, vì đó là dữ liệu lineage, không hiện trên UI.
+3. **(A) Vai trò trên edge.** `RecipeEdge.targetPort` mang vai trò (`first`, `last`, `source`, `reference`, `voice`…), khớp `RoleSpec` của kit.
+4. **(A) Node `text.generate`.** Input `context` (nhiều, mọi kind), param `preset`, `system`, `model`, `effort`, `useOwnText` (chỉ trên canvas).
+5. **(A) Asset `kept`.** Cột `assets.kept boolean`, upload = `true`, generated = `false`. `GET /assets` mặc định `kept=true`, có `kept=all`. `POST /assets/:id/keep` và `/unkeep`. Kéo một kết quả vào canvas, tải xuống hoặc dùng làm tham chiếu thì tự `keep`.
+6. **(A) Lịch sử theo node.** `GET /canvases/:id/nodes/:nodeId/history`: các lần chạy của node qua mọi run (job + output + snapshot giá trị). Retry **không xoá** job cũ nữa mà đánh dấu thay thế.
+7. **(A) Chạy một node.** `POST /runs` nhận `target: nodeId`: chạy node đó và phần phía trên còn thiếu (dùng `output_cache`). Chi tiết ngữ nghĩa Run vẫn là scope riêng của bạn; đây chỉ là mức tối thiểu để Composer và Studio chạy được.
+8. **(A) Bỏ seed** khỏi registry (`image.generate`). `GenerationProvider.seed` vẫn giữ nếu nhà cung cấp trả về, vì đó là dữ liệu lineage, không hiện trên UI.
+9. **(A) Auto prompt** (bản đầu của vòng lặp chất lượng, đã chốt). Param `autoPrompt` cho node Image, Video, Audio, mặc định bật. Bật thì trước khi sinh có một bước LLM viết lại prompt theo model và các tham chiếu (giữ nguyên token `@`). `generation` lưu cả **ý định** (prompt người dùng gõ) và **prompt cuối** đã gửi. Chi tiết run hiện cả hai; Re-edit và Clone & try lấy ý định, Regenerate dùng lại prompt cuối.
 
 ## 3a. Hàng đợi sinh media (D6)
 
@@ -59,7 +62,7 @@ Mô hình mới: **tạo task, hẹn giờ theo thời gian dự kiến, đến 
 10. **Công bằng giữa người dùng:** mỗi người có trần số job đang chạy, để một người chạy hàng loạt không chặn người khác.
 11. **LLM cũng đi qua hàng đợi** (node Text, các bước của vòng lặp chất lượng). Gọi nhanh thì `gen-submit` làm luôn, không cần `gen-fetch`.
 
-Vòng lặp chất lượng (P3) và agent chạy dài sau này dùng cùng cơ chế: mỗi bước là một job, trạng thái nằm trong Postgres, chờ media thì ngủ đến ETA hoặc tới khi callback đánh thức. Không cần thư viện durable workflow nào.
+Vòng lặp chất lượng và agent chạy dài sau này dùng cùng cơ chế: mỗi bước là một job, trạng thái nằm trong Postgres, chờ media thì ngủ đến ETA hoặc tới khi callback đánh thức. Không cần thư viện durable workflow nào.
 
 **Mẫu tham khảo:** harness của AI SDK 6 (`Agent` là interface, `ToolLoopAgent` là bản mặc định): chỉ dẫn + tool + điều kiện dừng, móc trước và sau mỗi bước, tin nhắn chia phần (chữ, gọi tool, kết quả tool), tool cần người duyệt. Vòng lặp của mình theo đúng hình dạng đó để sau này có thể cài interface `Agent` lên hàng đợi của mình, dùng lại thư viện và UI của họ mà không phụ thuộc hạ tầng Vercel.
 
@@ -89,29 +92,38 @@ Nguồn: nhánh `byteplus-provider` của `thaolhcx/nodetool` (repo riêng tư):
 
 ## 4. Các bước
 
+Viết provider và **thử trên Studio trước** (giai đoạn A). Canvas thật làm sau (giai đoạn B), dùng lại mọi thứ của A.
+
+### Giai đoạn A: provider + Studio
+
 | Bước | Nội dung | Xong khi |
 | --- | --- | --- |
-| **P0 · Contract** | Mục 3, kèm test contract và migration (`kept`, lịch sử job) | `pnpm test` xanh; registry và schema mới được validate |
-| **P1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, ETA, `gen-fetch` hẹn giờ, callback, slot dùng chung, huỷ, thử lại). Adapter BytePlus **port từ provider đã chạy thật** (§3b): Seedream (tạo + sửa ảnh), Seedance (tách thành gửi task và lấy kết quả, thêm huỷ task đang xếp hàng), Seed Audio TTS, tham chiếu qua TOS + `asset://`. Lỗi nhà cung cấp thành lỗi job dễ đọc. Ghi `usage` (cho hạn ngạch sau này). Script chạy thử với key thật + test dùng response ghi sẵn | Chạy được ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
-| **P2 · LLM** | Client OpenAI-compatible trỏ vào ModelArk, đi qua hàng đợi; worker `text.generate` (đọc ảnh, video, audio làm context nếu model hỗ trợ); Auto chọn model | Node Text chạy thật; đổi provider chỉ là đổi config |
-| **P3 · Vòng lặp chất lượng (bản đầu)** | Mỗi run là một vòng lặp, mỗi bước là một job trong hàng đợi, trạng thái lưu trong Postgres: viết lại prompt → sinh → (tuỳ chọn) chấm bằng model nhìn được → thử lại. Có trần số lần và thời gian. Lưu **công thức cuối** (prompt cuối, model, tham số) vào `generation` | Run lưu được ý định gốc và công thức cuối; huỷ giữa vòng lặp giữ bản tốt nhất |
-| **P4 · Kit vào canvas thật** | Node generate dùng Composer của kit qua một `GenSource` đọc Graph (Yjs) và API thật; `@` autocomplete lấy từ edge, asset và upload thật; chip vai trò ghi lên edge; lịch sử node từ endpoint mục 3.6 | Mọi luồng của prototype canvas chạy trên dữ liệu thật |
-| **P5 · Studio** | Route `/studio/:kind`. Mỗi người có một canvas ẩn cho mỗi loại (Text, Image, Video, Audio); feed = lịch sử node đó. Re-edit, Regenerate, Delete, chi tiết run, Clone & try, **Keep**, Tải xuống, Add to canvas. History dock (chỉ media) đọc từ server | Ba trang media và trang Text chạy thật; kết quả được giữ hiện trong media browser |
-| **P6 · Media browser** | Mặc định chỉ `kept`; công tắc "Hiện cả kết quả chưa giữ"; nút Keep / Unkeep trong chi tiết | Thư viện không bị lấp bởi các lần thử |
+| **A0 · Contract** | Các mục (A) ở §3, kèm test contract và migration (`kept`, lịch sử job, vai trò trên edge, canvas ẩn của Studio) | `pnpm test` xanh; registry và schema mới được validate |
+| **A1 · Hàng đợi + adapter BytePlus** | Hàng đợi theo §3a (`gen-submit`, ETA, `gen-fetch` hẹn giờ, callback, slot dùng chung, huỷ, thử lại). Adapter BytePlus **port từ provider đã chạy thật** (§3b): Seedream (tạo + sửa ảnh), Seedance (gửi task / lấy kết quả, huỷ task đang xếp hàng), Seed Audio TTS, tham chiếu qua TOS + `asset://`. Mock cũng đi qua cùng hàng đợi (ETA giả). Ghi `usage`. Script chạy thử với key thật + test dùng response ghi sẵn | Script chạy thử ra ảnh, video, giọng thật với `MOCK_WORKERS=0`; restart giữa lúc sinh video không gửi trùng và vẫn lấy được kết quả; mock vẫn chạy cho test và e2e |
+| **A2 · Studio Image, Video, Audio** | Route `/studio/:kind`. Mỗi người có một canvas ẩn cho mỗi loại; feed = lịch sử node đó. Composer của kit qua `GenSource` thật; upload và chọn từ thư viện thành asset + node `input.asset` + edge có vai trò; `@` gợi ý các tham chiếu đó. Thẻ đang chạy hiện thời gian dự kiến. Re-edit, Regenerate, Delete, chi tiết run, Clone & try, **Keep**, Tải xuống. History dock (chỉ media) đọc từ server | Ba trang chạy thật bằng BytePlus; huỷ, lỗi và restart hiện đúng trên feed |
+| **A3 · LLM + Text + Auto prompt** | Client tương thích OpenAI trỏ vào ModelArk, đi qua hàng đợi; worker `text.generate`; trang Text của Studio; Auto prompt (§3 mục 9) cho Image, Video, Audio | Trang Text chạy thật; bật Auto prompt thì chi tiết run hiện ý định và prompt cuối |
+| **A4 · Media browser** | Mặc định chỉ `kept`; công tắc "Hiện cả kết quả chưa giữ"; Keep / Unkeep trong chi tiết | Thư viện chỉ có cái được giữ và file upload |
 
-P1 và P2 làm song song được sau P0. P4 và P5 dùng chung `GenSource` thật nên làm P4 trước.
+A1 và A2 làm song song được sau A0: A2 chạy trên mock trước, rồi chuyển sang BytePlus khi A1 xong.
+
+### Giai đoạn B: canvas thật
+
+| Bước | Nội dung | Xong khi |
+| --- | --- | --- |
+| **B1 · Kit vào canvas** | Node generate dùng Composer của kit qua `GenSource` đọc Graph (Yjs); `@node` tự tạo edge kèm vai trò; `@asset` thêm node `input.asset` + edge; chip vai trò ghi lên edge; lịch sử node; chạy một node; Add to canvas từ Studio | Mọi luồng của prototype canvas chạy trên dữ liệu thật |
+| **B2 · Vòng lặp chất lượng đầy đủ** | Thêm bước chấm bằng model nhìn được và thử lại, mỗi bước là một job; trần số lần và thời gian; huỷ giữ bản tốt nhất | Một run có thể tự sửa và chọn bản tốt nhất |
 
 ## 5. Ngoài phạm vi
 
 - Thiết kế ngữ nghĩa Run đầy đủ (chạy lại phía dưới, cache, chạy hàng loạt): scope riêng của bạn.
-- Chat kiểu Canvas Agent và agent chạy dài: dùng cùng engine vòng lặp ở P3, làm sau.
+- Chat kiểu Canvas Agent và agent chạy dài: dùng cùng engine vòng lặp, làm sau.
 - Hạn ngạch và billing. `usage` vẫn ghi nhưng không hiện.
 - Dọn các kết quả không được giữ (retention).
 
-## 6. Còn cần bạn quyết
+## 6. Đã trả lời
 
-1. **`@asset` trên canvas** tự thêm node `input.asset` (đề xuất, để canvas thể hiện đủ flow) hay chỉ nằm trong prompt?
-2. **Vòng lặp chất lượng ở P3** bật mặc định cho mọi run, hay bắt đầu bằng "Auto prompt" rồi mới thêm bước chấm điểm?
+1. `@asset` trên canvas **có** tự thêm node `input.asset` + edge (§3 mục 2).
+2. Vòng lặp chất lượng **bắt đầu bằng Auto prompt** (§3 mục 9, bước A3); chấm điểm và thử lại ở B2.
 
 ## Nguồn
 
