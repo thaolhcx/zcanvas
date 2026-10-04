@@ -330,7 +330,8 @@ function start(id: string, value: GenValue, inputs: RefItem[]) {
     model = modelOf(modelsFor(spec), value.model);
   // Kept on the entry for a future quota; never shown (internal tool).
   const cost = estimate(spec, model, value, inputs).credits;
-  const ownText = activeEntry(n)?.outputs[0]?.text;
+  // Spaces have no "own text": the last feed result is not something the user asked to rewrite.
+  const ownText = id.startsWith("page:") ? undefined : activeEntry(n)?.outputs[0]?.text;
   const total = { text: 1800, image: 3200, video: 6000, audio: 2200 }[n.type];
   const started = Date.now();
   const job: RunJob = { id: nid("job"), at: started, value, refs: inputs, status: { state: "queued" } };

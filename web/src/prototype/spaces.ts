@@ -1,7 +1,7 @@
 // Small UI state shared by the Spaces page, the detail modal and the History dock.
 import { create } from "zustand";
 
-export const TABS = ["image", "video", "audio", "text"] as const;
+export const TABS = ["text", "image", "video", "audio"] as const;
 export type Tab = (typeof TABS)[number];
 
 const readTab = (): Tab => {

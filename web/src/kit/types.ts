@@ -35,6 +35,8 @@ export interface FieldSpec {
   help?: string;
   /** Hint inside an empty text box (string fields). */
   placeholder?: string;
+  /** Only meaningful on a canvas node (it reads the node's own result); spaces leave it out. */
+  canvasOnly?: boolean;
   /** No default: the chip shows a warning and Run is blocked until the user picks a value. */
   required?: string;
 }

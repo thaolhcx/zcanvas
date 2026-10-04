@@ -61,6 +61,7 @@ export const NODES: Record<string, NodeSpec> = {
         type: "boolean",
         placement: "advanced",
         default: true,
+        canvasOnly: true,
         help: "Send the text already in this node too, so you can ask to rewrite it.",
       },
     ],

@@ -13,7 +13,8 @@ export function useGenSource(id: string, opts?: { addInput?: () => void }): GenS
   const api = useProto.getState();
   return useMemo(() => {
     if (!node || node.type === "sticky") return undefined;
-    const spec = NODES[node.type];
+    // A space is a feed, not a node with its own text: canvas-only fields are left out there.
+    const spec = id.startsWith("page:") ? { ...NODES[node.type], fields: NODES[node.type].fields.filter((f) => !f.canvasOnly) } : NODES[node.type];
     const models = modelsFor(spec);
     const model = modelOf(models, node.value.model);
     const inputs = inputsOf({ nodes, edges }, id);

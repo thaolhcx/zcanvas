@@ -25,8 +25,8 @@ const nodeTypes = { gen: GenNode, sticky: StickyNode };
 const ADD: { type: ProtoType; label: string; description: string }[] = [
   { type: "text", label: "Text", description: "Scripts, advertising words, brand copy" },
   { type: "image", label: "Image", description: "Promotional graphics, posters, covers" },
-  { type: "audio", label: "Audio", description: "Music, dubbing, sound effects" },
   { type: "video", label: "Video", description: "Promotion of video, animation, film" },
+  { type: "audio", label: "Audio", description: "Music, dubbing, sound effects" },
   { type: "sticky", label: "Sticky Notes", description: "Logging with Markdown" },
 ];
 

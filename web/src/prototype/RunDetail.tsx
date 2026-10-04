@@ -51,7 +51,9 @@ export function RunDetail() {
   const cur = lookup(nodes, items[at]);
   if (!open || !cur) return null;
   const { node, entry, type } = cur;
-  const spec = NODES[type];
+  const base = NODES[type];
+  // Same rule as the composer: a space run never had the canvas-only fields.
+  const spec = node.id.startsWith("page:") ? { ...base, fields: base.fields.filter((f) => !f.canvasOnly) } : base;
   const { model, inline, advanced } = runParams(spec, modelsFor(spec), entry.value, voices);
   const out = entry.outputs[output] ?? entry.outputs[0];
   const media = entry.refs.filter((r) => r.kind !== "text");
