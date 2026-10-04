@@ -265,7 +265,7 @@ export function RunStrip({
       </button>
       <span title={new Date(entry.at).toLocaleTimeString()}>
         <History size={12} /> {entries.length - at}/{entries.length}
-        {entry.edited ? " · edited" : entry.seed ? ` · seed ${entry.seed}` : ""}
+        {entry.edited ? " · edited" : ""}
       </span>
       <button disabled={at === 0} onClick={() => onPick(entries[at - 1].id)} aria-label="Newer">
         <ChevronRight size={13} />

@@ -112,19 +112,12 @@ export function RunDetail() {
             {entry.value.times > 1 && <span>{entry.value.times}× run</span>}
           </div>
           <dl className="proto-detail-table">
-            {/* The run's actual seed replaces the model's "Seed" parameter (−1 = random). */}
-            {advanced
-              .filter((r) => r.key !== "seed")
-              .map((r) => (
-                <div key={r.key}>
-                  <dt>{r.label}</dt>
-                  <dd>{r.text}</dd>
-                </div>
-              ))}
-            <div>
-              <dt>Seed</dt>
-              <dd>{entry.seed || "—"}</dd>
-            </div>
+            {advanced.map((r) => (
+              <div key={r.key}>
+                <dt>{r.label}</dt>
+                <dd>{r.text}</dd>
+              </div>
+            ))}
           </dl>
           <small className="proto-detail-when">
             Generated on {stamp(entry.at)} · {where}

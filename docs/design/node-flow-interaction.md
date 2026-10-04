@@ -50,6 +50,7 @@ Mọi tính năng mới của node phải trả lời được: nó thuộc đ�
 |---|---|---|
 | Model | **Auto** mặc định ("Auto · Seedream 5.0 Pro"); chọn tay thì ghim. Vị trí: sau khi thử ở space, bạn chốt lại chip model **đứng đầu hàng** (feedback #30) — Auto vẫn là điểm chính, thứ tự chip là phụ | Đã sửa |
 | Billing / credit | **Bỏ hẳn khỏi UI** (badge trên node, pill, bảng giá, toast, "spent"). Tool nội bộ; credit chỉ quay lại nếu cần làm hạn ngạch | Đã sửa |
+| Seed | **Bỏ hẳn** (ô Seed trong Advanced, "· seed N" trong lịch sử node, dòng Seed ở chi tiết run, `RunEntry.seed`). Mỗi run là một vòng lặp agent tự viết lại prompt và chọn model, nên seed không tái tạo được kết quả; làm lại thì dùng công thức cuối đã lưu của run. Chỉ còn ý nghĩa với workflow kiểu ComfyUI | Đã sửa |
 | `@` trong prompt | Autocomplete như code editor; **danh sách theo loại node**: Text gọi mọi input; Image gọi ảnh/text + màu; Video gọi ảnh/video/audio; Audio gọi text/audio | Đã sửa |
 | Text node | **Preset ý định** là hàng đầu (Custom · Ad copy · Enrich prompt · Describe media · Script); model/effort xuống mục "Model" bên dưới | Đã sửa |
 | Tab mode (Video/Audio) | **Giữ tường minh.** Model quá phức tạp, nhiều loại tham chiếu, không đoán được | Giữ nguyên |

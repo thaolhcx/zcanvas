@@ -27,7 +27,6 @@ export const PRESETS: Record<string, { label: string; system: string; placeholde
 };
 
 const PROMPT_HINT = "Please enter a prompt word, use @ to introduce multimodal output";
-const seedField = { key: "seed", label: "Seed", type: "number" as const, placement: "advanced" as const, min: -1, default: -1, help: "-1 = random" };
 
 export const NODES: Record<string, NodeSpec> = {
   text: {
@@ -223,7 +222,6 @@ const effort = (levels: string[], def: string) => ({
 });
 
 // Shared image fields (Lumina schema formats: size-adjust, custom-camera, input_number, select…).
-const seed = { key: "seed", label: "Seed", type: "number" as const, placement: "advanced" as const, min: -1, default: -1, help: "-1 = random" };
 const watermark = { key: "watermark", label: "Watermark", type: "boolean" as const, placement: "advanced" as const, default: false };
 const outputFormat = {
   key: "format",
@@ -322,7 +320,7 @@ function legacyVideo(
     billing: Object.entries(rates)
       .reverse()
       .map(([r, v]) => ({ label: r, value: `${v} credits/s` })),
-    fields: [resolution(res, "720p"), duration(max, { min, smart: false }), seedField, cameraFixed, vWatermark, ...extra],
+    fields: [resolution(res, "720p"), duration(max, { min, smart: false }), cameraFixed, vWatermark, ...extra],
   };
 }
 
@@ -413,7 +411,7 @@ export const MODELS: ModelSpec[] = [
       { label: "Image Input Price", value: "0–0.3 credit/image" },
       { label: "Image Output Price", value: "9–18 credits/image" },
     ],
-    fields: [seedreamSize, outputFormat, watermark, seed],
+    fields: [seedreamSize, outputFormat, watermark],
   },
   {
     key: "seedream-5-lite",
@@ -426,7 +424,7 @@ export const MODELS: ModelSpec[] = [
     cancel: "never",
     price: { unit: "image", base: 6 },
     billing: [{ label: "Image Output Price", value: "6 credits/image" }],
-    fields: [seedreamSize, groupImage, maxImages, outputFormat, watermark, seed],
+    fields: [seedreamSize, groupImage, maxImages, outputFormat, watermark],
   },
   {
     key: "seedream-4.5",
@@ -453,7 +451,6 @@ export const MODELS: ModelSpec[] = [
         default: "standard",
         options: ["standard", "fast"].map((v) => ({ value: v, label: v })),
       },
-      seed,
     ],
   },
   {
@@ -507,7 +504,6 @@ export const MODELS: ModelSpec[] = [
     fields: [
       ...dims(2048),
       { ...negativePrompt, default: "nsfw" },
-      seed,
       { key: "preLlm", label: "Prompt pre-processing", type: "boolean", placement: "advanced", default: true },
       { key: "guidance", label: "Guidance scale", type: "number", display: "slider", placement: "advanced", min: 1, max: 10, step: 0.5, default: 3 },
     ],
@@ -555,7 +551,6 @@ export const MODELS: ModelSpec[] = [
       },
       outputFormat,
       watermark,
-      seed,
     ],
   },
   // Image tools (toolbar). Not in the model list; a tool creates a node already set to one of these.
@@ -620,7 +615,7 @@ export const MODELS: ModelSpec[] = [
       ["720p", 46, 28],
       ["480p", 21, 13],
     ]),
-    fields: [resolution(["480p", "720p", "1080p"], "720p"), duration(30), seedField, firstLast, sound(), vWatermark],
+    fields: [resolution(["480p", "720p", "1080p"], "720p"), duration(30), firstLast, sound(), vWatermark],
   },
   {
     key: "seedance-2.0",
@@ -642,7 +637,7 @@ export const MODELS: ModelSpec[] = [
       ["720p", 30, 19],
       ["480p", 14, 9],
     ]),
-    fields: [resolution(["480p", "720p", "1080p", "4k"], "720p"), duration(15, { smart: false }), seedField, firstLast, sound(), vWatermark, lastFrame],
+    fields: [resolution(["480p", "720p", "1080p", "4k"], "720p"), duration(15, { smart: false }), firstLast, sound(), vWatermark, lastFrame],
   },
   {
     key: "seedance-2-fast",
@@ -654,7 +649,7 @@ export const MODELS: ModelSpec[] = [
     cancel: "queued",
     price: { unit: "second", base: 14, byKey: { key: "resolution", map: { "480p": 7, "720p": 14 } } },
     billing: [{ label: "Price", value: "Tier-discounted per second" }],
-    fields: [resolution(["480p", "720p"], "720p"), duration(15, { smart: false }), seedField, cameraFixed, lastFrame, sound(), vWatermark],
+    fields: [resolution(["480p", "720p"], "720p"), duration(15, { smart: false }), cameraFixed, lastFrame, sound(), vWatermark],
   },
   {
     key: "seedance-2-mini",
@@ -677,7 +672,7 @@ export const MODELS: ModelSpec[] = [
       ]),
       { label: "Discount", value: "Limited-time member discounts apply based on membership tier" },
     ],
-    fields: [resolution(["480p", "720p"], "720p"), duration(15, { def: undefined, smart: false }), seedField, cameraFixed, lastFrame, sound(), vWatermark],
+    fields: [resolution(["480p", "720p"], "720p"), duration(15, { def: undefined, smart: false }), cameraFixed, lastFrame, sound(), vWatermark],
   },
   legacyVideo("seedance-1.5-pro", "Seedance 1.5 pro", ["480p", "720p", "1080p"], 12, { "480p": 1, "720p": 3, "1080p": 6 }, [
     { key: "fps", label: "Frames per second", type: "enum", placement: "advanced", default: "24", options: ["24"].map((v) => ({ value: v, label: v })) },

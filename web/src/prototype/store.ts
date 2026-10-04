@@ -245,7 +245,7 @@ export const useProto = create<State>((set, get) => ({
     stop.forEach((j) => clearTimers(j.id));
     // A stopped run stays in the feed as "cancelled" (Lumina V02), newest first like any entry.
     const gone: RunEntry[] = stop
-      .map((j) => ({ id: nid("run"), at: j.at, value: j.value, refs: j.refs, seed: 0, outputs: [], credits: 0, ms: Date.now() - j.at, cancelled: true }))
+      .map((j) => ({ id: nid("run"), at: j.at, value: j.value, refs: j.refs, outputs: [], credits: 0, ms: Date.now() - j.at, cancelled: true }))
       .reverse();
     const jobs = (n.jobs ?? []).filter((j) => !stop.includes(j));
     const history = [...gone, ...n.history].slice(0, HISTORY_MAX);
@@ -296,7 +296,6 @@ export const useProto = create<State>((set, get) => ({
       at: Date.now(),
       value: n.value,
       refs: [],
-      seed: 0,
       outputs: [{ kind: "text", text }],
       credits: 0,
       ms: 0,
@@ -361,7 +360,6 @@ function start(id: string, value: GenValue, inputs: RefItem[]) {
               at: Date.now(),
               value,
               refs: inputs,
-              seed: seed % 2147483647,
               outputs: generateOutputs(spec.output, value, inputs, seed, ownText),
               credits: cost / value.times,
               ms: Date.now() - started,

@@ -1,27 +1,30 @@
 // History dock (Lumina A06, I02 right column): every run of every space and canvas node, newest first,
 // filtered by prompt words, time and type. A click opens the detail modal over the filtered list.
+// Media only: text runs live in the Text space feed and on their canvas nodes, not in a thumbnail grid.
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useProto } from "./store.ts";
 import { RunThumb } from "./RunDetail.tsx";
-import { TABS, useDetail, type Tab } from "./spaces.ts";
+import { useDetail } from "./spaces.ts";
 
 const DAY = 24 * 3600e3;
 const TIME = { all: "All time", today: "Today", week: "Last 7 days" } as const;
-const TYPE_LABEL: Record<Tab, string> = { image: "Image", video: "Video", audio: "Audio", text: "Text" };
+const MEDIA = ["image", "video", "audio"] as const;
+type Media = (typeof MEDIA)[number];
+const TYPE_LABEL: Record<Media, string> = { image: "Image", video: "Video", audio: "Audio" };
 
 export function HistoryDock({ onClose }: { onClose: () => void }) {
   const nodes = useProto((s) => s.nodes);
   const open = useDetail((s) => s.open);
   const [q, setQ] = useState(""),
     [time, setTime] = useState<keyof typeof TIME>("all"),
-    [type, setType] = useState<Tab | "all">("all");
+    [type, setType] = useState<Media | "all">("all");
   const runs = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     const since = time === "today" ? new Date().setHours(0, 0, 0, 0) : time === "week" ? Date.now() - 7 * DAY : 0;
     return Object.values(nodes)
-      .filter((n) => n.type !== "sticky" && !n.asset)
-      .flatMap((n) => n.history.filter((e) => !e.cancelled && !e.edited && e.outputs.length).map((e) => ({ n, e, type: n.type as Tab })))
+      .filter((n) => MEDIA.includes(n.type as Media) && !n.asset)
+      .flatMap((n) => n.history.filter((e) => !e.cancelled && !e.edited && e.outputs.length).map((e) => ({ n, e, type: n.type as Media })))
       .filter(({ e, type: t }) => (type === "all" || t === type) && e.at >= since && words.every((w) => e.value.prompt.toLowerCase().includes(w)))
       .sort((a, b) => b.e.at - a.e.at);
   }, [nodes, q, time, type]);
@@ -45,9 +48,9 @@ export function HistoryDock({ onClose }: { onClose: () => void }) {
             </option>
           ))}
         </select>
-        <select value={type} onChange={(e) => setType(e.target.value as Tab | "all")} aria-label="Type">
+        <select value={type} onChange={(e) => setType(e.target.value as Media | "all")} aria-label="Type">
           <option value="all">All types</option>
-          {TABS.map((t) => (
+          {MEDIA.map((t) => (
             <option key={t} value={t}>
               {TYPE_LABEL[t]}
             </option>
