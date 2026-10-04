@@ -81,19 +81,24 @@ everything (`kept=all`), and asset details have Keep / Kept next to Download.
 
 ## Verified on mocks
 
-- `pnpm typecheck`, `pnpm build`, contract tests, and Vitest. The queue and BytePlus suites
-  replay recorded provider answers, including the AWS SigV4 test vector.
-- Playwright `e2e/studio.spec.ts` (7 scenarios):
+- `pnpm typecheck` and `pnpm build` pass. Changed files are formatted with Prettier.
+- `pnpm test`: 37 + 10 contract checks and 146 Vitest tests (18 files). The queue and BytePlus
+  suites replay recorded provider answers, including the AWS SigV4 test vector.
+- Playwright: 39 of 44 pass, including the 7 scenarios in `e2e/studio.spec.ts`:
   - image: run, Keep, details, History dock search, Delete + Undo
   - upload + `@` + Re-edit + Regenerate
-  - video: ETA and Stop while queued; a finished video plays
-  - text preset
-  - Auto prompt (detail shows what was sent) + Clone & try
+  - video: ETA and Stop while queued
+  - a finished video plays
+  - text preset; Auto prompt (detail shows what was sent) + Clone & try
   - audio
-  - library picker
-  - narrow-screen dock
+  - library picker + narrow-screen dock
 
-  The existing canvas and media specs were updated for v2 nodes and kept results.
+  The canvas, motion, template, palette and media specs were updated for v2 nodes and kept
+  results.
+- The 5 that fail are the 128-node FPS gates. They also fail on `main` in this cloud container
+  (headless, no GPU). On `main`, edge-signal ran at 28 FPS (31 on this branch), and the max
+  frame was 133 ms and 100 ms against a 100 ms gate. Run on their own, two of the five pass here.
+  They need a check on the reference laptop.
 
 ## Not proven live yet
 
