@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Bookmark,
+  BookmarkCheck,
   Check,
   ChevronRight,
   Copy,
@@ -23,6 +25,7 @@ import {
   deleteAsset,
   downloadUrl,
   getAsset,
+  keepAsset,
   renameAsset,
 } from "./api.ts";
 import { previews, useActivePreview } from "./previews.ts";
@@ -170,14 +173,36 @@ export function AssetDetails({
             <small>{formatDate(asset.createdAt)}</small>
           </span>
         </div>
-        <a
-          className="button download"
-          href={downloadUrl(asset)}
-          download={name}
-        >
-          <Download size={15} />
-          Download
-        </a>
+        <div className="details-actions">
+          <a
+            className="button download"
+            href={downloadUrl(asset)}
+            download={name}
+            onClick={() => {
+              // A download keeps the result (D5).
+              if (asset.kept === false)
+                setTimeout(() => void getAsset(asset.id).then((a) => (setAsset(a), onRenamed(a))).catch(() => {}), 800);
+            }}
+          >
+            <Download size={15} />
+            Download
+          </a>
+          {asset.source?.type === "generated" && canWrite && (
+            <button
+              className="button keep"
+              aria-pressed={asset.kept !== false}
+              title={asset.kept === false ? "Keep this result in the library" : "Hide it again unless results not kept are shown"}
+              onClick={async () => {
+                const saved = await keepAsset(asset.id, asset.kept === false);
+                setAsset(saved);
+                onRenamed(saved);
+              }}
+            >
+              {asset.kept === false ? <Bookmark size={15} /> : <BookmarkCheck size={15} />}
+              {asset.kept === false ? "Keep" : "Kept"}
+            </button>
+          )}
+        </div>
       </section>
       {asset.generation && <Generation info={asset.generation} />}
       {usage.length > 0 && (
@@ -349,6 +374,7 @@ function Generation({ info }: { info: GenerationInfo }) {
   const [expanded, setExpanded] = useState(false),
     [copied, setCopied] = useState(false);
   const prompt = info.prompt?.trim();
+  const intent = info.intent?.trim();
   const long = (prompt?.length ?? 0) > 180;
   const settings = Object.entries(info.settings ?? {});
   const ranAs =
@@ -392,6 +418,12 @@ function Generation({ info }: { info: GenerationInfo }) {
           {info.truncated?.includes("prompt") && (
             <small>The saved prompt was shortened.</small>
           )}
+        </div>
+      )}
+      {intent && intent !== prompt && (
+        <div className="generation-field">
+          <span className="caps">Typed (before Auto prompt)</span>
+          <p className="prompt">{intent}</p>
         </div>
       )}
       {info.references?.length ? (

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   isUnfilled,
+  resolveModel,
   type Asset,
   type AssetKind,
+  type ModelField,
+  type ModelSpec,
+  type NodeType,
   type Param,
   type RecipeNode,
 } from "../../contracts/index.ts";
@@ -89,7 +93,22 @@ export function ParamField({
         {label}
         {param.required && <i> ·</i>}
       </span>
-      {param.type === "enum" ? (
+      {param.type === "model" ? (
+        <select
+          aria-label={label}
+          value={String(value || "auto")}
+          onChange={(e) => commit(e.target.value)}
+        >
+          <option value="auto">Auto</option>
+          {(graph.models ?? [])
+            .filter((m) => m.kind === param.kind && !m.hidden)
+            .map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.title}
+              </option>
+            ))}
+        </select>
+      ) : param.type === "enum" ? (
         <select
           aria-label={label}
           value={String(value)}
@@ -163,6 +182,30 @@ export function ParamField({
     </label>
   );
 }
+/** A model's own field drawn with the same form controls as a registry param. */
+function fieldParam(field: ModelField): Param {
+  const common = { label: field.label, help: field.help, advanced: field.placement !== "inline" };
+  if (field.type === "enum")
+    return { ...common, type: "enum", options: field.options ?? [], default: field.default as string | undefined };
+  if (field.type === "number" || field.type === "duration")
+    return { ...common, type: "number", min: field.min, max: field.max, step: field.step, unit: field.unit, default: field.default as number | undefined };
+  if (field.type === "boolean") return { ...common, type: "boolean", default: field.default as boolean | undefined };
+  return { ...common, type: "string", placeholder: field.placeholder, default: field.default as string | undefined };
+}
+/** Registry params plus the fields of the model the node runs (Auto: the catalog default of its kind). */
+export function nodeParams(type: NodeType, node: RecipeNode, models: ModelSpec[] = []) {
+  const entries = Object.entries(type.params);
+  const modelParam = entries.find(([, p]) => p.type === "model");
+  if (!modelParam || modelParam[1].type !== "model") return entries;
+  const mode = typeof node.params.mode === "string" ? node.params.mode : undefined;
+  const model = resolveModel(models, modelParam[1].kind, node.params[modelParam[0]] ?? "auto", [], mode);
+  const own = (model?.fields ?? [])
+    .filter((f) => !f.modes || !mode || f.modes.includes(mode))
+    .map((f) => [f.key, fieldParam(f)] as [string, Param]);
+  // Model and prompt first (inline shows two), then the model's params, then the rest.
+  const first = entries.filter(([k]) => k === modelParam[0] || k === "prompt" || k === "mode");
+  return [...first, ...own, ...entries.filter((e) => !first.includes(e))];
+}
 export function ParamForm({
   node,
   inline = false,
@@ -172,7 +215,7 @@ export function ParamForm({
 }) {
   const graph = useGraph(),
     [advanced, setAdvanced] = useState(false);
-  const params = Object.entries(graph.registry.get(node.type)!.params).filter(
+  const params = nodeParams(graph.registry.get(node.type)!, node, graph.models).filter(
     ([, p]) =>
       (!p.showIf || node.params[p.showIf.key] === p.showIf.equals) &&
       (!p.advanced || advanced),
@@ -191,8 +234,8 @@ export function ParamForm({
         ))}
       </div>
       {!inline &&
-        Object.values(graph.registry.get(node.type)!.params).some(
-          (p) => p.advanced,
+        nodeParams(graph.registry.get(node.type)!, node, graph.models).some(
+          ([, p]) => p.advanced,
         ) && (
           <button className="subtle" onClick={() => setAdvanced(!advanced)}>
             {advanced ? "Less" : "More"} options

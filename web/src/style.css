@@ -185,6 +185,24 @@ a {
   bottom: 70px;
   padding: 13px 19px;
 }
+.home-intro > .studio-link {
+  position: absolute;
+  right: 160px;
+  bottom: 70px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+.home-intro > .studio-link:hover {
+  background: var(--hover);
+}
 .library-header {
   display: flex;
   justify-content: space-between;
@@ -2857,4 +2875,28 @@ audio.card-player {
   .asset-skeleton span {
     animation: none;
   }
+}
+.details-actions {
+  display: flex;
+  gap: 8px;
+}
+.details-actions > .button {
+  flex: 1;
+  justify-content: center;
+}
+.details-actions .keep[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.unkept-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #7c8799;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.unkept-toggle input {
+  margin: 0;
 }

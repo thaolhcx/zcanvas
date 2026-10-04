@@ -180,6 +180,7 @@ export function MediaBrowser({
     filters.kind,
     filters.source,
     filters.sort,
+    filters.unkept,
     retry,
   ]);
   useEffect(() => {
@@ -199,7 +200,7 @@ export function MediaBrowser({
       clearTimeout(timer);
       abort.abort();
     };
-  }, [spaceId, source, q, filters.kind, filters.source, searchNow]);
+  }, [spaceId, source, q, filters.kind, filters.source, filters.unkept, searchNow]);
   useEffect(() => {
     if (source !== "stock") return;
     setStock(undefined);
@@ -524,6 +525,14 @@ export function MediaBrowser({
                 <option value="upload">Uploaded</option>
                 <option value="generated">Generated</option>
               </select>
+              <label className="unkept-toggle" title="Results stay out of the library until used, downloaded or kept">
+                <input
+                  type="checkbox"
+                  checked={Boolean(filters.unkept)}
+                  onChange={(e) => media.setFilters({ unkept: e.target.checked })}
+                />
+                Show results not kept
+              </label>
               <ViewToggle view={view} onChange={media.setView} />
             </div>
           </>

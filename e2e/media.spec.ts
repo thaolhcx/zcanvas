@@ -301,9 +301,9 @@ test("generated prompt, settings and reference names stay as saved after the sou
         {
           id: "n_img",
           type: "image.generate",
-          typeVersion: 1,
+          typeVersion: 2,
           position: { x: 420, y: 0 },
-          params: { model: "flux-2", aspect: "1:1", count: 1, seed: 7 },
+          params: { model: "seedream-5-pro", ratio: "3:4", count: 1 },
         },
       ],
       [
@@ -338,6 +338,9 @@ test("generated prompt, settings and reference names stay as saved after the sou
   await page.getByRole("button", { name: "Close inspector" }).click();
   const browser = await openMedia(page);
   await browser.getByLabel("Source", { exact: true }).selectOption("generated");
+  // Results stay out of the library until used, downloaded or kept (D5).
+  await expect(browser.getByTestId("asset-card")).toHaveCount(0);
+  await browser.getByLabel("Show results not kept").check();
   const generated = browser.getByTestId("asset-card").first();
   await generated.locator(".asset-open").click();
   const details = browser.getByRole("complementary", { name: "Asset details" });
@@ -345,11 +348,16 @@ test("generated prompt, settings and reference names stay as saved after the sou
   await expect(generation).toContainText("A red fox in snow, golden hour");
   await expect(generation).not.toContainText("Something else entirely");
   await expect(generation).toContainText(ref);
-  await expect(generation).toContainText("flux-2");
+  await expect(generation).toContainText("seedream-5-pro");
   await generation.getByText("Generation settings").click();
-  await expect(generation).toContainText("seed");
+  await expect(generation).toContainText("3:4");
   // References are plain text, never links.
   await expect(generation.getByRole("link")).toHaveCount(0);
+  // Keep puts it in the library; it then lists without the switch.
+  await details.getByRole("button", { name: "Keep", exact: true }).click();
+  await expect(details.getByRole("button", { name: "Kept" })).toHaveAttribute("aria-pressed", "true");
+  await browser.getByLabel("Show results not kept").uncheck();
+  await expect(browser.getByTestId("asset-card")).toHaveCount(1);
 });
 test("video previews after a hover delay, audio only on Play, one player at a time", async ({
   page,

@@ -29,6 +29,7 @@ export const listAssets = (
       q: filters.q.trim(),
       kind: filters.kind,
       source: filters.source,
+      kept: filters.unkept ? "all" : undefined,
       sort: filters.sort,
       cursor,
       limit: PAGE_SIZE,
@@ -46,6 +47,7 @@ export const searchAssets = (
       q: filters.q.trim(),
       kind: filters.kind,
       source: filters.source,
+      kept: filters.unkept ? "all" : undefined,
       limit: 50,
     })}`,
     { signal },
@@ -69,6 +71,11 @@ export const deleteAsset = (id: string, canvasId?: string) =>
     `/assets/${encodeURIComponent(id)}${query({ canvasId })}`,
     { method: "DELETE" },
   );
+export const keepAsset = (id: string, keep: boolean) =>
+  request<Asset>(`/assets/${encodeURIComponent(id)}/${keep ? "keep" : "unkeep"}`, {
+    method: "POST",
+    body: "{}",
+  });
 export const getStock = () => request<unknown>("/stock");
 export const downloadUrl = (asset: Asset) => `${asset.url}?download=1`;
 /**

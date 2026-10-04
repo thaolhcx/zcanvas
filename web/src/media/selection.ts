@@ -9,6 +9,8 @@ export interface MediaFilters {
   kind?: AssetKind;
   source?: AssetSourceType;
   sort: AssetSort;
+  /** Also list results nobody kept (hidden by default, D5). */
+  unkept?: boolean;
 }
 export const emptyFilters = (): MediaFilters => ({
   q: "",
@@ -24,6 +26,7 @@ export function matchesFilters(
   semanticIds?: ReadonlySet<string>,
 ) {
   if (filters.kind && asset.kind !== filters.kind) return false;
+  if (!filters.unkept && asset.kept === false) return false;
   if (filters.source && (asset.source?.type ?? "upload") !== filters.source)
     return false;
   const q = filters.q.trim().toLowerCase();

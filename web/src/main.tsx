@@ -2,15 +2,16 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { IndexeddbPersistence } from "y-indexeddb";
-import { Plus, ArrowUpRight, Workflow } from "lucide-react";
+import { Plus, ArrowUpRight, Sparkles, Workflow } from "lucide-react";
 import { Graph, Y } from "../../graph/src/index.ts";
-import type { NodeType, Recipe } from "../../contracts/index.ts";
+import type { ModelSpec, ModelsResponse, NodeType, Recipe } from "../../contracts/index.ts";
 import pilot from "../../contracts/examples/pilot.recipe.json" with { type: "json" };
 import { GraphContext } from "./context.ts";
 import { Canvas } from "./Canvas.tsx";
 import { request, post, SYNC } from "./api.ts";
 import { bindGraph, useCanvas, useRun } from "./store.ts";
 import { TemplateBrowser } from "./TemplateBrowser.tsx";
+import { StudioApp } from "./studio/StudioApp.tsx";
 import type { TemplateEntry } from "./templates.ts";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
@@ -54,20 +55,34 @@ function App() {
       unbind: (() => void) | undefined;
     const init = async () => {
       let types: NodeType[];
+      let models: ModelSpec[] = [];
       try {
-        const bundle = await request<{ types: NodeType[] }>("/registry");
+        const [bundle, catalog] = await Promise.all([
+          request<{ types: NodeType[] }>("/registry"),
+          request<ModelsResponse>("/models"),
+        ]);
         types = bundle.types;
+        models = catalog.models;
         localStorage.setItem("zcanvas:registry", JSON.stringify(types));
+        localStorage.setItem("zcanvas:models", JSON.stringify(models));
       } catch {
         const cached = localStorage.getItem("zcanvas:registry");
         if (!cached) throw new Error("Connect once to load the node registry.");
         types = JSON.parse(cached);
+        models = JSON.parse(localStorage.getItem("zcanvas:models") ?? "[]");
       }
       await persistence.whenSynced;
       if (!live) return;
       const setup = () => {
         if (!live || current || !doc.getMap("meta").size) return;
-        current = new Graph(doc, new Map(types.map((t) => [t.type, t])));
+        current = new Graph(
+          doc,
+          new Map(types.map((t) => [t.type, t])),
+          undefined,
+          models,
+        );
+        // Canvases saved with v1 generate nodes are upgraded once (not undoable).
+        current.migrate();
         if (seed && current.toRecipe().nodes.length === 0)
           current.fromRecipe(
             { ...seed, meta: { ...seed.meta, id: canvasId } },
@@ -218,6 +233,10 @@ function App() {
           <Plus size={16} />
           New canvas
         </button>
+        <a className="studio-link" href="/studio/image">
+          <Sparkles size={16} />
+          Open Studio
+        </a>
       </section>
       <section className="canvas-library">
         <div className="library-header">
@@ -289,4 +308,6 @@ function App() {
 }
 if (import.meta.env.PROD && "serviceWorker" in navigator)
   void navigator.serviceWorker.register("/sw.js").catch(console.error);
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  location.pathname.startsWith("/studio") ? <StudioApp /> : <App />,
+);

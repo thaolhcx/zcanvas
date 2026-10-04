@@ -114,7 +114,7 @@ test("builds pilot by palette and port dragging, runs, exports, saves and opens 
     ["input.prompt", "text", "image.generate", "prompt"],
     ["image.generate", "image", "image.edit", "image"],
     ["image.edit", "image", "flow.if", "value"],
-    ["flow.if", "then", "video.generate", "image"],
+    ["flow.if", "then", "video.generate", "first"],
     ["input.prompt", "text", "audio.generate", "text"],
     ["video.generate", "video", "output.export", "video"],
     ["audio.generate", "audio", "output.export", "audio"],
