@@ -175,6 +175,8 @@ export interface AssetSearchQuery {
   spaceId?: string;
   kind?: AssetKind;
   source?: AssetSourceType;
+  /** "true" (default): kept assets and uploads only. "all": every result too. */
+  kept?: "true" | "all";
   /** 1–50, default 20. */
   limit?: number;
 }

@@ -72,6 +72,38 @@ export async function migrate() {
          FROM jsonb_array_elements(generation->'references') r))
     WHERE jsonb_typeof(generation->'references') = 'array'
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(generation->'references') r WHERE jsonb_typeof(r) = 'string');
+    -- #25: kept assets, per-node job history, the model queue, Studio canvases, provider caches.
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS kept boolean;
+    UPDATE assets SET kept = (COALESCE(source_type, 'upload') <> 'generated') WHERE kept IS NULL;
+    ALTER TABLE assets ALTER COLUMN kept SET DEFAULT false;
+    ALTER TABLE assets ALTER COLUMN kept SET NOT NULL;
+    CREATE INDEX IF NOT EXISTS assets_list_kept ON assets(space_id, kept, created_at DESC, id DESC) WHERE status = 'ready';
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS request jsonb;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS replaced_at timestamptz;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+    CREATE INDEX IF NOT EXISTS jobs_run ON jobs(run_id);
+    CREATE INDEX IF NOT EXISTS jobs_node_history ON jobs(node_id, created_at DESC);
+    ALTER TABLE runs ADD COLUMN IF NOT EXISTS target text;
+    ALTER TABLE canvases ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'canvas';
+    ALTER TABLE canvases ADD COLUMN IF NOT EXISTS studio_kind text;
+    ALTER TABLE canvases ADD COLUMN IF NOT EXISTS owner_id text;
+    CREATE UNIQUE INDEX IF NOT EXISTS canvases_studio ON canvases(owner_id, studio_kind) WHERE kind = 'studio';
+    CREATE TABLE IF NOT EXISTS gen_tasks (
+      id text PRIMARY KEY, job_id text NOT NULL, attempt integer NOT NULL, run_id text NOT NULL, node_id text NOT NULL,
+      actor_id text, provider text NOT NULL, model text NOT NULL, provider_task_id text,
+      state text NOT NULL CHECK (state IN ('submitting','submitted','done','failed','cancelled','dropped')),
+      eta_at timestamptz, deadline_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
+      submitted_at timestamptz, finished_at timestamptz, fetches integer NOT NULL DEFAULT 0, error text,
+      UNIQUE (job_id, attempt));
+    CREATE INDEX IF NOT EXISTS gen_tasks_active ON gen_tasks(model, state) WHERE state IN ('submitting','submitted','dropped');
+    CREATE INDEX IF NOT EXISTS gen_tasks_actor ON gen_tasks(actor_id, state) WHERE state IN ('submitting','submitted');
+    CREATE INDEX IF NOT EXISTS gen_tasks_run ON gen_tasks(run_id);
+    CREATE TABLE IF NOT EXISTS gen_stats (id bigserial PRIMARY KEY, model text NOT NULL, bucket text NOT NULL, ms integer NOT NULL, at timestamptz NOT NULL DEFAULT now());
+    CREATE INDEX IF NOT EXISTS gen_stats_model ON gen_stats(model, bucket, id DESC);
+    CREATE TABLE IF NOT EXISTS provider_media (sha256 text NOT NULL, provider text NOT NULL, object_key text, provider_asset_id text, real_person boolean, asset_type text, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (provider, sha256));
+    CREATE TABLE IF NOT EXISTS provider_state (key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE IF NOT EXISTS mock_tasks (id text PRIMARY KEY, ready_at timestamptz NOT NULL, request jsonb NOT NULL, state text NOT NULL DEFAULT 'queued', created_at timestamptz NOT NULL DEFAULT now());
     SELECT pg_advisory_unlock(hashtext('zcanvas.migrate'));
   `);
   // Under the same lock: two processes starting together would otherwise race

@@ -25,7 +25,7 @@ import {
 import { configuredProvider, type EmbeddingProvider } from "./embeddings.ts";
 const COLUMNS = `a.id, a.space_id, a.creator_id, a.source_type, a.source_canvas_id, a.source_run_id, a.source_node_id,
   a.name, a.kind, a.mime, a.bytes, a.meta, a.status, a.preview_status, a.description, a.tags, a.generation, a.revision,
-  a.created_at, a.updated_at, a.deleted_at`;
+  a.created_at, a.updated_at, a.deleted_at, a.kept`;
 let provider: EmbeddingProvider | undefined = configuredProvider();
 /** Tests and scripts may swap the provider; vectors stay separated by provider id. */
 export function setEmbeddingProvider(next: EmbeddingProvider | undefined) {
@@ -255,7 +255,7 @@ export function parseSearchQuery(
       "limit must be an integer from 1 to 50",
     );
   const unknown = Object.keys(rest).filter(
-    (k) => !["spaceId", "kind", "source"].includes(k),
+    (k) => !["spaceId", "kind", "source", "kept"].includes(k),
   );
   if (unknown.length)
     throw new ApiProblem(
@@ -270,8 +270,10 @@ function filters(
   params: unknown[],
   kind?: AssetKind,
   source?: AssetSourceType,
+  kept?: "true" | "all",
 ) {
   const where: string[] = [];
+  if (kept !== "all") where.push("a.kept");
   if (kind) {
     params.push(kind);
     where.push(`a.kind=$${params.length}`);
@@ -298,7 +300,7 @@ export async function searchAssets(
          (lower(a.name)=$2 OR lower(regexp_replace(a.name, '\\.[A-Za-z0-9]{1,5}$', ''))=$2) AS exact
        FROM assets a
        WHERE a.space_id=$1 AND a.status='ready' AND a.catalog_version=1
-         AND (lower(a.name) LIKE $3 OR lower(a.name) % $2)${filters(nameParams, query.kind, query.source)}
+         AND (lower(a.name) LIKE $3 OR lower(a.name) % $2)${filters(nameParams, query.kind, query.source, query.kept)}
        ORDER BY exact DESC, (lower(a.name) LIKE $3) DESC, similarity(lower(a.name), $2) DESC, a.id
        LIMIT ${limit}`,
       nameParams,
@@ -323,7 +325,7 @@ export async function searchAssets(
         config.search.queryTimeoutMs - (Date.now() - started),
       );
       const params: unknown[] = [spaceId, provider.id, JSON.stringify(vector)];
-      const extra = filters(params, query.kind, query.source);
+      const extra = filters(params, query.kind, query.source, query.kept);
       const client = await db.connect();
       try {
         await client.query("BEGIN");

@@ -17,7 +17,7 @@ const template = (title = `Template ${crypto.randomUUID()}`) => {
     tags: ["video"],
     inputs: [
       { nodeId: "n_prompt", paramKey: "text", label: "Scene" },
-      { nodeId: "n_vid", paramKey: "durationSec" },
+      { nodeId: "n_vid", paramKey: "duration" },
     ],
   };
   return recipe;
@@ -69,7 +69,7 @@ it("saves a template, clears its inputs and lists metadata without nodes", async
     (full.recipe as Recipe).nodes.map((n) => [n.id, n.params]),
   );
   expect(nodes.get("n_prompt")).not.toHaveProperty("text");
-  expect(nodes.get("n_vid")).not.toHaveProperty("durationSec");
+  expect(nodes.get("n_vid")).not.toHaveProperty("duration");
   expect(nodes.get("n_vid")).toHaveProperty("model");
   expect(full.recipe.meta.template).toEqual(recipe.meta.template);
   // Older clients still see templates through /presets.

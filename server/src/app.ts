@@ -6,6 +6,7 @@ import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
 import { Graph, Y, emptyRecipe } from "../../graph/src/index.ts";
 import {
+  migrateRecipe,
   validate,
   type CanvasInfo,
   type Recipe,
@@ -14,8 +15,13 @@ import {
 import { db } from "./db.ts";
 import { registry } from "./registry.ts";
 import { config } from "./config.ts";
-import { putAsset, unavailableAssets } from "./assets.ts";
+import { keepUsed, putAsset, unavailableAssets } from "./assets.ts";
 import { getRun, enqueue, emit } from "./runner.ts";
+import { cancelTasks } from "./gen.ts";
+import { models, modelsResponse } from "./catalog.ts";
+import { registerStudioRoutes } from "./studio.ts";
+import { boss } from "./queue.ts";
+import { callbackValid } from "./providers/callback.ts";
 import { templateRecipe, templateRoutes } from "./templates.ts";
 import {
   ApiProblem,
@@ -98,6 +104,7 @@ export async function createApp(options: { actorId?: string } = {}) {
   });
   await app.register(websocket);
   app.get("/health", async () => ({ ok: true, mock: config.mock }));
+  app.get("/models", async () => modelsResponse());
   app.get("/registry", async () => ({
     registryVersion: "2026.09.1",
     types: [...registry.values()],
@@ -107,7 +114,7 @@ export async function createApp(options: { actorId?: string } = {}) {
     async () =>
       (
         await db.query(
-          'SELECT id, name, version, updated_at, space_id AS "spaceId", project_id AS "projectId" FROM canvases WHERE space_id = ANY($1) ORDER BY updated_at DESC',
+          "SELECT id, name, version, updated_at, space_id AS \"spaceId\", project_id AS \"projectId\" FROM canvases WHERE space_id = ANY($1) AND kind='canvas' ORDER BY updated_at DESC",
           [await readableSpaceIds(actor)],
         )
       ).rows,
@@ -246,11 +253,66 @@ export async function createApp(options: { actorId?: string } = {}) {
   );
   templateRoutes(app);
   registerAssetRoutes(app, actor);
+  registerStudioRoutes(app, actor);
+  /**
+   * Provider callback (ModelArk callback_url): only wakes the scheduled fetch
+   * early; the fetch at the ETA still runs if a callback never comes.
+   */
+  app.post<{ Querystring: { task?: string; sig?: string } }>(
+    "/providers/callback",
+    async (request, reply) => {
+      const { task, sig } = request.query;
+      if (!task || !sig || !callbackValid(task, sig))
+        return reply.code(403).send({ error: "Invalid callback" });
+      await boss.send("gen-fetch", { taskId: task }, { singletonKey: `${task}:callback` });
+      return { ok: true };
+    },
+  );
   app.post<{
-    Body: { recipe: Recipe; canvasId: string; graphVersion: number };
+    Body: {
+      recipe: Recipe;
+      canvasId: string;
+      graphVersion: number;
+      target?: string;
+    };
   }>("/runs", async (request, reply) => {
-    const { recipe, canvasId, graphVersion } = request.body ?? {};
-    const issues = validate(recipe, registry);
+    const { canvasId, graphVersion, target } = request.body ?? {};
+    let recipe = request.body?.recipe;
+    if (recipe && typeof recipe === "object" && Array.isArray(recipe.nodes))
+      recipe = migrateRecipe(recipe);
+    if (target !== undefined) {
+      // Run one node: that node and the upstream work it needs (cached work is reused).
+      if (typeof target !== "string" || !recipe?.nodes?.some((n) => n.id === target))
+        return reply.code(400).send({ error: "target is not a node of this recipe" });
+      const keep = new Set([target]);
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const e of recipe.edges)
+          if (keep.has(e.target) && !keep.has(e.source)) {
+            keep.add(e.source);
+            grew = true;
+          }
+      }
+      const groups = new Set(recipe.nodes.filter((n) => keep.has(n.id)).map((n) => n.groupId));
+      recipe = {
+        ...recipe,
+        nodes: recipe.nodes.filter((n) => keep.has(n.id)),
+        edges: recipe.edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
+        groups: recipe.groups.filter((g) => groups.has(g.id)),
+      };
+    }
+    const structural = validate(recipe, registry);
+    if (structural.length) return reply.code(422).send(structural);
+    const kinds = recipe.nodes.length
+      ? Object.fromEntries(
+          (
+            await db.query("SELECT id, kind FROM assets WHERE id = ANY($1)", [
+              assetReferences(recipe).map((r) => r.assetId),
+            ])
+          ).rows.map((r) => [r.id, r.kind]),
+        )
+      : {};
+    const issues = validate(recipe, registry, models, kinds);
     if (issues.length) return reply.code(422).send(issues);
     if (graphVersion !== recipe.meta.version)
       return reply.code(422).send([
@@ -283,9 +345,12 @@ export async function createApp(options: { actorId?: string } = {}) {
           "This file was deleted or is not available in this space. Choose another file.",
       }));
     if (inputIssues.length) return reply.code(422).send(inputIssues);
+    // Using a result as a reference keeps it in the library (D5).
+    await keepUsed(refs.map((r) => r.assetId));
     const run: Run = {
       runId: `run_${crypto.randomUUID()}`,
       canvasId,
+      ...(target ? { target } : {}),
       graphVersion,
       status: "running",
       credits: 0,
@@ -293,8 +358,8 @@ export async function createApp(options: { actorId?: string } = {}) {
       jobs: [],
     };
     await db.query(
-      "INSERT INTO runs(id,canvas_id,recipe,data,space_id,actor_id) VALUES($1,$2,$3,$4,$5,$6)",
-      [run.runId, canvasId, recipe, run, spaceId, actor.id],
+      "INSERT INTO runs(id,canvas_id,recipe,data,space_id,actor_id,target) VALUES($1,$2,$3,$4,$5,$6,$7)",
+      [run.runId, canvasId, recipe, run, spaceId, actor.id, target ?? null],
     );
     await enqueue(run.runId);
     return reply.code(201).send(run);
@@ -387,6 +452,7 @@ export async function createApp(options: { actorId?: string } = {}) {
           }
       }
       const client = await db.connect();
+      let replaced: string[] = [];
       try {
         await client.query("BEGIN");
         const updated = await client.query(
@@ -397,10 +463,13 @@ export async function createApp(options: { actorId?: string } = {}) {
           await client.query("ROLLBACK");
           return reply.code(409).send({ error: "Run is already running" });
         }
-        await client.query(
-          "DELETE FROM jobs WHERE run_id=$1 AND node_id=ANY($2)",
-          [run.runId, [...affected]],
-        );
+        // Old jobs stay as the nodes' history; the retry makes new ones.
+        replaced = (
+          await client.query(
+            "UPDATE jobs SET replaced_at=now() WHERE run_id=$1 AND node_id=ANY($2) AND replaced_at IS NULL RETURNING id",
+            [run.runId, [...affected]],
+          )
+        ).rows.map((r) => r.id);
         await client.query(
           "DELETE FROM mock_failures WHERE run_id=$1 AND node_id=ANY($2)",
           [run.runId, [...affected]],
@@ -412,6 +481,7 @@ export async function createApp(options: { actorId?: string } = {}) {
       } finally {
         client.release();
       }
+      await cancelTasks(run.runId, replaced);
       await emit(run.runId, {
         type: "run.status",
         runId: run.runId,
@@ -448,9 +518,11 @@ export async function createApp(options: { actorId?: string } = {}) {
       );
       if (!cancelled.rowCount) return getRun(run.runId);
       await db.query(
-        "UPDATE jobs SET data=data || '{\"status\":\"cancelled\"}'::jsonb WHERE run_id=$1 AND data->>'status' IN ('queued','running')",
-        [run.runId],
+        "UPDATE jobs SET data=(data - 'queuePosition' - 'eta') || jsonb_build_object('status','cancelled','finishedAt',$2::text) WHERE run_id=$1 AND replaced_at IS NULL AND data->>'status' IN ('queued','running')",
+        [run.runId, new Date().toISOString()],
       );
+      // Model tasks: cancelled at the provider while queued, else dropped (fetched, not shown).
+      await cancelTasks(run.runId);
       await emit(run.runId, {
         type: "run.status",
         runId: run.runId,

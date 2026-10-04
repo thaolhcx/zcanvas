@@ -33,6 +33,7 @@ const ASSET_KEYS = new Set([
   "generation",
   "updatedAt",
   "deletedAt",
+  "kept",
 ]);
 function checkAsset(asset: Record<string, unknown>) {
   for (const key of ASSET_REQUIRED) expect(asset, key).toHaveProperty(key);

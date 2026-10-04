@@ -31,9 +31,19 @@ import {
   sweepStaleWrites,
 } from "./assets.ts";
 import { startSearchWorkers } from "./search.ts";
-import { boss, startQueue } from "./queue.ts";
+import { boss, startQueue, stopQueue } from "./queue.ts";
 export { boss, startQueue };
+import { emit, getRun, enqueue, advance } from "./run-store.ts";
+export { emit, getRun, enqueue };
 import { createModels, exportMedia } from "./models.ts";
+import { modeOf } from "../../contracts/validate.mjs";
+import {
+  buildRequest,
+  isGenNode,
+  requestProblem,
+  startGenWorkers,
+  type StoredRequest,
+} from "./gen.ts";
 if (process.env.ENABLE_SFX_EXAMPLE === "1") workers.push(sfxWorker);
 const activeWorkers = new Map<string, number>();
 async function withWorkerSlot<T>(
@@ -80,24 +90,6 @@ export function cacheKey(node: RecipeNode, inputs: Outputs, scope?: string) {
       }),
     )
     .digest("hex");
-}
-export async function emit(runId: string, event: RunEvent) {
-  await db.query("INSERT INTO run_events(run_id,data) VALUES($1,$2)", [
-    runId,
-    event,
-  ]);
-}
-export async function getRun(id: string): Promise<Run | undefined> {
-  const { rows } = await db.query("SELECT data FROM runs WHERE id=$1", [id]);
-  if (!rows.length) return undefined;
-  const jobs = await db.query(
-    "SELECT data FROM jobs WHERE run_id=$1 ORDER BY node_id, (data->>'itemIndex')::int NULLS FIRST",
-    [id],
-  );
-  return { ...rows[0].data, jobs: jobs.rows.map((r) => r.data) };
-}
-export async function enqueue(runId: string) {
-  return boss.send("canvas-run", { runId }, { singletonKey: runId });
 }
 function topo(recipe: Recipe) {
   const done = new Set<string>();
@@ -262,11 +254,13 @@ async function executeRun(runId: string) {
   );
   if (!acquired.rows[0].acquired) {
     lock.release();
+    // Another walk is busy; wake again shortly so this change is not lost.
+    await advance(runId, 1);
     return;
   }
   try {
     const { rows } = await db.query(
-      "SELECT r.recipe, r.generation, r.actor_id, COALESCE(r.space_id, c.space_id) AS space_id FROM runs r LEFT JOIN canvases c ON c.id=r.canvas_id WHERE r.id=$1",
+      "SELECT r.recipe, r.generation, r.actor_id, r.target, COALESCE(r.space_id, c.space_id) AS space_id FROM runs r LEFT JOIN canvases c ON c.id=r.canvas_id WHERE r.id=$1",
       [runId],
     );
     const run = await getRun(runId);
@@ -275,7 +269,10 @@ async function executeRun(runId: string) {
     const generation = rows[0].generation;
     const spaceId: string = rows[0].space_id;
     const actorId: string | null = rows[0].actor_id;
+    const target: string | null = rows[0].target;
     const results = new Map<string, Values>();
+    // Nodes whose model jobs are still in the queue; their dependents wait.
+    const pending = new Set<string>();
     const lists = new Map<string, boolean>();
     const current = async () => {
       const { rows } = await db.query(
@@ -304,6 +301,10 @@ async function executeRun(runId: string) {
       if (!(await current())) return;
       const entry = registry.get(node.type)!;
       const edges = recipe.edges.filter((e) => e.target === node.id);
+      if (edges.some((e) => pending.has(e.source))) {
+        pending.add(node.id);
+        continue;
+      }
       const fanEdges = edges.filter((e) => {
         const port = entry.inputs.find((p) => p.key === e.targetPort)!;
         return (
@@ -340,10 +341,29 @@ async function executeRun(runId: string) {
           previous?.status === "done" &&
           (await unavailableAssets(outputAssetIds(previous.outputs), spaceId))
             .length
-        )
-          previous = { ...previous, status: "queued", outputs: undefined };
+        ) {
+          if (isGenNode(node.type)) {
+            // A model job keeps its history: the old one is replaced by a new one.
+            await db.query("UPDATE jobs SET replaced_at=now() WHERE id=$1", [previous.jobId]);
+            previous = undefined;
+          } else previous = { ...previous, status: "queued", outputs: undefined };
+        }
+        if (isGenNode(node.type) && previous && ["queued", "running"].includes(previous.status)) {
+          // In the model queue. Re-send its submit if nothing holds it (a walk
+          // stopped between creating the job and queueing it); the singleton
+          // key makes this a no-op otherwise.
+          const { rowCount } = await db.query(
+            "SELECT 1 FROM gen_tasks WHERE job_id=$1 AND state IN ('submitting','submitted','dropped')",
+            [previous.jobId],
+          );
+          if (!rowCount)
+            await boss.send("gen-submit", { jobId: previous.jobId }, { singletonKey: previous.jobId });
+          pending.add(node.id);
+          return;
+        }
+        const terminal = ["done", "skipped", "failed", "cancelled"];
         const job: Job =
-          previous?.status === "done" || previous?.status === "skipped"
+          previous && terminal.includes(previous.status)
             ? previous
             : {
                 jobId: previous?.jobId ?? `job_${crypto.randomUUID()}`,
@@ -366,7 +386,7 @@ async function executeRun(runId: string) {
             }
           }
         };
-        if (job.status === "done" || job.status === "skipped") {
+        if (terminal.includes(job.status)) {
           collect();
           return;
         }
@@ -402,6 +422,55 @@ async function executeRun(runId: string) {
           job.status = "skipped";
           await save(job);
           collect();
+          return;
+        }
+        if (isGenNode(node.type)) {
+          // A model call: its own queue job (gen-submit), never awaited here.
+          const fail = async (code: string, message: string) => {
+            job.status = "failed";
+            job.error = { code, message };
+            await save(job);
+            collect();
+          };
+          const incoming = edges.map((edge) => {
+            const list = results.get(edge.source)?.[edge.sourcePort] ?? [];
+            const takeItem =
+              lists.get(`${edge.source}.${edge.sourcePort}`) &&
+              (fanEdges.includes(edge) || branchList);
+            return { edge, values: (takeItem ? [list[index]] : list).filter((v): v is Output => v !== undefined) };
+          });
+          let request: StoredRequest;
+          try {
+            if (lengthMismatch)
+              throw new Error("Fan-out input lists must have equal lengths");
+            checkValues(entry.inputs, inputs, false, modeOf(node, entry));
+            request = buildRequest(node, entry, incoming, recipe, run.canvasId);
+          } catch (error) {
+            return fail("MODEL", error instanceof Error ? error.message : String(error));
+          }
+          const problem = requestProblem(request);
+          if (problem) return fail("PARAM_VALUE", problem);
+          const key = cacheKey(node, inputs, spaceId);
+          const cacheable = entry.runner.kind === "job" && entry.runner.cacheable !== false;
+          // The node a run targets always makes something new; upstream work is reused.
+          if (cacheable && target !== node.id) {
+            const cached = (await db.query("SELECT outputs FROM output_cache WHERE key=$1", [key])).rows[0];
+            if (cached && !(await unavailableAssets(outputAssetIds(cached.outputs), spaceId)).length) {
+              job.outputs = cached.outputs;
+              job.status = "done";
+              job.progress = 1;
+              await save(job);
+              collect();
+              return;
+            }
+          }
+          if (cacheable) request.cacheKey = key;
+          job.model = request.model;
+          if (request.intent) job.intent = request.intent;
+          await save(job);
+          await db.query("UPDATE jobs SET request=$2 WHERE id=$1", [job.jobId, request]);
+          await boss.send("gen-submit", { jobId: job.jobId }, { singletonKey: job.jobId });
+          pending.add(node.id);
           return;
         }
         const controller = new AbortController();
@@ -616,6 +685,8 @@ async function executeRun(runId: string) {
         );
       results.set(node.id, output);
     }
+    // Model jobs still running: their completion wakes this walk again.
+    if (pending.size) return;
     if (await current()) {
       const final = (await getRun(runId))!;
       const status = final.jobs.some((j) => j.status === "failed")
@@ -654,6 +725,7 @@ export async function startRunner() {
   await startQueue();
   await startAssetWorkers();
   await startSearchWorkers();
+  await startGenWorkers();
   await boss.work<{ runId: string }>(
     "canvas-run",
     { batchSize: 4, pollingIntervalSeconds: 0.5 },
@@ -677,6 +749,6 @@ export async function startRunner() {
   return async () => {
     clearInterval(timer);
     clearInterval(sweeper);
-    await boss.stop({ graceful: true });
+    await stopQueue();
   };
 }

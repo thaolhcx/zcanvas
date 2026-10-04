@@ -39,7 +39,7 @@ const KINDS = ["image", "video", "audio"] as const;
 const MIME = /^(image|video|audio)\/[a-z0-9][a-z0-9.+-]{0,60}$/;
 const COLUMNS = `id, space_id, creator_id, source_type, source_canvas_id, source_run_id, source_node_id,
   name, kind, mime, bytes, meta, status, preview_status, description, tags, generation, revision,
-  created_at, updated_at, deleted_at`;
+  created_at, updated_at, deleted_at, kept`;
 type Row = Record<string, any>;
 const iso = (value: Date | string | null) =>
   value ? new Date(value).toISOString() : undefined;
@@ -64,6 +64,7 @@ export function toAsset(row: Row): Asset {
       ? { createdBy: { runId: row.source_run_id, nodeId: row.source_node_id } }
       : {}),
     createdAt: iso(row.created_at)!,
+    kept: row.kept ?? row.source_type !== "generated",
     ...(row.name ? { name: row.name } : {}),
     ...(row.space_id ? { spaceId: row.space_id } : {}),
     ...(row.creator_id ? { creatorId: row.creator_id } : {}),
@@ -259,8 +260,8 @@ export async function beginAsset(input: NewAsset) {
   const store = writeStore();
   await db.query(
     `INSERT INTO assets(id, catalog_version, space_id, creator_id, source_type, source_canvas_id, source_run_id, source_node_id, source_job_id,
-       name, kind, mime, bytes, meta, status, preview_status, generation)
-     VALUES($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,'uploading',$13,$14)`,
+       name, kind, mime, bytes, meta, status, preview_status, generation, kept)
+     VALUES($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,'uploading',$13,$14,$15)`,
     [
       id,
       input.spaceId,
@@ -276,6 +277,8 @@ export async function beginAsset(input: NewAsset) {
       input.meta ?? {},
       kind === "audio" ? "none" : "pending",
       input.generation ?? null,
+      // Uploads are kept; results are kept once used or kept by hand (D5).
+      input.source.type !== "generated",
     ],
   );
   await db.query(
@@ -501,6 +504,11 @@ export function parseListQuery(query: Record<string, unknown>): AssetListQuery {
       throw bad("source must be upload or generated");
     out.source = query.source;
   }
+  if (query.kept !== undefined) {
+    if (query.kept !== "true" && query.kept !== "all")
+      throw bad("kept must be true or all");
+    out.kept = query.kept;
+  }
   if (query.sort !== undefined) {
     if (
       !["created_desc", "created_asc", "name_asc"].includes(String(query.sort))
@@ -540,6 +548,8 @@ export async function listAssets(
   };
   if (query.kind) add((n) => `kind=${n}`, query.kind);
   if (query.source) add((n) => `source_type=${n}`, query.source);
+  // The library shows kept assets unless asked for every result.
+  if (query.kept !== "all") where.push("kept");
   if (query.q) add((n) => `lower(name) LIKE ${n}`, likePattern(query.q));
   // Stable keyset pagination: the ID breaks ties between equal sort values.
   const order =
@@ -910,5 +920,24 @@ export async function startAssetWorkers() {
     async (jobs) => {
       for (const job of jobs) await cleanupAsset(job.data.assetId);
     },
+  );
+}
+/** Keep (or stop keeping) a result in the library. Uploads are always kept. */
+export async function setKept(actor: Actor, id: string, kept: boolean) {
+  const found = await getAssetFor(actor, id, "write");
+  if (!kept && found.source_type !== "generated")
+    throw new ApiProblem(409, "CONFLICT", "Uploads are always kept");
+  const { rows } = await db.query(
+    `UPDATE assets SET kept=$2, updated_at=now() WHERE id=$1 RETURNING ${COLUMNS}`,
+    [id, kept],
+  );
+  return toAsset(rows[0]);
+}
+/** A result was used (as a reference, downloaded, placed on a canvas): keep it. */
+export async function keepUsed(ids: string[]) {
+  if (!ids.length) return;
+  await db.query(
+    "UPDATE assets SET kept=true, updated_at=now() WHERE id = ANY($1) AND NOT kept AND status='ready'",
+    [ids],
   );
 }

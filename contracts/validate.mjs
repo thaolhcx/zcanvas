@@ -210,7 +210,7 @@ export function validate(recipe, registry, models, assetKinds) {
  * Kept apart from validate so a canvas created from a template can still delete or change
  * the nodes its template once named. Returns Issue[] with code SCHEMA.
  */
-export function validateTemplate(recipe, registry) {
+export function validateTemplate(recipe, registry, models) {
   const issues = [];
   const template = recipe?.meta?.template;
   if (!template) return issues;
@@ -221,12 +221,19 @@ export function validateTemplate(recipe, registry) {
     const node = nodes.get(input.nodeId);
     const type = node && registry.get(node.type);
     if (!node) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i} names missing node ${input.nodeId}`, ...where });
-    else if (type && !type.params[input.paramKey]) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i}: ${node.type} has no param ${input.paramKey}`, ...where });
+    else if (type && !type.params[input.paramKey] && !modelField(type, input.paramKey, models)) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i}: ${node.type} has no param ${input.paramKey}`, ...where });
     const key = `${input.nodeId}.${input.paramKey}`;
     if (seen.has(key)) issues.push({ code: 'SCHEMA', severity: 'error', message: `/meta/template/inputs/${i} repeats ${key}`, ...where });
     seen.add(key);
   });
   return issues;
+}
+
+/** A param a node keeps for its model: any catalog model of its kind has this field (or no catalog given). */
+function modelField(type, key, models) {
+  const param = Object.values(type.params).find(p => p.type === 'model');
+  if (!param) return false;
+  return !models || models.some(m => m.kind === param.kind && m.fields.some(f => f.key === key));
 }
 
 export function checkModelEntry(entry) {

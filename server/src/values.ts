@@ -4,6 +4,8 @@ export function checkValues(
   ports: Port[],
   values: Outputs,
   allowMissing = false,
+  /** The node's mode: a port limited to other modes is not required. */
+  mode?: string,
 ) {
   for (const [key, output] of Object.entries(values)) {
     const port = ports.find((p) => p.key === key);
@@ -38,6 +40,10 @@ export function checkValues(
   }
   if (!allowMissing)
     for (const port of ports)
-      if (port.required && values[port.key] === undefined)
+      if (
+        port.required &&
+        (!port.modes || mode === undefined || port.modes.includes(mode)) &&
+        values[port.key] === undefined
+      )
         throw new Error(`Required port ${port.key} is missing`);
 }

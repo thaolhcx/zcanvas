@@ -280,6 +280,8 @@ export interface Job {
   /** What the user typed and what was sent after Auto prompt. */
   intent?: string;
   finalPrompt?: string;
+  /** When the job ended (done, failed or cancelled). */
+  finishedAt?: string;
 }
 export interface Run {
   runId: string;

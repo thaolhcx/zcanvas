@@ -21,6 +21,8 @@ import {
   parseListQuery,
   parsePatch,
   patchAsset,
+  setKept,
+  keepUsed,
   spool,
   toAsset,
 } from "./assets.ts";
@@ -116,6 +118,12 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
       parsePatch(request.body),
     ),
   );
+  app.post<{ Params: { id: string } }>("/assets/:id/keep", async (request) =>
+    setKept(actor, checkId(request.params.id, "asset ID"), true),
+  );
+  app.post<{ Params: { id: string } }>("/assets/:id/unkeep", async (request) =>
+    setKept(actor, checkId(request.params.id, "asset ID"), false),
+  );
   app.delete<{ Params: { id: string }; Querystring: { canvasId?: string } }>(
     "/assets/:id",
     async (request) =>
@@ -168,6 +176,9 @@ export function registerAssetRoutes(app: FastifyInstance, actor: Actor) {
         );
       else throw notFound("This asset has no preview");
     }
+    // Downloading a result keeps it (D5).
+    if (kind === "file" && (request.query as { download?: string })?.download === "1")
+      await keepUsed([asset.id]);
     const object = await objectFor(asset.id, role);
     if (!object || object.state !== "stored")
       throw new ApiProblem(

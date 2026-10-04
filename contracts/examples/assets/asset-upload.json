@@ -10,6 +10,7 @@
     "height": 1280
   },
   "createdAt": "2026-10-01T08:00:00.000Z",
+  "kept": true,
   "name": "Hero portrait.png",
   "spaceId": "spc_local",
   "creatorId": "usr_local",

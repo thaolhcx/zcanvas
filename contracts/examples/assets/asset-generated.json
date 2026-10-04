@@ -15,6 +15,7 @@
     "nodeId": "n_vid"
   },
   "createdAt": "2026-10-01T08:10:00.000Z",
+  "kept": false,
   "name": "Generate video 1.mp4",
   "spaceId": "spc_local",
   "creatorId": "usr_local",

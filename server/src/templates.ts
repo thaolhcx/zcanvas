@@ -4,8 +4,10 @@ import {
   validate,
   validateTemplate,
   clearTemplateInputs,
+  migrateRecipe,
   type Recipe,
 } from "../../contracts/index.ts";
+import { models } from "./catalog.ts";
 import { loadTemplates } from "../../contracts/node.mjs";
 import { db } from "./db.ts";
 import { registry } from "./registry.ts";
@@ -16,16 +18,25 @@ export const builtInDir = new URL(
   import.meta.url,
 ).pathname;
 const covers = new Map<string, string>();
-const incomplete = new Set(["PARAM_REQUIRED", "INPUT_REQUIRED"]);
+const incomplete = new Set([
+  "PARAM_REQUIRED",
+  "INPUT_REQUIRED",
+  "MODE",
+  "MODEL",
+  "REFERENCE",
+]);
 const migration = new Set(["VERSION", "UNKNOWN_TYPE"]);
 export const isBuiltIn = (id: string) => id.startsWith("tpl_builtin_");
 /** Upserts every built-in so repo edits reach existing databases. Idempotent. */
 export async function seedTemplates(dir = builtInDir) {
-  const templates = loadTemplates(dir);
+  const templates = loadTemplates(dir).map((t) => ({
+    ...t,
+    recipe: migrateRecipe(t.recipe),
+  }));
   for (const template of templates) {
     const issues = [
-      ...validate(template.recipe, registry),
-      ...validateTemplate(template.recipe, registry),
+      ...validate(template.recipe, registry, models),
+      ...validateTemplate(template.recipe, registry, models),
     ].filter((i) => !incomplete.has(i.code));
     if (!template.recipe.meta?.template || issues.length)
       throw new Error(
@@ -60,7 +71,7 @@ async function coverUrl(row: Row) {
 /** Browser metadata only: never includes recipe nodes. */
 async function entry(row: Row) {
   const template = row.recipe.meta.template;
-  const blocking = validate(row.recipe, registry).find((i) =>
+  const blocking = validate(row.recipe, registry, models).find((i) =>
     migration.has(i.code),
   );
   return {
@@ -88,7 +99,7 @@ async function find(id: string) {
     "SELECT id, name, recipe, updated_at FROM presets WHERE id=$1",
     [id],
   );
-  return rows[0];
+  return rows[0] && { ...rows[0], recipe: migrateRecipe(rows[0].recipe) };
 }
 /** Loads one template for a new canvas, or explains why it cannot be used. */
 export async function templateRecipe(id: string) {
@@ -107,7 +118,9 @@ export function templateRoutes(app: FastifyInstance) {
     const { rows } = await db.query<Row>(
       "SELECT id, name, recipe, updated_at FROM presets ORDER BY (id LIKE 'tpl\\_builtin\\_%') DESC, updated_at DESC",
     );
-    return Promise.all(rows.map(entry));
+    return Promise.all(
+      rows.map((row) => entry({ ...row, recipe: migrateRecipe(row.recipe) })),
+    );
   });
   app.get<{ Params: { id: string } }>(
     "/templates/:id",
@@ -139,15 +152,16 @@ export function templateRoutes(app: FastifyInstance) {
   app.post<{ Body: { recipe: Recipe } }>(
     "/templates",
     async (request, reply) => {
-      const recipe = request.body?.recipe;
+      const body = request.body?.recipe;
+      const recipe = Array.isArray(body?.nodes) ? migrateRecipe(body) : body;
       if (!recipe?.meta?.template)
         return reply.code(422).send({
           error: "A template needs meta.template with a title and inputs",
           code: "VALIDATION",
         });
       const issues = [
-        ...validate(recipe, registry),
-        ...validateTemplate(recipe, registry),
+        ...validate(recipe, registry, models),
+        ...validateTemplate(recipe, registry, models),
       ].filter((i) => !incomplete.has(i.code));
       if (issues.length)
         return reply.code(422).send({

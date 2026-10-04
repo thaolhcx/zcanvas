@@ -30,6 +30,7 @@ const make = async (
     description?: string;
     prompt?: string;
     kind?: "image" | "audio";
+    unkept?: boolean;
   } = {},
 ) => {
   const audio = extra.kind === "audio";
@@ -55,6 +56,9 @@ const make = async (
       publish: "ready",
     },
   );
+  // Search covers the library: results there are kept ones (D5).
+  if (extra.prompt && !extra.unkept)
+    await db.query("UPDATE assets SET kept=true WHERE id=$1", [asset.id]);
   if (extra.description)
     await db.query("UPDATE assets SET description=$2 WHERE id=$1", [
       asset.id,
@@ -382,5 +386,27 @@ describe("semantic search", () => {
     await expect(
       searchAssets({ id: otherId }, { q: "lighthouse", spaceId: space }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+describe("kept results (D5)", () => {
+  it("finds a result that is not kept only with kept=all", async () => {
+    const space = await teamSpace({ usr_local: "owner" });
+    const loose = await make(space, "IMG_loose.png", {
+      prompt: "a lantern floating over a dark lake",
+      unkept: true,
+    });
+    const shown = await search(app, `spaceId=${space}&q=lantern`);
+    expect(ids(shown)).not.toContain(loose.id);
+    const all = await search(app, `spaceId=${space}&q=lantern&kept=all`);
+    expect(ids(all)).toContain(loose.id);
+    const listed = (await app.inject(`/assets?spaceId=${space}`)).json();
+    expect(listed.items.map((a: { id: string }) => a.id)).not.toContain(loose.id);
+    const every = (await app.inject(`/assets?spaceId=${space}&kept=all`)).json();
+    expect(every.items.map((a: { id: string }) => a.id)).toContain(loose.id);
+    const kept = await app.inject({ method: "POST", url: `/assets/${loose.id}/keep` });
+    expect(kept.json().kept).toBe(true);
+    const after = (await app.inject(`/assets?spaceId=${space}`)).json();
+    expect(after.items.map((a: { id: string }) => a.id)).toContain(loose.id);
+    expect((await app.inject({ method: "POST", url: `/assets/${loose.id}/unkeep` })).json().kept).toBe(false);
   });
 });

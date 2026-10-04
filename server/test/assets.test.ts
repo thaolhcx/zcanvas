@@ -387,14 +387,20 @@ describe("generated outputs", () => {
       generation: {
         nodeType: "image.generate",
         prompt,
-        prompts: { prompt },
-        model: "flux-2",
-        settings: { aspect: "1:1", count: 1 },
-        provider: { name: "mock", model: "mock:image" },
+        // Auto resolved to the catalog's default image model; settings are its params.
+        model: "seedream-5-pro",
+        settings: { ratio: "1:1", resolution: "2K", count: 1 },
+        provider: { name: "mock", model: "mock:seedream-5-pro" },
       },
+      // A result is stored but not kept until it is used or kept by hand (D5).
+      kept: false,
     });
-    const list = (
+    const library = (
       await app.inject(`/assets?spaceId=${team}&source=generated`)
+    ).json<AssetListResponse>();
+    expect(library.items.map((a) => a.id)).not.toContain(output.id);
+    const list = (
+      await app.inject(`/assets?spaceId=${team}&source=generated&kept=all`)
     ).json<AssetListResponse>();
     expect(list.items.map((a) => a.id)).toContain(output.id);
     // Editing the node later does not rewrite the older output's history.
