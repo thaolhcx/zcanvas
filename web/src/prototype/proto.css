@@ -90,6 +90,7 @@ html, body, #root { height: 100%; }
 .proto-modal-card header .kit-link { margin-left: auto; }
 .proto-samples { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; }
 .proto-samples button { flex-direction: column; padding: 6px; font-size: 12px; }
+.proto-sample-icon { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--surface-subtle); color: var(--muted); }
 .proto-samples img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
 .proto-gen { flex: 1; display: flex; min-height: 0; }
 .proto-gen-tabs { width: 92px; border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; gap: 4px; padding: 10px 8px; }

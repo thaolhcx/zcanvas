@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRight,
+  AudioLines,
   Check,
   ChevronDown,
   Aperture,
@@ -22,9 +23,16 @@ import {
 import type { FieldSpec, GenSource, MediaKind, ModelSpec, NodeSpec, RefItem } from "./types.ts";
 import { compatibleModel, fieldValue, inputProblems, modeAvailability, modelOf, resolveFields, rolesFor } from "./logic.ts";
 import { Popover } from "./Popover.tsx";
-import { FieldChip, GroupChip, SettingsBody } from "./fields.tsx";
+import { FieldChip, GroupChip, KitContext, SettingsBody, VoicePicker } from "./fields.tsx";
 
 export const KIND_ICON: Record<MediaKind, typeof Type> = { text: Type, image: ImageIcon, video: Video, audio: Mic };
+
+/** What the reference slot of a wide composer offers (Lumina: local upload · library · …). */
+export interface SlotSpec {
+  /** Word inside the empty box: "image", "material"… */
+  label: string;
+  actions: { label: string; icon?: typeof Type; run(): void }[];
+}
 
 /**
  * The prompt panel. Same component under a canvas node ("compact"), at the bottom
@@ -32,7 +40,16 @@ export const KIND_ICON: Record<MediaKind, typeof Type> = { text: Type, image: Im
  * Layout follows Lumina: mode tabs · input chips · prompt · chips + settings + model · 1× · ▶.
  * Unlike Lumina there is no billing anywhere: this is an internal tool (quotas may come later).
  */
-export function Composer({ source, layout = "compact" }: { source: GenSource; layout?: "compact" | "wide" | "form" }) {
+export function Composer({
+  source,
+  layout = "compact",
+  slot,
+}: {
+  source: GenSource;
+  layout?: "compact" | "wide" | "form";
+  /** Wide layout: references live in a square slot left of the prompt instead of a chip row. */
+  slot?: SlotSpec;
+}) {
   const { node, value, models } = source;
   const model = modelOf(models, value.model);
   const fields = resolveFields(node, model, value.mode);
@@ -44,6 +61,9 @@ export function Composer({ source, layout = "compact" }: { source: GenSource; la
   const groups = new Map<string, FieldSpec[]>();
   for (const f of fields.inline) if (f.group) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);
   const seen = new Set<string>();
+  const useSlot = layout === "wide" && !!slot;
+  // Seed TTS takes no media: its slot is the voice (Lumina A07 "Voice").
+  const voiceField = fields.all.find((f) => f.type === "voice");
   return (
     <div className={`kit-composer kit-${layout} nodrag nopan nowheel`} onKeyDown={(e) => e.stopPropagation()}>
       <button className="kit-icon kit-expand" onClick={() => setFull(!full)} title={full ? "Collapse" : "Expand"}>
@@ -71,17 +91,34 @@ export function Composer({ source, layout = "compact" }: { source: GenSource; la
           })}
         </div>
       )}
-      <RefTray items={source.inputs} node={node} mode={value.mode} onRemove={source.removeInput} onRole={source.setRole} onAdd={source.addInput} model={model} />
-      <PromptEditor
-        value={value.prompt}
-        placeholder={node.promptPlaceholder}
-        refs={source.inputs}
-        mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
-        full={full}
-        onFull={setFull}
-        onChange={(prompt) => source.setValue({ prompt })}
-        onSubmit={() => !busy && !source.issues.length && source.run()}
-      />
+      {!useSlot && (
+        <RefTray items={source.inputs} node={node} mode={value.mode} onRemove={source.removeInput} onRole={source.setRole} onAdd={source.addInput} model={model} />
+      )}
+      <div className="kit-body">
+        {useSlot && (
+          <RefTray
+            variant="slot"
+            slot={slot}
+            items={source.inputs}
+            node={node}
+            mode={value.mode}
+            onRemove={source.removeInput}
+            onRole={source.setRole}
+            model={model}
+            voice={voiceField && !Object.keys(model.accepts).length ? { value: String(values(voiceField) ?? ""), onChange: (v) => source.setParam(voiceField.key, v) } : undefined}
+          />
+        )}
+        <PromptEditor
+          value={value.prompt}
+          placeholder={node.promptPlaceholder}
+          refs={source.inputs}
+          mention={{ ...node.mentions, roleLabel: (k) => node.roles?.find((r) => r.key === k)?.label }}
+          full={full}
+          onFull={setFull}
+          onChange={(prompt) => source.setValue({ prompt })}
+          onSubmit={() => !busy && !source.issues.length && source.run()}
+        />
+      </div>
       <div className="kit-footer">
         <div className="kit-chips">
           {/* Intent first: outcome chips (size, duration, count…) lead; the model is the last, smallest chip. */}
@@ -391,6 +428,9 @@ export function RefTray({
   onRole,
   onAdd,
   model,
+  variant = "chips",
+  slot,
+  voice,
 }: {
   items: RefItem[];
   node?: NodeSpec;
@@ -399,7 +439,13 @@ export function RefTray({
   onRole?: (id: string, role: string) => void;
   onAdd?: () => void;
   model?: ModelSpec;
+  /** chips = a row of input chips (node); slot = one square box left of the prompt (space). */
+  variant?: "chips" | "slot";
+  slot?: SlotSpec;
+  /** Slot shows the voice instead of media (TTS). */
+  voice?: { value: string; onChange: (id: string) => void };
 }) {
+  if (variant === "slot") return <RefSlot items={items} node={node} mode={mode} onRemove={onRemove} onRole={onRole} model={model} slot={slot} voice={voice} />;
   if (!items.length && !onAdd) return null;
   const problems = model ? inputProblems(model, items) : [];
   const roleLabel = (key?: string) => node?.roles?.find((r) => r.key === key)?.label;
@@ -463,6 +509,96 @@ export function RefTray({
       )}
       {problems.length > 0 && <span className="kit-ref-warn">{problems[0]}</span>}
     </div>
+  );
+}
+
+/**
+ * Lumina's square reference box: empty → "+ image"; filled → stacked thumbnails with "+N".
+ * Clicking opens the actions (upload, library…) and, when filled, the same role chips as a node.
+ */
+function RefSlot({
+  items,
+  node,
+  mode,
+  onRemove,
+  onRole,
+  model,
+  slot,
+  voice,
+}: {
+  items: RefItem[];
+  node?: NodeSpec;
+  mode?: string;
+  onRemove: (id: string) => void;
+  onRole?: (id: string, role: string) => void;
+  model?: ModelSpec;
+  slot?: SlotSpec;
+  voice?: { value: string; onChange: (id: string) => void };
+}) {
+  const { voices } = useContext(KitContext);
+  if (voice) {
+    const v = voices.find((x) => x.id === voice.value);
+    return (
+      <Popover
+        width={560}
+        trigger={(open, toggle) => (
+          <button className={`kit-slot voice ${open ? "open" : ""}`} onClick={toggle} title="Pick a voice">
+            {v ? <i className="kit-slot-avatar" style={{ background: `hsl(${v.hue} 60% 55%)` }} /> : <AudioLines size={18} />}
+            <span>{v?.name ?? "Voice"}</span>
+          </button>
+        )}
+      >
+        <VoicePicker value={voice.value} onChange={voice.onChange} />
+      </Popover>
+    );
+  }
+  const problems = model ? inputProblems(model, items) : [];
+  return (
+    <Popover
+      width={items.length ? 300 : 190}
+      trigger={(open, toggle) =>
+        items.length ? (
+          <button className={`kit-slot filled ${open ? "open" : ""} ${problems.length ? "warn" : ""}`} onClick={toggle} title={problems[0] ?? items.map((r) => r.label).join(", ")}>
+            {items.slice(0, 3).map((r, i) => {
+              const Icon = KIND_ICON[r.kind];
+              return (
+                <span key={r.id} className="kit-slot-card" style={{ transform: `translate(${i * 6}px, ${i * -4}px) rotate(${(i - 1) * 6}deg)`, zIndex: 3 - i }}>
+                  {r.thumb ? <img src={r.thumb} alt="" /> : <Icon size={18} />}
+                </span>
+              );
+            })}
+            {items.length > 1 && <b className="kit-slot-count">+{items.length - 1}</b>}
+          </button>
+        ) : (
+          <button className={`kit-slot ${open ? "open" : ""}`} onClick={toggle}>
+            <Plus size={16} />
+            <span>{slot?.label ?? "reference"}</span>
+          </button>
+        )
+      }
+    >
+      {(close) => (
+        <div className="kit-slot-pop">
+          {items.length > 0 && <RefTray items={items} node={node} mode={mode} onRemove={onRemove} onRole={onRole} model={model} />}
+          <div className="kit-menu kit-menu-icons">
+            {slot?.actions.map((a) => {
+              const Icon = a.icon ?? Plus;
+              return (
+                <button
+                  key={a.label}
+                  onClick={() => {
+                    close();
+                    a.run();
+                  }}
+                >
+                  <Icon size={13} /> {a.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Popover>
   );
 }
 

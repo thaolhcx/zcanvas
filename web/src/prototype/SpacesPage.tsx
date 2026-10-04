@@ -1,15 +1,16 @@
 // Spaces: one generation page per media kind (Lumina /model/image, /video, /audio), plus Text.
 // Each space is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Composer } from "../kit/Composer.tsx";
+import { Composer, KIND_ICON, type SlotSpec } from "../kit/Composer.tsx";
 import { FeedCard } from "../kit/results.tsx";
 import { modelOf } from "../kit/logic.ts";
-import type { Output } from "../kit/types.ts";
+import type { MediaKind, Output, RefItem } from "../kit/types.ts";
 import { useGenSource } from "./adapter.ts";
 import { NODES } from "./catalog.ts";
 import { useProto } from "./store.ts";
 import { TYPE_ICON } from "./nodes.tsx";
-import { SAMPLES, upload } from "./actions.ts";
+import { MEDIA_LIBRARY, SAMPLES, upload } from "./actions.ts";
+import { Clapperboard, FolderOpen, Upload, UserSquare } from "lucide-react";
 import { useLightbox } from "./lightbox.ts";
 
 export const TABS = ["image", "video", "audio", "text"] as const;
@@ -58,9 +59,24 @@ export function SpacesPage() {
   );
 }
 
+const SLOT_LABEL: Record<MediaKind, string> = { image: "image", video: "material", audio: "material", text: "file" };
+let fileSeq = 1;
+
+/** Stand-in for the asset library: sample images plus a few clips and tracks. */
+function library(kinds: MediaKind[]): RefItem[] {
+  const media = (["video", "audio"] as const).flatMap((k) =>
+    MEDIA_LIBRARY[k].map((f) => {
+      const o = f.make();
+      return { id: `lib_${f.name}`, kind: k, label: f.name.replace(/\.[^.]+$/, ""), thumb: o.poster, aspect: o.width && o.height ? o.width / o.height : undefined };
+    }),
+  );
+  return [...SAMPLES, ...media].filter((r) => kinds.includes(r.kind));
+}
+
 function GenFeed({ id }: { id: string }) {
   const [picking, setPicking] = useState(false);
   const composer = useRef<HTMLDivElement>(null);
+  const file = useRef<HTMLInputElement>(null);
   const addInput = useCallback(() => setPicking(true), []);
   const source = useGenSource(id, { addInput });
   const open = useLightbox((s) => s.open);
@@ -70,6 +86,24 @@ function GenFeed({ id }: { id: string }) {
   // Lumina: oldest at the top, newest just above the composer; runs in flight come last.
   const entries = [...source.history].reverse();
   const jobs = source.jobs ?? [];
+  const accepts = source.node.accepts.filter((k): k is Exclude<MediaKind, "text"> => k !== "text");
+  const soon = (what: string) => () => api.toast(`${what} is not in this prototype.`, "info");
+  // Lumina's material menu: local upload · library; Video adds Portrait Gallery and Director's Desk.
+  const slot: SlotSpec | undefined = accepts.length
+    ? {
+        label: SLOT_LABEL[source.node.output],
+        actions: [
+          { label: "Upload", icon: Upload, run: () => file.current?.click() },
+          { label: "From library", icon: FolderOpen, run: () => setPicking(true) },
+          ...(source.node.output === "video"
+            ? [
+                { label: "Portrait Gallery", icon: UserSquare, run: soon("Portrait Gallery") },
+                { label: "Director's Desk", icon: Clapperboard, run: soon("Director's Desk") },
+              ]
+            : []),
+        ],
+      }
+    : undefined;
   const download = (o: Output) => {
     const a = document.createElement("a");
     a.href = o.url ?? "";
@@ -114,30 +148,52 @@ function GenFeed({ id }: { id: string }) {
         )}
       </section>
       <div className="proto-gen-composer" ref={composer}>
-        <Composer source={source} layout="wide" />
+        <Composer source={source} layout="wide" slot={slot} />
       </div>
+      <input
+        ref={file}
+        type="file"
+        hidden
+        multiple
+        accept={accepts.map((k) => `${k}/*`).join(",")}
+        onChange={(e) => {
+          for (const f of e.target.files ?? []) {
+            const kind = accepts.find((k) => f.type.startsWith(k));
+            if (!kind) {
+              api.toast(`${f.name}: this space doesn't take that file.`, "warn");
+              continue;
+            }
+            const url = URL.createObjectURL(f);
+            api.addUpload(id, { id: `file_${fileSeq++}`, kind, label: f.name.replace(/\.[^.]+$/, ""), thumb: kind === "image" ? url : undefined });
+          }
+          e.target.value = "";
+        }}
+      />
       {picking && (
         <div className="proto-modal" onMouseDown={() => setPicking(false)}>
           <div className="proto-modal-card proto-picker" onMouseDown={(e) => e.stopPropagation()}>
             <header>
-              <b>Add a reference</b>
+              <b>From library</b>
               <button className="kit-link" onClick={() => setPicking(false)}>
                 Close
               </button>
             </header>
             <div className="proto-samples">
-              {SAMPLES.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    api.addUpload(id, upload(s));
-                    setPicking(false);
-                  }}
-                >
-                  <img src={s.thumb} alt="" />
-                  <span>{s.label}</span>
-                </button>
-              ))}
+              {library(accepts).map((s) => {
+                const Icon = KIND_ICON[s.kind];
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      api.addUpload(id, upload(s));
+                      setPicking(false);
+                    }}
+                  >
+                    {s.thumb ? <img src={s.thumb} alt="" /> : <span className="proto-sample-icon"><Icon size={22} /></span>}
+                    <span>{s.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
