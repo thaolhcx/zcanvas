@@ -159,7 +159,7 @@ function GenFeed({ id, history, onHistory }: { id: string; history: boolean; onH
         )}
       </section>
       <div className="proto-gen-composer" ref={composer}>
-        <Composer source={source} layout="wide" slot={slot} />
+        <Composer source={source} layout="wide" slot={slot} parallel />
       </div>
       <input
         ref={file}

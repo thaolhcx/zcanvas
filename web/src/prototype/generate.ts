@@ -20,7 +20,8 @@ export function hashText(text: string) {
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-export function imageUrl(prompt: string, seed: number, ratio: number, tag = "") {
+/** `video`: a poster under player controls (time bottom-left, mute top-right), so no caption bar or tag. */
+export function imageUrl(prompt: string, seed: number, ratio: number, tag = "", video = false) {
   const r = rand(seed);
   const w = 640,
     h = Math.round(w / ratio);
@@ -35,9 +36,9 @@ export function imageUrl(prompt: string, seed: number, ratio: number, tag = "") 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},65%,32%)"/><stop offset="1" stop-color="hsl(${(hue + 70) % 360},70%,62%)"/></linearGradient></defs>
 <rect width="100%" height="100%" fill="url(#g)"/>${shapes}
-<rect x="0" y="${h - 56}" width="${w}" height="56" fill="rgba(0,0,0,.35)"/>
-<text x="20" y="${h - 22}" font-family="system-ui" font-size="20" fill="white">${words}</text>
-${tag ? `<text x="${w - 20}" y="34" text-anchor="end" font-family="system-ui" font-size="18" font-weight="700" fill="white">${esc(tag)}</text>` : ""}
+${video ? "" : `<rect x="0" y="${h - 56}" width="${w}" height="56" fill="rgba(0,0,0,.35)"/>
+<text x="20" y="${h - 22}" font-family="system-ui" font-size="20" fill="white">${words}</text>`}
+${tag && !video ? `<text x="${w - 20}" y="34" text-anchor="end" font-family="system-ui" font-size="18" font-weight="700" fill="white">${esc(tag)}</text>` : ""}
 </svg>`;
   return { url: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg), width: w, height: h };
 }
@@ -168,7 +169,7 @@ export function generateOutputs(
   if (kind === "video") {
     const firstImage = inputs.find((i) => i.kind === "image");
     const ratio = value.params.ratio && value.params.ratio !== "adaptive" ? aspectOf(value, 16 / 9) : firstImage ? 1 : 16 / 9;
-    const poster = imageUrl(prompt, seed, ratio, `▶ ${value.mode ?? ""}`);
+    const poster = imageUrl(prompt, seed, ratio, "", true);
     return [{ kind, url: poster.url, poster: poster.url, width: poster.width, height: poster.height, durationSec: Number(value.params.duration ?? 5) }];
   }
   // Seed TTS (voice param) speaks; reference/image modes of Seed Audio come out as music-like clips.

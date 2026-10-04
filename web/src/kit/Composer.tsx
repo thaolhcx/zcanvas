@@ -44,17 +44,20 @@ export function Composer({
   source,
   layout = "compact",
   slot,
+  parallel = false,
 }: {
   source: GenSource;
   layout?: "compact" | "wide" | "form";
   /** Wide layout: references live in a square slot left of the prompt instead of a chip row. */
   slot?: SlotSpec;
+  /** Runs don't block the composer: each run has its own card with Stop (space feed), so ▶ stays ▶. */
+  parallel?: boolean;
 }) {
   const { node, value, models } = source;
   const model = modelOf(models, value.model);
   const fields = resolveFields(node, model, value.mode);
   const availability = modeAvailability(node, model, source.inputs);
-  const busy = source.status.state === "queued" || source.status.state === "running";
+  const busy = !parallel && (source.status.state === "queued" || source.status.state === "running");
   const [full, setFull] = useState(false);
   const values = (f: FieldSpec) => fieldValue(f, value.params);
   // Inline fields: ungrouped ones get their own chip, grouped ones share one.
@@ -139,7 +142,23 @@ export function Composer({
       </div>
       <div className="kit-footer">
         <div className="kit-chips">
-          {/* Intent first: outcome chips (size, duration, count…) lead; the model is the last, smallest chip. */}
+          {/* Model first (feedback #30): what runs, then what it makes (size, duration, count…), then Advanced. */}
+          {layout !== "form" && !node.paramsInModel && (
+            <ModelPicker
+              models={node.listByMode && value.mode ? models.filter((m) => m.modes.includes(value.mode!) || m.key === model.key) : models}
+              value={model.key}
+              auto={value.auto === true}
+              inputs={source.inputs}
+              onChange={(key) => {
+                source.setValue({ auto: false });
+                source.changeModel(key);
+              }}
+              onAuto={() => {
+                source.setValue({ auto: true });
+                source.changeModel(compatibleModel(models, source.inputs)?.key ?? node.defaultModel);
+              }}
+            />
+          )}
           {layout !== "form" && node.paramsInModel && (
             <ModelParams
               source={source}
@@ -183,22 +202,6 @@ export function Composer({
               </div>
               <SettingsBody fields={fields.advanced} values={values} onChange={(k, v) => source.setParam(k, v)} />
             </Popover>
-          )}
-          {layout !== "form" && !node.paramsInModel && (
-            <ModelPicker
-              models={node.listByMode && value.mode ? models.filter((m) => m.modes.includes(value.mode!) || m.key === model.key) : models}
-              value={model.key}
-              auto={value.auto === true}
-              inputs={source.inputs}
-              onChange={(key) => {
-                source.setValue({ auto: false });
-                source.changeModel(key);
-              }}
-              onAuto={() => {
-                source.setValue({ auto: true });
-                source.changeModel(compatibleModel(models, source.inputs)?.key ?? node.defaultModel);
-              }}
-            />
           )}
         </div>
         <div className="kit-run">
@@ -301,7 +304,6 @@ export function ModelPicker({
   return (
     <Popover
       width={280}
-      align="end"
       trigger={(open, toggle) => (
         <button className={`kit-chip kit-model ${auto ? "auto" : ""} ${open ? "open" : ""}`} onClick={toggle} title={auto ? `Auto: ${current.title}` : current.title}>
           {Mark ? <Mark size={13} /> : <span className="kit-model-dot" />}
@@ -394,15 +396,20 @@ function ModelParams({
   const preset = fields.find((f) => f.key === "preset");
   const own = fields.filter((f) => node.fields.includes(f) && f !== preset);
   const params = fields.filter((f) => !node.fields.includes(f));
-  const presetLabel = preset?.options?.find((o) => o.value === values(preset))?.label ?? "Custom";
+  const presetValue = preset ? values(preset) : undefined;
+  const presetLabel = preset?.options?.find((o) => o.value === presetValue)?.label ?? "Custom";
   const auto = source.value.auto === true;
+  // The chip names the model; a preset shows only once one is picked ("Custom" alone said nothing).
+  const picked = !!presetValue && presetValue !== "custom";
   return (
     <Popover
       width={340}
       trigger={(open, toggle) => (
         <button className={`kit-chip kit-model ${open ? "open" : ""}`} onClick={toggle} title={`${presetLabel} · ${auto ? "Auto: " : ""}${model.title}`}>
           <span className="kit-model-dot" />
-          {preset ? presetLabel : model.title}
+          {auto && <em>Auto ·</em>}
+          {model.title}
+          {picked && <span className="kit-chip-sub">· {presetLabel}</span>}
           <ChevronDown size={13} />
         </button>
       )}
