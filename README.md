@@ -43,7 +43,7 @@ pnpm exec playwright install chromium
 pnpm e2e
 ```
 
-`pnpm test` reproduces the supplied 20 contract tests, checks the template contract and every built-in template, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres (with pgvector), pg-boss, the local storage adapter and ffmpeg. Set `S3_TEST_ENDPOINT` to also run the storage contract against MinIO. `pnpm bench:catalog`, `pnpm bench:storage` and `EMBEDDING_PROVIDER=local pnpm search:eval` record the asset evidence in `docs/evidence/`. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in the local database.
+`pnpm test` reproduces the supplied 20 contract tests, checks the template contract and every built-in template, then runs Vitest integration tests against real Yjs, Hocuspocus, Postgres (with pgvector), pg-boss, the local storage adapter and ffmpeg. Set `S3_TEST_ENDPOINT` to also run the storage contract against MinIO. `pnpm bench:catalog`, `pnpm bench:storage` and `EMBEDDING_PROVIDER=local pnpm search:eval` record the asset evidence in `docs/evidence/`. `pnpm e2e` builds the production frontend and starts the API, runner and preview server. Tests use mock workers. Vitest uses its own database, `zcanvas_test` on the same server (`TEST_DATABASE_URL` overrides it), created on first run, so `pnpm test` can run while `pnpm dev` is up. API integration tests create isolated canvas/run IDs; they retain run and asset evidence in that database.
 
 For a persistent production preview:
 

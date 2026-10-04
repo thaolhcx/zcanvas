@@ -1,4 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { setTimeout as sleep } from "node:timers/promises";
 import sharp from "sharp";
 import { db } from "../db.ts";
@@ -20,6 +24,64 @@ const delay = () => Number(process.env.MOCK_DELAY_MS ?? 200);
 const videoDelay = () => Number(process.env.MOCK_VIDEO_MS ?? delay() * 3);
 const fixture = (name: string) =>
   readFile(new URL(`../../../fixtures/${name}`, import.meta.url));
+/** Width × height for a "W:H" ratio with the long side at `long`, even numbers (video codecs). */
+function frame(ratio: unknown, long: number) {
+  const [w, h] = String(ratio ?? "")
+    .split(":")
+    .map(Number);
+  if (!(w > 0 && h > 0)) return undefined;
+  const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+  return w >= h
+    ? { width: even(long), height: even((long * h) / w) }
+    : { width: even((long * w) / h), height: even(long) };
+}
+/** The portrait fixture cut to the asked ratio, so layouts look right on mocks. */
+async function mockImage(ratio: unknown) {
+  const size = frame(ratio, 1024);
+  const bytes = await fixture("portrait.png");
+  return size
+    ? new Uint8Array(
+        await sharp(bytes)
+          .resize({ ...size, fit: "cover" })
+          .png()
+          .toBuffer(),
+      )
+    : bytes;
+}
+const clips = new Map<string, Promise<Uint8Array>>();
+/** The clip fixture cut to the asked ratio (ffmpeg, cached per ratio). */
+function mockClip(ratio: unknown) {
+  const size = frame(ratio, 640);
+  if (!size) return fixture("clip.mp4").then((b) => new Uint8Array(b));
+  const key = `${size.width}x${size.height}`;
+  let clip = clips.get(key);
+  if (!clip) {
+    clip = (async () => {
+      const dir = await mkdtemp(join(tmpdir(), "zcanvas-mock-"));
+      try {
+        await writeFile(join(dir, "in.mp4"), await fixture("clip.mp4"));
+        await promisify(execFile)("ffmpeg", [
+          "-v",
+          "error",
+          "-y",
+          "-i",
+          join(dir, "in.mp4"),
+          "-vf",
+          `scale=${size.width}:${size.height}:force_original_aspect_ratio=increase,crop=${size.width}:${size.height}`,
+          "-c:a",
+          "copy",
+          join(dir, "out.mp4"),
+        ]);
+        return new Uint8Array(await readFile(join(dir, "out.mp4")));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    })();
+    clip.catch(() => clips.delete(key));
+    clips.set(key, clip);
+  }
+  return clip;
+}
 const blob = (bytes: Uint8Array, type: string) =>
   new Blob([new Uint8Array(bytes)], { type });
 async function failed(request: GenRequest) {
@@ -105,7 +167,7 @@ export const mockAdapter: ProviderAdapter = {
     else {
       const count =
         request.task === "image" ? Number(request.params.count ?? 1) : 1;
-      let bytes: Uint8Array = await fixture("portrait.png");
+      let bytes: Uint8Array = await mockImage(request.params.ratio);
       const source = request.refs.find(
         (r) => r.role === "source" || r.role === "image",
       );
@@ -166,7 +228,7 @@ export const mockAdapter: ProviderAdapter = {
       outputs: [
         {
           type: "file",
-          file: blob(await fixture("clip.mp4"), "video/mp4"),
+          file: blob(await mockClip(task.request.params.ratio), "video/mp4"),
           meta: {
             kind: "video",
             provider: { name: "mock", model: `mock:${task.request.model.key}` },

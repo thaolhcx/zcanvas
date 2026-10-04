@@ -818,4 +818,63 @@ describe("through the queue", () => {
     ).jobs.find((j) => j.nodeId === "i")!;
     expect(second.finalPrompt).toBe(second.intent);
   });
+  it("Auto prompt for speech may fix punctuation but never change the words", async () => {
+    setAdapterForTests(new BytePlusAdapter(() => env()));
+    const audio = await fixture("voice.wav");
+    let rewrite = "";
+    on("POST", /chat\/completions$/, () =>
+      ok({ choices: [{ message: { content: rewrite } }] }),
+    );
+    on("POST", /tts\/create$/, () => ok({ audio: audio.toString("base64") }));
+    const canvasId = (
+      await app.inject({
+        method: "POST",
+        url: "/canvases",
+        payload: { name: "Speech" },
+      })
+    ).json().canvasId;
+    const speak = async (intent: string) => {
+      const recipe: Recipe = {
+        schema: "recipe/v1",
+        meta: { id: canvasId, name: "s", version: 1, registryVersion: "x" },
+        nodes: [
+          {
+            id: "s",
+            type: "audio.generate",
+            typeVersion: 2,
+            position: { x: 0, y: 0 },
+            params: { model: "auto", prompt: intent },
+          },
+        ],
+        edges: [],
+        groups: [],
+      };
+      const run = (
+        await app.inject({
+          method: "POST",
+          url: "/runs",
+          payload: { recipe, canvasId, graphVersion: 1, target: "s" },
+        })
+      ).json<Run>();
+      const done = await until(async () => {
+        const r = (await app.inject(`/runs/${run.runId}`)).json<Run>();
+        return r.status !== "running" && r;
+      }, 20000);
+      return done.jobs.find((j) => j.nodeId === "s")!;
+    };
+    const id = crypto.randomUUID();
+    // Only punctuation changed: the rewrite is used.
+    rewrite = `Mornings… made slower, ${id}!`;
+    expect((await speak(`mornings made slower ${id}`)).finalPrompt).toBe(
+      rewrite,
+    );
+    // A word changed: the voice reads the script as typed.
+    rewrite = `Mornings made quieter, ${id}.`;
+    const changed = await speak(`Mornings made slower again ${id}`);
+    expect(changed.finalPrompt).toBe(changed.intent);
+    const tts = calls.filter((c) => /tts\/create/.test(c.url)).at(-1)!;
+    expect(JSON.stringify(tts.body)).toContain(
+      `Mornings made slower again ${id}`,
+    );
+  });
 });

@@ -560,7 +560,7 @@ function ModelParams({
         >
           <span className="kit-model-dot" />
           {auto && <em>Auto ·</em>}
-          {model.title}
+          <span className="kit-model-title">{model.title}</span>
           {picked && <span className="kit-chip-sub">· {presetLabel}</span>}
           <ChevronDown size={13} />
         </button>

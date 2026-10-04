@@ -551,8 +551,23 @@ async function autoPrompt(
   const kept = promptRefs(intent).every((r) =>
     text.includes(`(${r.scheme}:${r.id})`),
   );
+  // Speech reads the script: a rewrite may only change punctuation and spacing.
+  if (kind === "audio" && !sameWords(intent, text)) return undefined;
   return kept && text ? text : undefined;
 }
+/** The words of a script, ignoring case, punctuation and spacing (an @ token counts as one word). */
+const words = (text: string) =>
+  text
+    .replace(/@\[[^\]]*\]\([^)]*\)/g, (token) => ` ${token} `)
+    .split(/\s+/)
+    .map((w) =>
+      w.startsWith("@[")
+        ? w
+        : w.toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, ""),
+    )
+    .filter(Boolean);
+export const sameWords = (a: string, b: string) =>
+  words(a).join(" ") === words(b).join(" ");
 
 // ---------------------------------------------------------------- gen-submit
 export async function submitJob(jobId: string) {

@@ -18,7 +18,7 @@ import type { MediaKind, ModelSpec, Output, RunJob } from "../kit/types.ts";
 import { HistoryDock } from "./HistoryDock.tsx";
 import { RunDetail } from "./RunDetail.tsx";
 import { useDetail } from "./detail.ts";
-import { attachAssets, useStudioSource } from "./source.ts";
+import { attachAssets, fitMode, useStudioSource } from "./source.ts";
 import { assetFileUrl, useStudio } from "./store.ts";
 import "../kit/kit.css";
 import "./studio.css";
@@ -150,6 +150,19 @@ function GenFeed({
   }, [kind]);
   const addInput = useCallback(() => setPicking(true), []);
   const source = useStudioSource(kind, { addInput });
+  // A saved draft can sit in a mode that needs a file it no longer has (First & last frame
+  // without an image): move it to the mode that fits, or Run stays disabled.
+  const staleMode = (() => {
+    const needs = source?.node.modes?.find(
+      (m) => m.value === source.value.mode,
+    )?.needs;
+    return source && needs && !source.inputs.some((i) => i.kind === needs)
+      ? fitMode(source.node, source.inputs)
+      : undefined;
+  })();
+  useEffect(() => {
+    if (staleMode) source?.setValue({ mode: staleMode });
+  }, [staleMode, source]);
   // Newest is at the bottom: open scrolled down, and follow when a card is added (a new job or a
   // finished run), not when one is deleted or older ones load.
   const runCount = source?.history.length ?? 0,

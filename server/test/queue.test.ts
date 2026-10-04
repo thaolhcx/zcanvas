@@ -607,3 +607,25 @@ describe("Studio pages and node history", () => {
     expect(entry).toMatchObject({ replaced: true, status: "failed" });
   });
 });
+describe("mock media", () => {
+  it("follows the asked ratio, so layouts look right on mocks (#25 review)", async () => {
+    const sharp = (await import("sharp")).default;
+    const base = { jobId: "j", runId: "r", nodeId: "n", prompt: "x", refs: [] };
+    const image = await mockAdapter.submit(
+      {
+        ...base,
+        task: "image",
+        model: modelByKey("seedream-5-pro")!,
+        params: { ratio: "16:9", count: 1 },
+      },
+      async () => new Uint8Array(),
+      AbortSignal.timeout(10000),
+    );
+    if (image.type !== "done" || image.outputs[0].type !== "file")
+      throw new Error("no image");
+    const { width, height } = await sharp(
+      Buffer.from(await image.outputs[0].file.arrayBuffer()),
+    ).metadata();
+    expect(width! / height!).toBeCloseTo(16 / 9, 1);
+  });
+});

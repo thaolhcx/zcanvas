@@ -703,3 +703,9 @@
   color: var(--accent);
   border-color: var(--accent);
 }
+/* No chips (Text): the table follows the heading without a second line. */
+.studio-detail-info h4 + .studio-detail-table {
+  margin-top: 0;
+  padding-top: 2px;
+  border-top: 0;
+}

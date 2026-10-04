@@ -103,6 +103,9 @@ export function RunDetail() {
   const out = entry?.outputs[index] ?? entry?.outputs[0];
   const asset = h?.outputs.find((a) => a.id === out?.assetId);
   const media = entry?.refs.filter((r) => r.kind !== "text") ?? [];
+  const hasChips = Boolean(
+    (spec?.modes && entry?.value.mode) || params?.inline.length || media.length,
+  );
   const studioKind = h && kindOfType(h.node.type);
   const where =
     item && h
@@ -197,42 +200,46 @@ export function RunDetail() {
                   </>
                 )}
               <h4>Parameter</h4>
-              <div className="studio-detail-chips">
-                {spec.modes && entry.value.mode && (
-                  <span>
-                    {
-                      spec.modes.find((m) => m.value === entry.value.mode)
-                        ?.label
-                    }
-                  </span>
-                )}
-                {params.inline.map((r) => (
-                  <span key={r.key} title={r.label}>
-                    {r.text}
-                  </span>
-                ))}
-                {media.length > 0 && (
-                  <span title={media.map((r) => r.label).join(", ")}>
-                    {media
-                      .slice(0, 3)
-                      .map(
-                        (r) =>
-                          r.thumb && <img key={r.id} src={r.thumb} alt="" />,
-                      )}
-                    {media.length === 1
-                      ? media[0].label
-                      : `${media.length} references`}
-                  </span>
-                )}
-              </div>
-              <dl className="studio-detail-table">
-                {params.advanced.map((r) => (
-                  <div key={r.key}>
-                    <dt>{r.label}</dt>
-                    <dd>{r.text}</dd>
-                  </div>
-                ))}
-              </dl>
+              {hasChips && (
+                <div className="studio-detail-chips">
+                  {spec.modes && entry.value.mode && (
+                    <span>
+                      {
+                        spec.modes.find((m) => m.value === entry.value.mode)
+                          ?.label
+                      }
+                    </span>
+                  )}
+                  {params.inline.map((r) => (
+                    <span key={r.key} title={r.label}>
+                      {r.text}
+                    </span>
+                  ))}
+                  {media.length > 0 && (
+                    <span title={media.map((r) => r.label).join(", ")}>
+                      {media
+                        .slice(0, 3)
+                        .map(
+                          (r) =>
+                            r.thumb && <img key={r.id} src={r.thumb} alt="" />,
+                        )}
+                      {media.length === 1
+                        ? media[0].label
+                        : `${media.length} references`}
+                    </span>
+                  )}
+                </div>
+              )}
+              {params.advanced.length > 0 && (
+                <dl className="studio-detail-table">
+                  {params.advanced.map((r) => (
+                    <div key={r.key}>
+                      <dt>{r.label}</dt>
+                      <dd>{r.text}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               <small className="studio-detail-when">
                 Generated on {stamp(entry.at)} · {where}
               </small>

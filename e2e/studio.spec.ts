@@ -191,6 +191,19 @@ test("video: ETA while running, Stop while queued at the provider", async ({
   });
 });
 
+test("video: a draft left in First & last frame without an image falls back and runs", async ({
+  page,
+}) => {
+  await resetStudio(page, "video", { mode: "frames" });
+  await page.goto("/studio/video");
+  await expect(
+    page.getByRole("tab", { name: "Text to video" }),
+  ).toHaveAttribute("aria-selected", "true");
+  const text = `Fallback ${Date.now()}`;
+  await run(page, text);
+  await expect(card(page, text)).toHaveCount(1);
+});
+
 test("video: a run finishes with a playable result", async ({ page }) => {
   await resetStudio(page, "video");
   await page.goto("/studio/video");
