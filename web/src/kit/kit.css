@@ -234,7 +234,7 @@
 .kit-strip button:hover { background: var(--hover) !important; }
 .kit-strip button:disabled { opacity: .3; }
 
-/* ---------- Gen page feed ---------- */
+/* ---------- Space feed ---------- */
 .kit-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .kit-card.active { border-color: var(--accent); }
 .kit-card header time { font-size: 11px; color: var(--muted); }

@@ -1,5 +1,5 @@
 // Shared node UI kit types. Nothing here knows about React Flow, the Graph or a store:
-// every place that shows a node (canvas, Gen page, app form) adapts its data to GenSource.
+// every place that shows a node (canvas, space, app form) adapts its data to GenSource.
 export type MediaKind = "text" | "image" | "video" | "audio";
 
 export interface Option {

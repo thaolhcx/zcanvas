@@ -26,7 +26,7 @@ export interface ProtoNode {
   history: RunEntry[];
   active?: { entryId: string; index: number };
   status: GenStatus;
-  /** Gen page: references picked from files instead of edges. */
+  /** Space: references picked from files instead of edges. */
   uploads: RefItem[];
   sticky?: { text: string; color: string };
   /** Result-only media node (Lumina BAFileLoad: uploads, grid slices). No prompt panel. */

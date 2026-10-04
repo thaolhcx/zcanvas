@@ -1,4 +1,5 @@
-// The same kit on a standalone generation page: a feed of runs and a wide composer.
+// Spaces: one generation page per media kind (Lumina /model/image, /video, /audio), plus Text.
+// Each space is a hidden node `page:<kind>` in the prototype store; its feed is that node's history.
 import { useCallback, useEffect, useState } from "react";
 import { Composer } from "../kit/Composer.tsx";
 import { RunCard, StatusOverlay } from "../kit/results.tsx";
@@ -10,12 +11,29 @@ import { TYPE_ICON } from "./nodes.tsx";
 import { SAMPLES, upload } from "./actions.ts";
 import { useLightbox } from "./lightbox.ts";
 
-const TABS = ["image", "video", "audio", "text"] as const;
+export const TABS = ["image", "video", "audio", "text"] as const;
 const TAB_LABEL = { image: "Image", video: "Video", audio: "Audio", text: "Text" };
-type Tab = (typeof TABS)[number];
+export type Tab = (typeof TABS)[number];
 
-export function GenPage() {
-  const [tab, setTab] = useState<Tab>("image");
+const readTab = (): Tab => {
+  try {
+    const t = localStorage.getItem("proto.space");
+    return TABS.includes(t as Tab) ? (t as Tab) : "image";
+  } catch {
+    return "image";
+  }
+};
+
+export function SpacesPage() {
+  const [tab, setTabState] = useState<Tab>(readTab);
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    try {
+      localStorage.setItem("proto.space", t);
+    } catch {
+      /* private mode: the tab is just not remembered */
+    }
+  };
   const id = `page:${tab}`;
   const exists = useProto((s) => !!s.nodes[id]);
   useEffect(() => {
@@ -78,8 +96,7 @@ function GenFeed({ id }: { id: string }) {
         ))}
         {!busy && !source.history.length && (
           <div className="proto-feed-empty">
-            <h2>{source.node.title}</h2>
-            <p>Same Composer as on the canvas, wide layout. References come from files instead of edges.</p>
+            <h2>Light up your creation</h2>
           </div>
         )}
       </section>

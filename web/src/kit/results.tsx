@@ -269,7 +269,7 @@ export function RunStrip({
   );
 }
 
-/** Feed card used on the Gen page: one per run. */
+/** Feed card used in a space: one per run. */
 export function RunCard({
   entry,
   kind,

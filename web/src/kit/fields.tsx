@@ -4,7 +4,7 @@ import type { FieldSpec, VoiceOption } from "./types.ts";
 import { Popover } from "./Popover.tsx";
 import { CameraChip, type CameraValue } from "./camera.tsx";
 
-/** Catalog data supplied by the host (canvas, Gen page…). */
+/** Catalog data supplied by the host (canvas, spaces…). */
 export const KitContext = createContext<{
   voices: VoiceOption[];
   /** Scene chips for the voice library; defaults to the voices' own scenes. */

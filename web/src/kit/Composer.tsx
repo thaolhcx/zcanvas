@@ -28,7 +28,7 @@ export const KIND_ICON: Record<MediaKind, typeof Type> = { text: Type, image: Im
 
 /**
  * The prompt panel. Same component under a canvas node ("compact"), at the bottom
- * of a Gen page ("wide") and in an app form ("form"); only the GenSource differs.
+ * of a space ("wide") and in an app form ("form"); only the GenSource differs.
  * Layout follows Lumina: mode tabs · input chips · prompt · chips + settings + model · 1× · ▶.
  * Unlike Lumina there is no billing anywhere: this is an internal tool (quotas may come later).
  */

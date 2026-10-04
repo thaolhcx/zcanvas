@@ -7,7 +7,7 @@ import { KitContext } from "../kit/fields.tsx";
 import { Lightbox } from "../kit/results.tsx";
 import type { RunEntry } from "../kit/types.ts";
 import { CanvasProto } from "./CanvasProto.tsx";
-import { GenPage } from "./GenPage.tsx";
+import { SpacesPage } from "./SpacesPage.tsx";
 import { NODES, VOICE_SCENES, VOICES } from "./catalog.ts";
 import { audioClip, generateOutputs, imageUrl } from "./generate.ts";
 import { inputsOf, useProto, type ProtoType } from "./store.ts";
@@ -135,18 +135,22 @@ function RunningPill() {
 }
 
 function App() {
-  const [view, setView] = useState<"canvas" | "gen">("canvas");
+  const [view, setView] = useState<"canvas" | "spaces">(() => (location.hash === "#spaces" ? "spaces" : "canvas"));
   const lightbox = useLightbox();
+  const go = (v: "canvas" | "spaces") => {
+    setView(v);
+    history.replaceState(null, "", v === "spaces" ? "#spaces" : location.pathname);
+  };
   return (
     <KitContext.Provider value={{ voices: VOICES, scenes: VOICE_SCENES, previewVoice }}>
       <header className="proto-top">
         <b>zcanvas · node prototype</b>
         <div className="kit-seg">
-          <button className={view === "canvas" ? "active" : ""} onClick={() => setView("canvas")}>
+          <button className={view === "canvas" ? "active" : ""} onClick={() => go("canvas")}>
             <LayoutGrid size={14} /> Canvas
           </button>
-          <button className={view === "gen" ? "active" : ""} onClick={() => setView("gen")}>
-            <Sparkles size={14} /> Gen page
+          <button className={view === "spaces" ? "active" : ""} onClick={() => go("spaces")}>
+            <Sparkles size={14} /> Spaces
           </button>
         </div>
         <RunningPill />
@@ -154,7 +158,7 @@ function App() {
           <RotateCcw size={13} /> Reset
         </button>
       </header>
-      <ReactFlowProvider>{view === "canvas" ? <CanvasProto /> : <GenPage />}</ReactFlowProvider>
+      <ReactFlowProvider>{view === "canvas" ? <CanvasProto /> : <SpacesPage />}</ReactFlowProvider>
       <Toasts />
       <Lightbox output={lightbox.output} onClose={lightbox.close} />
     </KitContext.Provider>
